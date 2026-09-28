@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 
 export function AccordionSection({
   titulo,
@@ -7,7 +8,7 @@ export function AccordionSection({
   children,
 }: {
   titulo: string;
-  icono?: string;
+  icono?: ReactNode;
   abiertoInicial?: boolean;
   children: ReactNode;
 }) {
@@ -20,7 +21,7 @@ export function AccordionSection({
           {icono && <span className="accordion-icon">{icono}</span>}
           {titulo}
         </span>
-        <span className={`accordion-chevron ${abierto ? "abierto" : ""}`}>▾</span>
+        <ChevronDown size={18} className={`accordion-chevron ${abierto ? "abierto" : ""}`} />
       </button>
       {abierto && <div className="accordion-body">{children}</div>}
     </div>

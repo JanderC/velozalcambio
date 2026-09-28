@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { TrendingUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { getTrmColombia, type TrmColombiaData } from "../../api/tasas.api";
 
@@ -106,7 +107,7 @@ export function TrmColombiaPanel() {
           </ResponsiveContainer>
         ) : (
           <p className="trm-panel-building">
-            📈 Construyendo el histórico propio desde hoy — volvé mañana y ya vas a ver la curva empezar a moverse.
+            <TrendingUp size={16} className="icono-inline" /> Construyendo el histórico propio desde hoy — volvé mañana y ya vas a ver la curva empezar a moverse.
           </p>
         )}
       </div>

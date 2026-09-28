@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ArrowDownToLine, ArrowUpFromLine, Check, CircleCheck, ClipboardList, Hourglass, UserPlus } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
@@ -7,6 +8,7 @@ import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
 import { getCotizacionesDetalle, type CotizacionDetalle } from "../../api/tasas.api";
 import { registrarCambioDivisa } from "../../api/transacciones.api";
 import { ApiError } from "../../api/client";
+import { ClienteRapidoForm } from "./ClienteRapidoForm";
 import "./nuevaTransaccion.css";
 
 type Direccion = "COMPRA_DIVISA" | "VENTA_DIVISA";
@@ -33,6 +35,9 @@ export function NuevaTransaccionPage() {
   const [busqueda, setBusqueda] = useState("");
   const [resultadosCliente, setResultadosCliente] = useState<Tercero[]>([]);
   const [cliente, setCliente] = useState<Tercero | null>(null);
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [busquedaResuelta, setBusquedaResuelta] = useState("");
+  const [creandoCliente, setCreandoCliente] = useState(false);
 
   // Paso 2: dirección, divisa, monto
   const [direccion, setDireccion] = useState<Direccion | null>(null);
@@ -65,10 +70,32 @@ export function NuevaTransaccionPage() {
   }, []);
 
   useEffect(() => {
-    if (busqueda.trim().length < 2) { setResultadosCliente([]); return; }
-    const t = setTimeout(() => buscarTerceros(busqueda.trim()).then(setResultadosCliente), 300);
-    return () => clearTimeout(t);
+    const termino = busqueda.trim();
+    if (termino.length < 2) { setResultadosCliente([]); setBusquedaResuelta(""); return; }
+    let vigente = true;
+    setBuscandoCliente(true);
+    const t = setTimeout(() => {
+      buscarTerceros(termino)
+        .then((r) => { if (vigente) setResultadosCliente(r); })
+        .catch(() => { if (vigente) setResultadosCliente([]); })
+        .finally(() => {
+          if (!vigente) return;
+          setBuscandoCliente(false);
+          setBusquedaResuelta(termino);
+        });
+    }, 300);
+    return () => { vigente = false; clearTimeout(t); };
   }, [busqueda]);
+
+  function clienteCreado(nuevo: Tercero) {
+    setCliente(nuevo);
+    setCreandoCliente(false);
+    setResultadosCliente([]);
+    setPaso(2);
+  }
+
+  const busquedaSinResultados =
+    !buscandoCliente && busquedaResuelta !== "" && busquedaResuelta === busqueda.trim() && resultadosCliente.length === 0;
 
   const monedaExtranjeraCodigo = monedas.find((m) => m.id === monedaExtranjeraId)?.codigo;
   const tipoCotizacion = direccion === "COMPRA_DIVISA" ? "COMPRA" : "VENTA";
@@ -133,6 +160,7 @@ export function NuevaTransaccionPage() {
     setResultado(null);
     setCliente(null);
     setBusqueda("");
+    setCreandoCliente(false);
     setDireccion(null);
     setMonedaExtranjeraId("");
     setCantidad("");
@@ -159,7 +187,7 @@ export function NuevaTransaccionPage() {
             {PASOS.map((p, i) => (
               <div key={p.n} style={{ display: "flex", alignItems: "center", flex: i < PASOS.length - 1 ? 1 : undefined }}>
                 <div className={`nt-step ${paso === p.n ? "activo" : ""} ${paso > p.n ? "completo" : ""}`}>
-                  <div className="nt-step-circle">{paso > p.n ? "✓" : p.n}</div>
+                  <div className="nt-step-circle">{paso > p.n ? <Check size={16} strokeWidth={3} /> : p.n}</div>
                   <span className="nt-step-label">{p.label}</span>
                 </div>
                 {i < PASOS.length - 1 && <div className={`nt-step-linea ${paso > p.n ? "completa" : ""}`} />}
@@ -172,24 +200,44 @@ export function NuevaTransaccionPage() {
               {paso === 1 && (
                 <>
                   <h2>¿Quién es el cliente?</h2>
-                  <p className="nt-form-panel-sub">Buscalo por nombre o identificación.</p>
+                  <p className="nt-form-panel-sub">Buscalo por nombre o identificación. Si no existe, lo creás acá mismo.</p>
                   {cliente ? (
                     <div className="nt-cliente-seleccionado">
                       <span><strong>{cliente.nombre}</strong> — {cliente.identificacion ?? "sin identificación"}</span>
                       <button onClick={() => setCliente(null)}>Cambiar</button>
                     </div>
+                  ) : creandoCliente ? (
+                    <ClienteRapidoForm
+                      textoBuscado={busqueda}
+                      onCreado={clienteCreado}
+                      onCancelar={() => setCreandoCliente(false)}
+                    />
                   ) : (
                     <div className="nt-cliente-buscador">
                       <input placeholder="Nombre o identificación..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} autoFocus />
+                      {buscandoCliente && <p className="nt-cliente-hint">Buscando…</p>}
                       {resultadosCliente.length > 0 && (
                         <ul className="nt-cliente-lista">
                           {resultadosCliente.map((t) => (
-                            <li key={t.id} onClick={() => { setCliente(t); setResultadosCliente([]); }}>
+                            <li key={t.id} onClick={() => { setCliente(t); setResultadosCliente([]); setPaso(2); }}>
                               <span>{t.nombre}</span>
                               <span style={{ color: "#9ca3af" }}>{t.identificacion ?? ""}</span>
                             </li>
                           ))}
                         </ul>
+                      )}
+                      {busquedaSinResultados && (
+                        <div className="nt-cliente-vacio">
+                          <span>No encontramos a "{busqueda.trim()}".</span>
+                          <button className="nt-cliente-nuevo-btn" onClick={() => setCreandoCliente(true)}>
+                            <UserPlus size={16} /> Crear cliente nuevo
+                          </button>
+                        </div>
+                      )}
+                      {!busquedaSinResultados && (
+                        <button className="nt-cliente-nuevo-link" onClick={() => setCreandoCliente(true)}>
+                          <UserPlus size={14} /> ¿No está? Crear cliente nuevo
+                        </button>
                       )}
                     </div>
                   )}
@@ -202,12 +250,12 @@ export function NuevaTransaccionPage() {
                   <p className="nt-form-panel-sub">Elegí la dirección, la divisa y la cantidad.</p>
                   <div className="nt-direccion-cards">
                     <div className={`nt-direccion-card ${direccion === "COMPRA_DIVISA" ? "activa" : ""}`} onClick={() => setDireccion("COMPRA_DIVISA")}>
-                      <div className="nt-direccion-icono">📥</div>
+                      <div className="nt-direccion-icono"><ArrowDownToLine size={34} /></div>
                       <div className="nt-direccion-titulo">Le compramos</div>
                       <div className="nt-direccion-sub">El cliente entrega divisa</div>
                     </div>
                     <div className={`nt-direccion-card ${direccion === "VENTA_DIVISA" ? "activa" : ""}`} onClick={() => setDireccion("VENTA_DIVISA")}>
-                      <div className="nt-direccion-icono">📤</div>
+                      <div className="nt-direccion-icono"><ArrowUpFromLine size={34} /></div>
                       <div className="nt-direccion-titulo">Le vendemos</div>
                       <div className="nt-direccion-sub">El cliente entrega pesos</div>
                     </div>
@@ -304,7 +352,7 @@ export function NuevaTransaccionPage() {
                   <p className="nt-form-panel-sub">Revisá el resumen a la derecha. Si todo está bien, confirmá.</p>
                   {error && <p className="nt-error">{error}</p>}
                   <button className="nt-btn-confirmar" onClick={confirmar} disabled={enviando}>
-                    {enviando ? "Registrando…" : "✅ Confirmar y registrar"}
+                    {enviando ? "Registrando…" : <><CircleCheck size={18} /> Confirmar y registrar</>}
                   </button>
                 </>
               )}
@@ -328,7 +376,7 @@ export function NuevaTransaccionPage() {
 
             <div className="nt-resumen">
               <div className="nt-resumen-card">
-                <div className="nt-resumen-titulo">📋 Resumen de la operación</div>
+                <div className="nt-resumen-titulo"><ClipboardList size={16} /> Resumen de la operación</div>
 
                 <div className="nt-resumen-fila">
                   <span className="nt-resumen-fila-label">Cliente</span>
@@ -379,7 +427,7 @@ export function NuevaTransaccionPage() {
         <div className="nt-layout">
           <div className="nt-form-panel" style={{ flex: 1 }}>
             <div className="nt-exito">
-              <div className="nt-exito-icono">{resultado.requiereConfirmacion ? "⏳" : "✅"}</div>
+              <div className="nt-exito-icono">{resultado.requiereConfirmacion ? <Hourglass size={56} /> : <CircleCheck size={56} />}</div>
               <h2>{resultado.requiereConfirmacion ? "Solicitud registrada" : "Operación confirmada"}</h2>
               <p>
                 {resultado.requiereConfirmacion

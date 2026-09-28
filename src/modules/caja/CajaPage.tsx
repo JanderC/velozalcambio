@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Search } from "lucide-react";
 import { buscarTerceros, obtenerResumenTercero, type Tercero, type ResumenTercero } from "../../api/terceros.api";
 import { ClienteForm } from "../clientes/ClienteForm";
 import { ClienteAccionesPanel } from "./ClienteAccionesPanel";
@@ -74,7 +75,7 @@ const [tipoDocumento, setTipoDocumento] = useState<string>(TIPOS_DOCUMENTO[0]);
       </div>
 
       {!clienteSeleccionado && (
-  <AccordionSection titulo="Búsqueda de Clientes" icono="🔍">
+  <AccordionSection titulo="Búsqueda de Clientes" icono={<Search size={18} />}>
     <div className="busqueda-documento">
       <label>
         Tipo de Documento

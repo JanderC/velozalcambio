@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { AccordionSection } from "../../components/common/AccordionSection";
 import {
@@ -60,7 +61,7 @@ export function CuentasPorPagarPage() {
       </div>
 
       {mostrarForm && (
-        <AccordionSection titulo="Nueva cuenta por pagar" icono="➕">
+        <AccordionSection titulo="Nueva cuenta por pagar" icono={<Plus size={18} />}>
           <CuentaForm onGuardar={handleCrear} onCancelar={() => setMostrarForm(false)} />
         </AccordionSection>
       )}

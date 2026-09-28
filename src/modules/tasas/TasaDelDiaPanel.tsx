@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { ArrowDownToLine, ArrowUpFromLine, Globe, Lightbulb, TriangleAlert } from "lucide-react";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { getCotizacionesDetalle, registrarCotizacionDetalle, getTrmColombia, type CotizacionDetalle } from "../../api/tasas.api";
 import { ApiError } from "../../api/client";
@@ -79,13 +80,13 @@ export function TasaDelDiaPanel() {
       </div>
 
       <div className="tasa-dia-bloques">
-        <BloqueDireccion titulo="📥 Nosotros te compramos" subtitulo="Recibimos" agrupado={compramos} tono="compra" />
-        <BloqueDireccion titulo="📤 Nosotros te vendemos" subtitulo="Entregamos" agrupado={vendemos} tono="venta" />
+        <BloqueDireccion titulo="Nosotros te compramos" icono={<ArrowDownToLine size={18} className="icono-inline" />} subtitulo="Recibimos" agrupado={compramos} tono="compra" />
+        <BloqueDireccion titulo="Nosotros te vendemos" icono={<ArrowUpFromLine size={18} className="icono-inline" />} subtitulo="Entregamos" agrupado={vendemos} tono="venta" />
       </div>
 
       {giros.length > 0 && (
         <div className="tasa-dia-giros">
-          <span className="tasa-dia-giros-titulo">🌐 Giros y Transferencias Internacionales</span>
+          <span className="tasa-dia-giros-titulo"><Globe size={16} className="icono-inline" /> Giros y Transferencias Internacionales</span>
           <div className="tasa-dia-giros-lista">
             {giros.map((l) => (
               <div className="tasa-dia-giro-item" key={l.id}>
@@ -101,7 +102,7 @@ export function TasaDelDiaPanel() {
 
       {lineas.length === 0 && <p className="tasa-dia-vacio">Todavía no hay cotizaciones registradas hoy.</p>}
 
-      <span className="tasa-dia-disclaimer">⚠️ Tasas sujetas a cambios sin previo aviso.</span>
+      <span className="tasa-dia-disclaimer"><TriangleAlert size={14} className="icono-inline" /> Tasas sujetas a cambios sin previo aviso.</span>
 
       <form className="tasa-dia-form" onSubmit={handleSubmit}>
         <div className="tasa-dia-form-row">
@@ -152,7 +153,7 @@ export function TasaDelDiaPanel() {
 
         {mostrarSugerencia && trmActual != null && (
           <div className="tasa-dia-sugerencia">
-            <span>💡 TRM de hoy: <strong>${trmActual.toLocaleString("es-CO")}</strong> — sugerencia de compra (TRM menos margen):</span>
+            <span><Lightbulb size={15} className="icono-inline" /> TRM de hoy: <strong>${trmActual.toLocaleString("es-CO")}</strong> — sugerencia de compra (TRM menos margen):</span>
             <div className="tasa-dia-sugerencia-botones">
               {MARGENES_SUGERIDOS.map((m) => {
                 const sugerido = trmActual * (1 - m / 100);
@@ -186,11 +187,13 @@ function agruparPorMoneda(lineas: CotizacionDetalle[]) {
 
 function BloqueDireccion({
   titulo,
+  icono,
   subtitulo,
   agrupado,
   tono,
 }: {
   titulo: string;
+  icono: ReactNode;
   subtitulo: string;
   agrupado: Record<string, CotizacionDetalle[]>;
   tono: "compra" | "venta";
@@ -201,7 +204,7 @@ function BloqueDireccion({
   return (
     <div className={`tasa-dia-direccion tasa-dia-direccion-${tono}`}>
       <div className="tasa-dia-direccion-header">
-        <span className="tasa-dia-direccion-titulo">{titulo}</span>
+        <span className="tasa-dia-direccion-titulo">{icono} {titulo}</span>
         <span className="tasa-dia-direccion-subtitulo">{subtitulo}</span>
       </div>
       {entradas.map(([codigo, items]) => (

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
@@ -115,10 +116,10 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
     <form className="operacion-form" onSubmit={handleSubmit}>
       <div className="operacion-tipo-toggle">
         <button type="button" className={tipo === "COMPRA_DIVISA" ? "activo" : ""} onClick={() => { setTipo("COMPRA_DIVISA"); setCotizacionSeleccionadaId(""); }}>
-          📥 Le compramos al cliente
+          <ArrowDownToLine size={16} className="icono-inline" /> Le compramos al cliente
         </button>
         <button type="button" className={tipo === "VENTA_DIVISA" ? "activo" : ""} onClick={() => { setTipo("VENTA_DIVISA"); setCotizacionSeleccionadaId(""); }}>
-          📤 Le vendemos al cliente
+          <ArrowUpFromLine size={16} className="icono-inline" /> Le vendemos al cliente
         </button>
       </div>
 

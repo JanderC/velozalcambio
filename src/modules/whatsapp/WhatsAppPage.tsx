@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { CircleCheck, Construction, Lightbulb, Smartphone, TriangleAlert } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import {
   getEstadoWhatsapp,
@@ -90,10 +91,19 @@ export function WhatsAppPage() {
         <p>Recibí solicitudes de cambio y capta clientes nuevos directo desde WhatsApp.</p>
       </div>
 
+      <div className="wa-desarrollo">
+        <Construction size={20} />
+        <div>
+          <strong>Módulo en desarrollo.</strong> Falta integrar WhatsApp Business API (Cloud API oficial de Meta).
+          Mientras tanto, esta pantalla funciona con la conexión provisional descrita abajo.
+        </div>
+      </div>
+
       <div className="wa-aviso">
-        ⚠️ Esta conexión usa un método no oficial (no es la API empresarial de Meta). Es rápida de activar, pero el número
+        <TriangleAlert size={18} />
+        <span>Esta conexión usa un método no oficial (no es la API empresarial de Meta). Es rápida de activar, pero el número
         puede ser desconectado por WhatsApp sin aviso previo. Para producción a mayor escala, se recomienda migrar a
-        WhatsApp Business Cloud API.
+        WhatsApp Business Cloud API.</span>
       </div>
 
       <div className="wa-explicacion">
@@ -117,7 +127,7 @@ export function WhatsAppPage() {
             {estado?.estado === "ESPERANDO_QR" && estado.qr ? (
               <img src={estado.qr} alt="Código QR de WhatsApp" />
             ) : estado?.estado === "CONECTADO" ? (
-              <span className="wa-qr-vacio">✅ Ya está conectado, no hace falta escanear nada.</span>
+              <span className="wa-qr-vacio wa-qr-conectado"><CircleCheck size={18} /> Ya está conectado, no hace falta escanear nada.</span>
             ) : (
               <span className="wa-qr-vacio">Presioná "Iniciar" para generar el código QR.</span>
             )}
@@ -125,7 +135,7 @@ export function WhatsAppPage() {
 
           {estado?.estado !== "CONECTADO" && (
             <button className="wa-btn-iniciar" onClick={handleIniciar}>
-              📲 Iniciar sesión de WhatsApp
+              <Smartphone size={18} /> Iniciar sesión de WhatsApp
             </button>
           )}
         </div>
@@ -160,7 +170,7 @@ export function WhatsAppPage() {
               <div className="wa-mensaje-texto">"{m.mensaje}"</div>
               {m.monto_detectado && (
                 <div className="wa-mensaje-detectado">
-                  💡 Detectado: {Number(m.monto_detectado).toLocaleString("es-CO")} {m.moneda_codigo}
+                  <Lightbulb size={15} /> Detectado: {Number(m.monto_detectado).toLocaleString("es-CO")} {m.moneda_codigo}
                 </div>
               )}
               <div className="wa-mensaje-acciones">

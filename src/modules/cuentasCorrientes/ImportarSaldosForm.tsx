@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { FileSpreadsheet } from "lucide-react";
 import { importarSaldosIniciales } from "../../api/cuentasCorrientes.api";
 import { ApiError } from "../../api/client";
 
@@ -32,7 +33,7 @@ export function ImportarSaldosForm({ onImportado }: { onImportado: () => void })
     <div>
       <input ref={inputRef} type="file" accept=".xlsx" style={{ display: "none" }} onChange={handleChange} />
       <button className="cc-import-btn" onClick={() => inputRef.current?.click()} disabled={enviando}>
-        {enviando ? "Importando…" : "📤 Importar saldos iniciales (Excel)"}
+        {enviando ? "Importando…" : <><FileSpreadsheet size={16} className="icono-inline" /> Importar saldos iniciales (Excel)</>}
       </button>
 
       {error && <p className="cc-form-error">{error}</p>}

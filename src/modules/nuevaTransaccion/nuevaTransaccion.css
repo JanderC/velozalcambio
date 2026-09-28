@@ -118,3 +118,32 @@
   .nt-resumen { position: static; width: 100%; }
   .nt-direccion-cards { grid-template-columns: 1fr; }
 }
+/* ---------- Alta rápida de cliente (paso 1) ---------- */
+.nt-cliente-hint { font-family: "Inter", sans-serif; font-size: 0.82rem; color: #9ca3af; margin: 8px 0 0; }
+.nt-cliente-vacio {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 12px; padding: 14px 16px; background: #fff8e6; border: 1px dashed var(--color-gold-dark); border-radius: 8px;
+  font-family: "Inter", sans-serif; font-size: 0.9rem; color: #8a6d1f;
+}
+.nt-cliente-vacio .nt-cliente-nuevo-btn { margin-top: 0; }
+.nt-cliente-nuevo-btn { display: inline-flex; align-items: center; gap: 8px; }
+.nt-cliente-nuevo-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; background: none; border: none; padding: 0;
+  color: var(--color-navy); font-family: "Inter", sans-serif; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.nt-cliente-nuevo-link:hover { text-decoration: underline; }
+.nt-cliente-rapido { border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; background: #fafbfc; }
+.nt-cliente-rapido-titulo {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+  font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--color-navy-dark);
+}
+.nt-cliente-rapido-acciones { display: flex; justify-content: space-between; gap: 12px; }
+
+@media (max-width: 720px) {
+  .nt-fila-dos { flex-direction: column; gap: 0; }
+}
+
+/* Íconos lucide dentro de textos y botones */
+.nt-resumen-titulo, .nt-btn-confirmar { display: inline-flex; align-items: center; gap: 8px; }
+.nt-resumen-titulo { display: flex; }
+.nt-exito-icono { color: var(--color-navy); }

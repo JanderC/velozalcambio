@@ -50,3 +50,13 @@
 .wa-btn-convertir { background: #1a7f37; color: white; }
 .wa-btn-descartar { background: transparent; border: 1px solid #d7dbe2 !important; color: #6b7280; }
 .wa-bandeja-vacio { color: #6b7280; font-family: "Inter", sans-serif; }
+.wa-aviso { display: flex; gap: 10px; align-items: flex-start; }
+.wa-aviso svg { flex-shrink: 0; margin-top: 1px; }
+.wa-desarrollo {
+  margin: 0 40px 12px; display: flex; gap: 12px; align-items: flex-start;
+  background: #eaf1f8; border: 1px solid var(--color-navy); border-left: 4px solid var(--color-navy); border-radius: 8px;
+  padding: 14px 18px; font-family: "Inter", sans-serif; font-size: 0.88rem; color: var(--color-navy-dark);
+}
+.wa-desarrollo svg { flex-shrink: 0; color: var(--color-navy); margin-top: 1px; }
+.wa-qr-conectado { display: inline-flex; align-items: center; gap: 8px; color: #1a7f37; }
+.wa-btn-iniciar, .wa-mensaje-detectado { display: inline-flex; align-items: center; gap: 8px; }

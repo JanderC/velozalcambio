@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CreditCard, FileText, Settings, User } from "lucide-react";
 import type { ResumenTercero, CuentaCorriente } from "../../api/terceros.api";
 import { cambiarEstadoCuentaCorriente } from "../../api/cuentasCorrientes.api";
 import { getSolicitudesPorCliente, type Solicitud } from "../../api/transacciones.api";
@@ -34,7 +35,7 @@ export function ClienteAccionesPanel({
 
   return (
     <div className="cliente-panel">
-      <AccordionSection titulo={`C.I.: ${tercero.identificacion ?? "sin identificación"}`} icono="👤">
+      <AccordionSection titulo={`C.I.: ${tercero.identificacion ?? "sin identificación"}`} icono={<User size={18} />}>
         <dl className="cliente-datos">
           <dt>Nombre</dt>
           <dd>{tercero.nombre}</dd>
@@ -52,7 +53,7 @@ export function ClienteAccionesPanel({
         </button>
       </AccordionSection>
 
-      <AccordionSection titulo="Seguimiento de Solicitudes" icono="📝">
+      <AccordionSection titulo="Seguimiento de Solicitudes" icono={<FileText size={18} />}>
         {solicitudes === null && <p className="cliente-panel-vacio">Cargando…</p>}
         {solicitudes?.length === 0 && <p className="cliente-panel-vacio">Este cliente no tiene solicitudes pendientes.</p>}
         {solicitudes && solicitudes.length > 0 && (
@@ -81,7 +82,7 @@ export function ClienteAccionesPanel({
         )}
       </AccordionSection>
 
-      <AccordionSection titulo="Opciones del Cliente" icono="⚙️">
+      <AccordionSection titulo="Opciones del Cliente" icono={<Settings size={18} />}>
         <div className="opciones-botones">
           <button className="btn-opcion btn-opcion-dorado" onClick={() => setMostrarPagos((v) => !v)}>
             Gestión de Pagos
@@ -94,7 +95,7 @@ export function ClienteAccionesPanel({
         )}
       </AccordionSection>
 
-      <AccordionSection titulo="Cuentas del Cliente" icono="💳">
+      <AccordionSection titulo="Cuentas del Cliente" icono={<CreditCard size={18} />}>
         <div className="opciones-botones">
           <button className="btn-opcion" onClick={() => setVistaCuentas(vistaCuentas === "disponibles" ? null : "disponibles")}>
             Cuentas Disponibles ({cuentas.disponibles.length})

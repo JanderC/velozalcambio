@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { AccordionSection } from "../../components/common/AccordionSection";
 import { getTransacciones, type Transaccion } from "../../api/transacciones.api";
@@ -66,7 +67,7 @@ export function TransaccionesPage() {
         <p>Historial completo de operaciones cambiarias.</p>
       </div>
 
-      <AccordionSection titulo="Filtros" icono="🔍">
+      <AccordionSection titulo="Filtros" icono={<Search size={18} />}>
         <div className="filtros-grid">
           <label>
             Desde
