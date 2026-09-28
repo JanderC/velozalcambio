@@ -10,6 +10,8 @@ import { TransaccionesPage } from "../modules/transacciones/TransaccionesPage";
 import { CuentasPorCobrarPagarPage } from "../modules/cuentasPorCobrarPagar/CuentasPorCobrarPagarPage";
 import { CuentasCorrientesPage } from "../modules/cuentasCorrientes/CuentasCorrientesPage";
 import { TasasPage } from "../modules/tasas/TasasPage";
+import { RegistroTasasPage } from "../modules/tasas/RegistroTasasPage";
+import { ROLES_REGISTRO_TASAS } from "../modules/tasas/tasas.roles";
 import { CierreCajaPage } from "../modules/cierreCaja/CierreCajaPage";
 import { ReportesPage } from "../modules/reportes/ReportesPage";
 import { UsuariosPage } from "../modules/usuarios/UsuariosPage";
@@ -33,6 +35,9 @@ export function AppRoutes() {
         <Route path="/reportes" element={<ReportesPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />
+        <Route element={<RequireRole roles={ROLES_REGISTRO_TASAS} />}>
+          <Route path="/tasas/registro" element={<RegistroTasasPage />} />
+        </Route>
         <Route element={<RequireRole roles={["ADMIN"]} />}>
         <Route path="/nueva-transaccion" element={<NuevaTransaccionPage />} />
         <Route path="/usuarios" element={<UsuariosPage />} />

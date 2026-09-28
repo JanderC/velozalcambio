@@ -3,23 +3,12 @@
 .tasas-header h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
 .tasas-header p { font-family: "Inter", sans-serif; color: #5b6472; margin: 0; }
 
-.tasas-layout { display: flex; gap: 20px; padding: 16px 40px 40px; flex-wrap: wrap; align-items: flex-start; }
-
 .tasas-hoy { flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .tasa-card { background: var(--color-navy); color: white; border-radius: 8px; padding: 16px; }
 .tasa-card-par { font-family: "Inter", sans-serif; font-size: 0.8rem; opacity: 0.8; margin-bottom: 6px; }
 .tasa-card-valor { font-family: "Space Grotesk", sans-serif; font-size: 1.3rem; font-weight: 700; color: var(--color-gold); }
 .tasa-card-fecha { font-family: "Inter", sans-serif; font-size: 0.72rem; opacity: 0.65; margin-top: 6px; }
 
-.tasas-form-panel { flex: 1; min-width: 300px; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
-.tasas-form-panel h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 14px; font-size: 1rem; }
-.tasas-form { display: flex; flex-direction: column; gap: 12px; font-family: "Inter", sans-serif; }
-.tasas-form-row { display: flex; gap: 10px; }
-.tasas-form-row label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: #374151; flex: 1; }
-.tasas-form select, .tasas-form input { padding: 8px; border: 1px solid #d7dbe2; border-radius: 4px; }
-.tasas-form-error { color: #c0392b; font-size: 0.85rem; margin: 0; }
-.tasas-form-exito { color: #1a7f37; font-size: 0.85rem; margin: 0; }
-.tasas-form button[type="submit"] { background: var(--color-navy); color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: 600; }
 
 .tasas-historial { padding: 0 40px 40px; }
 .tasas-historial h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 12px; font-size: 1rem; }
@@ -126,51 +115,123 @@
 .trm-panel-chart { margin-top: 16px; position: relative; }
 .trm-panel-building { font-family: "Inter", sans-serif; font-size: 0.82rem; color: rgba(255,255,255,0.55); text-align: center; padding: 30px 0; margin: 0; }
 
-/* ---------- Tasa del Día (broadcast style) ---------- */
+/* ---------- Tasa del Día (tablero, colores de marca) ---------- */
 .tasa-dia-panel {
-  margin: 8px 40px 20px; border-radius: 14px; overflow: hidden;
-  background: linear-gradient(160deg, #0d1f0f 0%, #071309 100%);
-  border: 1px solid rgba(139, 224, 69, 0.25);
-  padding: 24px 28px;
+  position: relative; overflow: hidden;
+  margin: 8px 40px 20px; border-radius: 14px; padding: 24px 28px;
+  background: linear-gradient(160deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
+  border: 1px solid rgba(244,215,81,0.2);
   color: white;
+  box-shadow: 0 10px 30px -8px rgba(11,14,19,0.45);
 }
-.tasa-dia-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.tasa-dia-eyebrow { font-family: "Inter", sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #8be045; }
+.tasa-dia-panel::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(115deg, rgba(244,215,81,0.04) 0px, rgba(244,215,81,0.04) 1.5px, transparent 1.5px, transparent 24px);
+}
+.tasa-dia-panel > * { position: relative; }
+.tasa-dia-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--color-gold); }
+.tasa-dia-eyebrow { font-family: "Inter", sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-gold); }
 .tasa-dia-titulo h2 { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 1.5rem; margin: 4px 0 0; }
-.tasa-dia-fecha { font-family: "Inter", sans-serif; font-size: 0.8rem; color: rgba(255,255,255,0.5); }
+.tasa-dia-fecha { font-family: "Inter", sans-serif; font-size: 0.8rem; color: rgba(255,255,255,0.55); }
 
-.tasa-dia-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.tasa-dia-moneda-bloque { background: rgba(139, 224, 69, 0.06); border: 1px solid rgba(139, 224, 69, 0.2); border-radius: 10px; padding: 14px; }
-.tasa-dia-moneda-nombre { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: #8be045; font-size: 0.85rem; display: block; margin-bottom: 10px; }
+.tasa-dia-bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.tasa-dia-direccion { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; }
+.tasa-dia-direccion-compra { border-top: 3px solid var(--color-gold); }
+.tasa-dia-direccion-venta { border-top: 3px solid var(--color-accent-blue); }
+.tasa-dia-direccion-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+.tasa-dia-direccion-titulo { display: inline-flex; align-items: center; gap: 8px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 1rem; }
+.tasa-dia-direccion-compra .tasa-dia-direccion-titulo svg { color: var(--color-gold); }
+.tasa-dia-direccion-venta .tasa-dia-direccion-titulo svg { color: #5cb8ec; }
+.tasa-dia-direccion-subtitulo { font-family: "Inter", sans-serif; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); }
+
+.tasa-dia-monedas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tasa-dia-moneda-bloque { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 12px; }
+.tasa-dia-moneda-nombre { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 0.85rem; display: block; margin-bottom: 8px; letter-spacing: 0.04em; }
+.tasa-dia-direccion-compra .tasa-dia-moneda-nombre { color: var(--color-gold); }
+.tasa-dia-direccion-venta .tasa-dia-moneda-nombre { color: #5cb8ec; }
 .tasa-dia-chips { display: flex; flex-direction: column; gap: 6px; }
-.tasa-dia-chip { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 7px 10px; font-family: "Inter", sans-serif; font-size: 0.85rem; }
+.tasa-dia-chip { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border-radius: 6px; padding: 7px 10px; font-family: "Inter", sans-serif; font-size: 0.85rem; }
 .tasa-dia-chip-etiqueta { color: rgba(255,255,255,0.65); }
-.tasa-dia-chip-valor { font-weight: 700; color: white; }
-.chip-compra .tasa-dia-chip-valor { color: #8be045; }
-.chip-venta .tasa-dia-chip-valor { color: #fbbf24; }
-.tasa-dia-vacio { color: rgba(255,255,255,0.5); font-family: "Inter", sans-serif; grid-column: 1 / -1; }
+.tasa-dia-chip-valor { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: white; font-size: 0.95rem; }
 
-.tasa-dia-form { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 18px; display: flex; flex-direction: column; gap: 12px; font-family: "Inter", sans-serif; }
-.tasa-dia-form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
-.tasa-dia-form-row label { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; color: rgba(255,255,255,0.6); flex: 1; min-width: 130px; }
-.tasa-dia-form select, .tasa-dia-form input[type="text"] {
-  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: white; padding: 8px 10px; font-family: "Inter", sans-serif;
+.tasa-dia-giros { margin-top: 18px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 16px; }
+.tasa-dia-giros-titulo { display: inline-flex; align-items: center; gap: 8px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 0.95rem; margin-bottom: 10px; }
+.tasa-dia-giros-titulo svg { color: var(--color-gold); }
+.tasa-dia-giros-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.tasa-dia-giro-item { display: flex; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px 12px; font-family: "Inter", sans-serif; font-size: 0.85rem; color: rgba(255,255,255,0.75); }
+.tasa-dia-giro-valor { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--color-gold); }
+
+.tasa-dia-vacio { color: rgba(255,255,255,0.55); font-family: "Inter", sans-serif; margin: 4px 0 0; }
+.tasa-dia-disclaimer { display: flex; align-items: center; gap: 6px; margin-top: 16px; font-family: "Inter", sans-serif; font-size: 0.75rem; color: rgba(255,255,255,0.45); }
+
+/* ---------- Encabezado con acción (tablero y registro) ---------- */
+.tasas-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; }
+.tasas-header-accion {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  background: var(--color-gold); color: var(--color-navy-dark); padding: 10px 18px; border-radius: 6px;
+  font-family: "Inter", sans-serif; font-weight: 700; font-size: 0.88rem;
 }
-.tasa-dia-modo { flex-direction: row !important; align-items: center; gap: 6px !important; }
-.tasa-dia-valor-input { min-width: 140px; }
+.tasas-header-accion:hover { background: #e0c23f; }
+.tasas-header-accion.secundaria { background: white; color: var(--color-navy); border: 1px solid var(--color-navy); }
+.tasas-header-accion.secundaria:hover { background: #eaf1f8; }
 
-.tasa-dia-sugerencia { background: rgba(139, 224, 69, 0.08); border: 1px dashed rgba(139, 224, 69, 0.4); border-radius: 8px; padding: 12px 14px; font-size: 0.85rem; }
-.tasa-dia-sugerencia-botones { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-.tasa-dia-sugerencia-botones button {
-  background: rgba(139, 224, 69, 0.15); border: 1px solid rgba(139, 224, 69, 0.4); color: #8be045; padding: 5px 10px;
-  border-radius: 14px; font-size: 0.78rem; cursor: pointer;
+/* ---------- Registro de tasas (/tasas/registro) ---------- */
+.registro-layout { display: flex; gap: 20px; padding: 16px 40px 8px; flex-wrap: wrap; align-items: flex-start; }
+.registro-card { flex: 1; min-width: 320px; background: white; border-radius: 12px; padding: 22px; box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.registro-card-titulo { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
+.registro-card-titulo > svg { color: var(--color-navy); background: #eaf1f8; border-radius: 8px; padding: 7px; box-sizing: content-box; flex-shrink: 0; }
+.registro-card-titulo h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 2px; font-size: 1.05rem; }
+.registro-card-titulo span { font-family: "Inter", sans-serif; font-size: 0.8rem; color: #6b7280; }
+
+.registro-preview { flex: 1.3; min-width: 340px; }
+.registro-preview .tasa-dia-panel { margin: 0; }
+.registro-preview-label { display: block; font-family: "Inter", sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #8a93a3; margin-bottom: 8px; }
+
+.registro-form { display: flex; flex-direction: column; gap: 14px; font-family: "Inter", sans-serif; }
+.registro-fila { display: flex; gap: 14px; flex-wrap: wrap; }
+.registro-fila > .registro-campo { flex: 1; min-width: 160px; }
+.registro-campo { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: #374151; }
+.registro-campo select, .registro-campo input { padding: 10px 12px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: "Inter", sans-serif; font-size: 0.95rem; background: white; }
+.registro-campo select:focus, .registro-campo input:focus { outline: none; border-color: var(--color-gold); }
+
+.registro-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.registro-chips button {
+  background: white; border: 1px solid #d7dbe2; color: #5b6472; padding: 8px 14px; border-radius: 20px; cursor: pointer;
+  font-family: "Inter", sans-serif; font-size: 0.82rem; transition: all 0.15s ease;
 }
-.tasa-dia-sugerencia-botones button:hover { background: rgba(139, 224, 69, 0.3); }
-.tasa-dia-sugerencia-nota { display: block; font-size: 0.72rem; color: rgba(255,255,255,0.4); }
+.registro-chips button:hover { border-color: var(--color-gold); }
+.registro-chips button.activo { background: var(--color-navy); border-color: var(--color-navy); color: white; font-weight: 600; }
 
-.tasa-dia-error { color: #f87171; font-size: 0.82rem; margin: 0; }
-.tasa-dia-guardar { align-self: flex-start; background: #8be045; color: #0d1f0f; border: none; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-weight: 700; }
-.tasa-dia-guardar:disabled { opacity: 0.6; cursor: default; }
+.registro-sugerencia { background: #fff8e6; border: 1px dashed var(--color-gold-dark); border-radius: 8px; padding: 12px 14px; font-size: 0.85rem; color: #5b4a14; }
+.registro-sugerencia-botones { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.registro-sugerencia-botones button {
+  background: white; border: 1px solid var(--color-gold-dark); color: #8a6d1f; padding: 5px 10px;
+  border-radius: 14px; font-size: 0.78rem; cursor: pointer; font-family: "Inter", sans-serif;
+}
+.registro-sugerencia-botones button:hover { background: var(--color-gold); color: var(--color-navy-dark); }
+.registro-sugerencia-nota { display: block; font-size: 0.72rem; color: #8a6d1f; }
+
+.registro-error { color: #c0392b; font-size: 0.85rem; margin: 0; }
+.registro-exito { color: #1a7f37; font-size: 0.85rem; margin: 0; }
+.registro-guardar {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px;
+  background: var(--color-navy); color: white; border: none; padding: 11px 22px; border-radius: 6px; cursor: pointer;
+  font-family: "Inter", sans-serif; font-weight: 700;
+}
+.registro-guardar:hover { background: var(--color-navy-dark); }
+.registro-guardar:disabled { opacity: 0.6; cursor: default; }
+
+.tasas-internas { margin: 8px 40px 40px; }
+.tasas-internas h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 12px; font-size: 1rem; }
+.registro-card .tasas-hoy { min-width: 0; }
+.tasas-historial { padding-top: 16px; }
+.tasas-historial-scroll { overflow-x: auto; }
+
+@media (max-width: 720px) {
+  .tasas-header, .registro-layout, .tasas-historial, .tasas-nav-pills { padding-left: 16px; padding-right: 16px; }
+  .tasa-dia-panel, .trm-panel, .mercado-dashboard, .tasas-externas-panel, .tasas-resumen-strip, .tasas-internas { margin-left: 16px; margin-right: 16px; }
+  .registro-card, .registro-preview { min-width: 0; width: 100%; }
+}
 
 /* ---------- Resumen ejecutivo ---------- */
 .tasas-resumen-strip {

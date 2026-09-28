@@ -11,8 +11,10 @@ import {
   Inbox,
   PlusCircle,
   MessageCircle,
+  PencilLine,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
+import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
 
 // 4 acentos, uno por categoría -- no un color random por tarjeta.
 // El acento vive en el borde y el ícono; el cuerpo de la tarjeta es
@@ -62,12 +64,21 @@ export const MODULOS: ModuloConfig[] = [
   },
   {
     id: "tasas",
-    titulo: "Divisas y Tasas",
-    categoria: "Configuración",
-    acento: ACENTO_CONFIG,
+    titulo: "Tablero de Tasas",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
     icono: Repeat2,
     ruta: "/tasas",
-    rolesPermitidos: ["ADMIN", "ASESOR"],
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO", "OPERADOR"],
+  },
+  {
+    id: "registro-tasas",
+    titulo: "Registro de Tasas",
+    categoria: "Configuración",
+    acento: ACENTO_CONFIG,
+    icono: PencilLine,
+    ruta: "/tasas/registro",
+    rolesPermitidos: ROLES_REGISTRO_TASAS,
   },
   {
     id: "cuentas",
