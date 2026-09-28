@@ -1,0 +1,25 @@
+.usuarios-page { min-height: 100vh; background: #f2f4f7; }
+.usuarios-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 28px 40px 8px; flex-wrap: wrap; gap: 12px; }
+.usuarios-header h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
+.usuarios-header p { font-family: "Inter", sans-serif; color: #5b6472; margin: 0; }
+.usuarios-nuevo-btn { background: var(--color-navy); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 600; }
+
+.usuarios-form { background: white; border-radius: 8px; padding: 20px; margin: 0 40px 20px; max-width: 480px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 12px; font-family: "Inter", sans-serif; }
+.usuarios-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #374151; }
+.usuarios-form input, .usuarios-form select { padding: 9px; border: 1px solid #d7dbe2; border-radius: 4px; }
+.usuarios-form-error { color: #c0392b; font-size: 0.85rem; margin: 0; }
+.usuarios-form-acciones { display: flex; justify-content: flex-end; gap: 10px; }
+.usuarios-form-acciones button[type="button"] { background: transparent; border: 1px solid #d7dbe2; padding: 9px 16px; border-radius: 4px; cursor: pointer; }
+.usuarios-form-acciones button[type="submit"] { background: var(--color-navy); color: white; border: none; padding: 9px 16px; border-radius: 4px; cursor: pointer; }
+
+.usuarios-tabla-wrap { padding: 0 40px 40px; }
+.usuarios-tabla { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; }
+.usuarios-tabla th { text-align: left; font-size: 0.78rem; color: #6b7280; padding: 12px 16px; border-bottom: 2px solid #e5e7eb; }
+.usuarios-tabla td { padding: 12px 16px; border-bottom: 1px solid #f1f2f4; }
+.usuarios-tabla select { padding: 6px 8px; border: 1px solid #d7dbe2; border-radius: 4px; font-family: "Inter", sans-serif; }
+
+.usuario-activo { color: #1a7f37; font-weight: 600; font-size: 0.85rem; }
+.usuario-inactivo { color: #c0392b; font-weight: 600; font-size: 0.85rem; }
+.usuarios-tabla-acciones { display: flex; gap: 6px; }
+.usuarios-tabla-acciones button { background: transparent; border: 1px solid #d7dbe2; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.usuarios-tabla-acciones button:hover { border-color: var(--color-gold-dark); }

@@ -1,0 +1,46 @@
+.reportes-page { min-height: 100vh; background: #f2f4f7; }
+.reportes-header { padding: 28px 40px 8px; }
+.reportes-header h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
+.reportes-header p { font-family: "Inter", sans-serif; color: #5b6472; margin: 0; }
+
+.reportes-tabs { display: flex; gap: 4px; background: var(--color-navy-dark); padding: 0 40px; margin-top: 16px; flex-wrap: wrap; }
+.reportes-tabs button {
+  background: none; border: none; color: rgba(255,255,255,0.7); padding: 12px 18px; cursor: pointer;
+  font-family: "Inter", sans-serif; font-weight: 600; font-size: 0.88rem; border-bottom: 3px solid transparent;
+}
+.reportes-tabs button.activo { color: white; border-bottom-color: var(--color-gold); }
+
+.reportes-body { padding: 24px 40px 40px; }
+.reportes-hint { color: #6b7280; font-family: "Inter", sans-serif; }
+
+/* Capital consolidado */
+.capital-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.capital-card { background: white; border-radius: 8px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; }
+.capital-card h4 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 12px; }
+.capital-linea { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.85rem; color: #5b6472; }
+.capital-neto { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 6px; border-top: 1px solid #f1f2f4; font-weight: 700; }
+.capital-neto-pos { color: #1a7f37; }
+.capital-neto-neg { color: #c0392b; }
+
+/* Filtros compartidos */
+.reportes-filtros { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.reportes-filtros input, .reportes-filtros select { padding: 8px 12px; border: 1px solid #d7dbe2; border-radius: 4px; font-family: "Inter", sans-serif; }
+.reportes-filtros button { background: var(--color-navy); color: white; border: none; padding: 9px 16px; border-radius: 4px; cursor: pointer; font-family: "Inter", sans-serif; }
+
+/* Tablas genéricas de reportes */
+.reportes-tabla { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; }
+.reportes-tabla th { text-align: left; font-size: 0.76rem; color: #6b7280; padding: 10px 14px; border-bottom: 2px solid #e5e7eb; }
+.reportes-tabla td { padding: 10px 14px; border-bottom: 1px solid #f1f2f4; font-size: 0.86rem; }
+
+.tipo-ingreso, .tipo-compra { color: #1a7f37; font-weight: 600; }
+.tipo-egreso, .tipo-venta { color: #c0392b; font-weight: 600; }
+
+/* Estado de cuenta */
+.estado-cuenta-buscador { display: flex; gap: 10px; margin-bottom: 20px; max-width: 420px; }
+.estado-cuenta-buscador input { flex: 1; padding: 9px 12px; border: 1px solid #d7dbe2; border-radius: 4px; font-family: "Inter", sans-serif; }
+.estado-cuenta-resultados { list-style: none; margin: -12px 0 20px; padding: 0; background: white; border: 1px solid #e5e7eb; border-radius: 6px; max-width: 420px; }
+.estado-cuenta-resultados li { padding: 10px 14px; cursor: pointer; font-family: "Inter", sans-serif; font-size: 0.88rem; }
+.estado-cuenta-resultados li:hover { background: #f7f8fa; }
+.estado-cuenta-bloque { background: white; border-radius: 8px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+.estado-cuenta-bloque h4 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
+.estado-cuenta-saldo { font-weight: 700; margin-bottom: 12px; }

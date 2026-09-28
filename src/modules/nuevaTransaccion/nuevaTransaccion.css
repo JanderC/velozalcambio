@@ -1,0 +1,120 @@
+.nt-page { min-height: 100vh; background: #eef0f4; }
+.nt-header { padding: 28px 40px 0; }
+.nt-header h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
+.nt-header p { font-family: "Inter", sans-serif; color: #5b6472; margin: 0 0 20px; }
+
+/* ---------- Stepper ---------- */
+.nt-stepper { display: flex; align-items: center; padding: 0 40px 24px; gap: 4px; }
+.nt-step { display: flex; align-items: center; gap: 10px; }
+.nt-step-circle {
+  width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 0.9rem;
+  background: white; border: 2px solid #d7dbe2; color: #9ca3af; transition: all 0.2s ease; flex-shrink: 0;
+}
+.nt-step.activo .nt-step-circle { border-color: var(--color-navy); background: var(--color-navy); color: white; }
+.nt-step.completo .nt-step-circle { border-color: var(--color-gold-dark); background: var(--color-gold); color: var(--color-navy-dark); }
+.nt-step-label { font-family: "Inter", sans-serif; font-size: 0.82rem; color: #9ca3af; white-space: nowrap; }
+.nt-step.activo .nt-step-label { color: var(--color-navy-dark); font-weight: 600; }
+.nt-step.completo .nt-step-label { color: #5b6472; }
+.nt-step-linea { flex: 1; height: 2px; background: #d7dbe2; margin: 0 8px; min-width: 24px; }
+.nt-step-linea.completa { background: var(--color-gold); }
+
+/* ---------- Layout: form + resumen lateral ---------- */
+.nt-layout { display: flex; gap: 24px; padding: 0 40px 40px; align-items: flex-start; flex-wrap: wrap; }
+.nt-form-panel { flex: 2; min-width: 380px; background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.nt-form-panel h2 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; font-size: 1.2rem; }
+.nt-form-panel-sub { font-family: "Inter", sans-serif; color: #6b7280; font-size: 0.85rem; margin: 0 0 22px; }
+
+/* Resumen tipo recibo, siempre visible */
+.nt-resumen { flex: 1; min-width: 260px; position: sticky; top: 16px; }
+.nt-resumen-card {
+  background: linear-gradient(160deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
+  border-radius: 12px; padding: 22px; color: white; overflow: hidden; position: relative;
+}
+.nt-resumen-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(115deg, rgba(244,215,81,0.04) 0px, rgba(244,215,81,0.04) 1.5px, transparent 1.5px, transparent 24px);
+}
+.nt-resumen-titulo { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 0.95rem; color: var(--color-gold); margin-bottom: 16px; position: relative; }
+.nt-resumen-fila { display: flex; justify-content: space-between; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: "Inter", sans-serif; font-size: 0.85rem; position: relative; gap: 10px; }
+.nt-resumen-fila:last-of-type { border-bottom: none; }
+.nt-resumen-fila-label { color: rgba(255,255,255,0.55); flex-shrink: 0; }
+.nt-resumen-fila-valor { color: white; font-weight: 600; text-align: right; }
+.nt-resumen-fila-vacio { color: rgba(255,255,255,0.3); font-style: italic; font-weight: 400; }
+.nt-resumen-total { margin-top: 14px; padding-top: 14px; border-top: 2px solid var(--color-gold); display: flex; justify-content: space-between; align-items: baseline; position: relative; }
+.nt-resumen-total-label { font-family: "Inter", sans-serif; font-size: 0.8rem; color: rgba(255,255,255,0.6); }
+.nt-resumen-total-valor { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 1.5rem; color: var(--color-gold); }
+.nt-resumen-badge { display: inline-block; margin-top: 12px; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; position: relative; }
+.nt-resumen-badge.pendiente { background: rgba(251,191,36,0.2); color: #fbbf24; }
+.nt-resumen-badge.instantaneo { background: rgba(74,222,128,0.2); color: #4ade80; }
+
+/* ---------- Cliente ---------- */
+.nt-cliente-buscador input { width: 100%; padding: 12px 14px; border: 2px solid #d7dbe2; border-radius: 8px; font-family: "Inter", sans-serif; font-size: 1rem; }
+.nt-cliente-buscador input:focus { outline: none; border-color: var(--color-gold); }
+.nt-cliente-lista { list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.nt-cliente-lista li { display: flex; justify-content: space-between; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f2f4; font-family: "Inter", sans-serif; }
+.nt-cliente-lista li:last-child { border-bottom: none; }
+.nt-cliente-lista li:hover { background: #f7f8fa; }
+.nt-cliente-seleccionado {
+  display: flex; justify-content: space-between; align-items: center; background: #eaf1f8;
+  border: 1px solid var(--color-navy); border-radius: 8px; padding: 14px 18px; font-family: "Inter", sans-serif;
+}
+.nt-cliente-seleccionado strong { color: var(--color-navy-dark); }
+.nt-cliente-seleccionado button { background: none; border: none; color: var(--color-navy); text-decoration: underline; cursor: pointer; font-size: 0.85rem; }
+.nt-cliente-nuevo-btn { margin-top: 12px; background: var(--color-gold); color: var(--color-navy-dark); border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 700; font-family: "Inter", sans-serif; }
+
+/* ---------- Dirección (paso 2) ---------- */
+.nt-direccion-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.nt-direccion-card {
+  border: 2px solid #e5e7eb; border-radius: 10px; padding: 24px 18px; text-align: center; cursor: pointer;
+  transition: all 0.15s ease; background: #fafbfc;
+}
+.nt-direccion-card:hover { border-color: var(--color-gold); }
+.nt-direccion-card.activa { border-color: var(--color-navy); background: linear-gradient(160deg, var(--color-navy) 0%, var(--color-navy-dark) 100%); color: white; }
+.nt-direccion-icono { font-size: 2.2rem; margin-bottom: 10px; }
+.nt-direccion-titulo { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
+.nt-direccion-sub { font-family: "Inter", sans-serif; font-size: 0.8rem; opacity: 0.7; }
+
+/* ---------- Formularios genéricos dentro del wizard ---------- */
+.nt-campo { display: flex; flex-direction: column; gap: 6px; font-family: "Inter", sans-serif; font-size: 0.85rem; color: #374151; margin-bottom: 16px; }
+.nt-campo select, .nt-campo input { padding: 11px 12px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: "Inter", sans-serif; font-size: 0.95rem; }
+.nt-campo select:focus, .nt-campo input:focus { outline: none; border-color: var(--color-gold); }
+.nt-fila-dos { display: flex; gap: 14px; }
+.nt-fila-dos .nt-campo { flex: 1; }
+
+.nt-billetes-label { font-family: "Inter", sans-serif; font-size: 0.82rem; color: #6b7280; display: block; margin: 4px 0 10px; }
+.nt-billetes-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.nt-billetes-chips button {
+  background: white; border: 2px solid #d7dbe2; padding: 10px 16px; border-radius: 20px; cursor: pointer;
+  font-family: "Inter", sans-serif; font-size: 0.85rem; transition: all 0.15s ease;
+}
+.nt-billetes-chips button.activo { background: var(--color-gold-dark); border-color: var(--color-gold-dark); color: white; font-weight: 700; }
+.nt-billetes-vacio { background: #fff8e6; border: 1px dashed var(--color-gold-dark); border-radius: 8px; padding: 12px 14px; font-family: "Inter", sans-serif; font-size: 0.85rem; color: #8a6d1f; margin-bottom: 12px; }
+
+.nt-total-preview { background: #eaf6ec; border: 1px solid #b7e0bd; border-radius: 8px; padding: 14px 18px; font-family: "Inter", sans-serif; color: #1a7f37; font-size: 0.95rem; margin-bottom: 8px; }
+.nt-total-preview strong { font-size: 1.2rem; }
+
+/* ---------- Navegación entre pasos ---------- */
+.nt-nav { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 20px; border-top: 1px solid #f1f2f4; }
+.nt-btn-volver { background: transparent; border: 1px solid #d7dbe2; color: #5b6472; padding: 11px 22px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 600; }
+.nt-btn-siguiente { background: var(--color-navy); color: white; border: none; padding: 11px 26px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 700; }
+.nt-btn-siguiente:hover { background: var(--color-navy-dark); }
+.nt-btn-siguiente:disabled { opacity: 0.5; cursor: default; }
+.nt-btn-confirmar { background: var(--color-gold); color: var(--color-navy-dark); border: none; padding: 13px 30px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 800; font-size: 1rem; }
+.nt-btn-confirmar:hover { background: #e0c23f; }
+.nt-btn-confirmar:disabled { opacity: 0.5; cursor: default; }
+
+.nt-error { color: #c0392b; font-family: "Inter", sans-serif; font-size: 0.85rem; margin: 0 0 12px; }
+
+/* ---------- Éxito ---------- */
+.nt-exito { text-align: center; padding: 40px 20px; }
+.nt-exito-icono { font-size: 3.5rem; margin-bottom: 12px; }
+.nt-exito h2 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); }
+.nt-exito p { font-family: "Inter", sans-serif; color: #5b6472; margin-bottom: 24px; }
+.nt-exito button { background: var(--color-navy); color: white; border: none; padding: 12px 26px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 700; }
+
+@media (max-width: 720px) {
+  .nt-layout { flex-direction: column; }
+  .nt-resumen { position: static; width: 100%; }
+  .nt-direccion-cards { grid-template-columns: 1fr; }
+}

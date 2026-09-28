@@ -1,0 +1,135 @@
+import {
+  CreditCard,
+  ArrowLeftRight,
+  Lock,
+  Repeat2,
+  FileText,
+  Users,
+  BookOpen,
+  BarChart3,
+  Settings,
+  Inbox,
+  PlusCircle,
+  MessageCircle,
+} from "lucide-react";
+import type { ModuloConfig } from "../../types/modulo.types";
+
+// 4 acentos, uno por categoría -- no un color random por tarjeta.
+// El acento vive en el borde y el ícono; el cuerpo de la tarjeta es
+// siempre el mismo navy oscuro, para que la grilla se lea como un
+// solo sistema y no como una paleta de crayones.
+const ACENTO_OPERACION = "#F4D751"; // dorado -- lo que se usa todo el día
+const ACENTO_CONFIG = "#C9A23E"; // dorado apagado -- configuración
+const ACENTO_FINANCIERO = "#4FA8D8"; // azul claro -- gestión financiera
+const ACENTO_ADMIN = "#94A3B8"; // gris azulado -- administración general
+
+export const MODULOS: ModuloConfig[] = [
+  {
+    id: "caja",
+    titulo: "Atención de Solicitudes",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
+    icono: CreditCard,
+    ruta: "/caja",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "transacciones",
+    titulo: "Transacciones",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
+    icono: ArrowLeftRight,
+    ruta: "/transacciones",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "cierre-caja",
+    titulo: "Cierre de Caja",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
+    icono: Lock,
+    ruta: "/cierre-caja",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "solicitudes",
+    titulo: "Solicitudes por Confirmar",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
+    icono: Inbox,
+    ruta: "/solicitudes",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "tasas",
+    titulo: "Divisas y Tasas",
+    categoria: "Configuración",
+    acento: ACENTO_CONFIG,
+    icono: Repeat2,
+    ruta: "/tasas",
+    rolesPermitidos: ["ADMIN", "ASESOR"],
+  },
+  {
+    id: "cuentas",
+    titulo: "Cuentas por Cobrar / Pagar",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: FileText,
+    ruta: "/cuentas-por-cobrar-pagar",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "clientes",
+    titulo: "Clientes",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: Users,
+    ruta: "/clientes",
+    rolesPermitidos: ["ADMIN", "ASESOR"],
+  },
+  {
+    id: "cuentas-corrientes",
+    titulo: "Cuentas Corrientes",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: BookOpen,
+    ruta: "/cuentas-corrientes",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "reportes",
+    titulo: "Reportes",
+    categoria: "Administración general",
+    acento: ACENTO_ADMIN,
+    icono: BarChart3,
+    ruta: "/reportes",
+    rolesPermitidos: ["ADMIN", "ASESOR"],
+  },
+  {
+    id: "usuarios",
+    titulo: "Usuarios y Roles",
+    categoria: "Administración general",
+    acento: ACENTO_ADMIN,
+    icono: Settings,
+    ruta: "/usuarios",
+    rolesPermitidos: ["ADMIN"],
+  },
+  {
+    id: "nueva-transaccion",
+    titulo: "Nueva Transacción",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
+    icono: PlusCircle,
+    ruta: "/nueva-transaccion",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "whatsapp",
+    titulo: "WhatsApp",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
+    icono: MessageCircle,
+    ruta: "/whatsapp",
+    rolesPermitidos: ["ADMIN", "ASESOR"],
+  },
+];

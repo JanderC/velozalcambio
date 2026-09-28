@@ -1,0 +1,52 @@
+.wa-page { min-height: 100vh; background: #eef0f4; }
+.wa-header { padding: 28px 40px 0; }
+.wa-header h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
+.wa-header p { font-family: "Inter", sans-serif; color: #5b6472; margin: 0 0 20px; }
+
+.wa-aviso { margin: 0 40px 20px; background: #fff4cc; border: 1px solid #e0c23f; border-radius: 8px; padding: 14px 18px; font-family: "Inter", sans-serif; font-size: 0.85rem; color: #8a6d1f; }
+
+.wa-explicacion { margin: 0 40px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.wa-explicacion-card { background: white; border-radius: 10px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; }
+.wa-explicacion-numero { width: 28px; height: 28px; border-radius: 50%; background: var(--color-navy); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: "Space Grotesk", sans-serif; margin-bottom: 10px; font-size: 0.85rem; }
+.wa-explicacion-titulo { font-weight: 700; color: var(--color-navy-dark); font-size: 0.9rem; margin-bottom: 4px; }
+.wa-explicacion-texto { font-size: 0.82rem; color: #6b7280; }
+
+.wa-layout { display: flex; gap: 20px; padding: 0 40px 40px; flex-wrap: wrap; align-items: flex-start; }
+
+.wa-conexion { flex: 1; min-width: 280px; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.07); text-align: center; }
+.wa-conexion h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 16px; }
+.wa-estado-badge { display: inline-flex; align-items: center; gap: 6px; font-family: "Inter", sans-serif; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px; margin-bottom: 16px; }
+.wa-estado-dot { width: 8px; height: 8px; border-radius: 50%; }
+.wa-estado-conectado { background: #d9f2e3; color: #1a7f37; }
+.wa-estado-conectado .wa-estado-dot { background: #1a7f37; }
+.wa-estado-esperando { background: #fff4cc; color: #8a6d1f; }
+.wa-estado-esperando .wa-estado-dot { background: #e0c23f; animation: wa-pulse 1.5s infinite; }
+.wa-estado-desconectado { background: #fbdcdc; color: #c0392b; }
+.wa-estado-desconectado .wa-estado-dot { background: #c0392b; }
+@keyframes wa-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.wa-qr-box { width: 220px; height: 220px; margin: 0 auto 16px; border: 2px dashed #d7dbe2; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.wa-qr-box img { width: 100%; height: 100%; }
+.wa-qr-vacio { font-family: "Inter", sans-serif; font-size: 0.82rem; color: #9ca3af; padding: 16px; }
+.wa-btn-iniciar { background: #25d366; color: white; border: none; padding: 11px 22px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 700; }
+
+.wa-config { flex: 1; min-width: 280px; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.wa-config h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 16px; }
+.wa-config-toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-family: "Inter", sans-serif; font-size: 0.88rem; }
+.wa-config textarea { width: 100%; min-height: 90px; padding: 10px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: "Inter", sans-serif; font-size: 0.88rem; resize: vertical; }
+.wa-config-guardar { margin-top: 12px; background: var(--color-navy); color: white; border: none; padding: 9px 18px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 600; }
+
+.wa-bandeja { margin: 0 40px 40px; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.wa-bandeja h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 16px; }
+.wa-mensaje-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; font-family: "Inter", sans-serif; }
+.wa-mensaje-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.wa-mensaje-contacto { font-weight: 700; color: var(--color-navy-dark); }
+.wa-mensaje-contacto span { font-weight: 400; color: #9ca3af; font-size: 0.8rem; margin-left: 6px; }
+.wa-mensaje-fecha { font-size: 0.78rem; color: #9ca3af; }
+.wa-mensaje-texto { color: #374151; font-size: 0.9rem; margin-bottom: 8px; }
+.wa-mensaje-detectado { display: inline-block; background: #eaf6ec; color: #1a7f37; font-size: 0.78rem; padding: 3px 10px; border-radius: 12px; margin-bottom: 8px; }
+.wa-mensaje-acciones { display: flex; gap: 8px; }
+.wa-mensaje-acciones button { border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; font-family: "Inter", sans-serif; }
+.wa-btn-convertir { background: #1a7f37; color: white; }
+.wa-btn-descartar { background: transparent; border: 1px solid #d7dbe2 !important; color: #6b7280; }
+.wa-bandeja-vacio { color: #6b7280; font-family: "Inter", sans-serif; }

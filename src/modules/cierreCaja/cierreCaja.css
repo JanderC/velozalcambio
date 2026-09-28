@@ -1,0 +1,33 @@
+.cierre-page { min-height: 100vh; background: #f2f4f7; }
+.cierre-header { padding: 28px 40px 8px; }
+.cierre-header h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
+.cierre-header p { font-family: "Inter", sans-serif; color: #5b6472; margin: 0; }
+
+.cierre-selector { display: flex; gap: 12px; padding: 8px 40px 16px; }
+.cierre-selector select { padding: 9px 12px; border: 1px solid #d7dbe2; border-radius: 4px; font-family: "Inter", sans-serif; }
+
+.cierre-panel { margin: 0 40px 24px; background: white; border-radius: 8px; padding: 24px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; max-width: 480px; }
+.cierre-panel-vacio { color: #6b7280; }
+.cierre-estado-abierta { color: #1a7f37; font-weight: 700; }
+.cierre-estado-cerrada { color: #6b7280; font-weight: 700; }
+
+.cierre-dato { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f2f4; }
+.cierre-dato span:first-child { color: #6b7280; font-size: 0.88rem; }
+.cierre-dato span:last-child { font-weight: 600; color: var(--color-navy-dark); }
+
+.cierre-diferencia-pos { color: #1a7f37; }
+.cierre-diferencia-neg { color: #c0392b; }
+.cierre-diferencia-cero { color: #6b7280; }
+
+.cierre-btn-abrir { background: var(--color-navy); color: white; border: none; padding: 11px 18px; border-radius: 4px; cursor: pointer; font-weight: 600; margin-top: 12px; width: 100%; }
+.cierre-btn-cerrar { background: var(--color-gold-dark); color: white; border: none; padding: 11px 18px; border-radius: 4px; cursor: pointer; font-weight: 600; margin-top: 12px; width: 100%; }
+.cierre-form-cerrar { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.cierre-form-cerrar label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #374151; }
+.cierre-form-cerrar input { padding: 9px; border: 1px solid #d7dbe2; border-radius: 4px; }
+.cierre-error { color: #c0392b; font-size: 0.85rem; margin: 0; }
+
+.cierre-historial { padding: 0 40px 40px; }
+.cierre-historial h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 12px; font-size: 1rem; }
+.cierre-historial-tabla { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; }
+.cierre-historial-tabla th { text-align: left; font-size: 0.76rem; color: #6b7280; padding: 10px 14px; border-bottom: 2px solid #e5e7eb; }
+.cierre-historial-tabla td { padding: 10px 14px; border-bottom: 1px solid #f1f2f4; font-size: 0.86rem; }
