@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightLeft, PiggyBank, Plus, Star } from "lucide-react";
+import { ArrowRightLeft, PiggyBank, Plus, Search, Star, X } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { useAuth } from "../../auth/useAuth";
@@ -15,6 +15,7 @@ import {
   type MovimientoInterno,
 } from "../../api/cajas.api";
 import { CajaForm, TIPO_CAJA_LABEL } from "./CajaForm";
+import type { TipoCaja } from "../../api/cajas.api";
 import { FondeoForm } from "./FondeoForm";
 import { TransferenciaForm } from "./TransferenciaForm";
 import { formatearMonto } from "./montos";
@@ -50,6 +51,19 @@ function motivosParaNoDesactivar(caja: CajaTablero) {
   return motivos;
 }
 
+const REFRESCO_MS = 8000;
+
+const FILTROS_TIPO: { valor: TipoCaja | ""; etiqueta: string }[] = [
+  { valor: "", etiqueta: "Todas" },
+  { valor: "FISICA", etiqueta: "Físicas" },
+  { valor: "FUERTE", etiqueta: "Fuertes" },
+  { valor: "BANCO", etiqueta: "Bancos" },
+];
+
+function claveSaldo(cajaId: number, monedaId: number) {
+  return `${cajaId}-${monedaId}`;
+}
+
 type Dialogo =
   | { tipo: "nueva" }
   | { tipo: "editar"; caja: CajaTablero }
@@ -68,28 +82,100 @@ export function CajasPage() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Filtros y "en vivo"
+  const [monedaFiltro, setMonedaFiltro] = useState<number | "">("");
+  const [tipoFiltro, setTipoFiltro] = useState<TipoCaja | "">("");
+  const [busqueda, setBusqueda] = useState("");
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(null);
+  const [cambiados, setCambiados] = useState<Set<string>>(new Set());
+  const saldosPrevios = useRef<Map<string, string> | null>(null);
 
-  async function cargar() {
-    setCargando(true);
-    try {
-      const [tablero, movs] = await Promise.all([getTableroCajas(mostrarInactivas), getMovimientosInternos()]);
-      setCajas(tablero);
-      setMovimientos(movs);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron cargar las cajas.");
-    } finally {
-      setCargando(false);
-    }
-  }
+  // silencioso = refresco automático: no muestra "cargando" ni pisa el aviso del usuario
+  const cargar = useCallback(
+    async (silencioso = false) => {
+      if (!silencioso) setCargando(true);
+      try {
+        const [tablero, movs] = await Promise.all([getTableroCajas(mostrarInactivas), getMovimientosInternos()]);
+
+        // Qué saldos cambiaron desde la última lectura (para resaltarlos)
+        const actuales = new Map<string, string>();
+        for (const c of tablero) for (const s of c.saldos) actuales.set(claveSaldo(c.id, s.moneda_id), s.monto);
+        const previos = saldosPrevios.current;
+        if (previos) {
+          const distintos = new Set([...actuales].filter(([k, v]) => previos.get(k) !== v).map(([k]) => k));
+          if (distintos.size > 0) {
+            setCambiados(distintos);
+            setTimeout(() => setCambiados(new Set()), 2500);
+          }
+        }
+        saldosPrevios.current = actuales;
+
+        setCajas(tablero);
+        setMovimientos(movs);
+        setActualizadoEn(new Date());
+        if (silencioso) setError((e) => (e === "No se pudieron cargar las cajas." ? null : e));
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "No se pudieron cargar las cajas.");
+      } finally {
+        if (!silencioso) setCargando(false);
+      }
+    },
+    [mostrarInactivas]
+  );
 
   useEffect(() => {
     getMonedas().then(setMonedas).catch(() => setMonedas([]));
   }, []);
 
   useEffect(() => {
+    saldosPrevios.current = null;
     cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mostrarInactivas]);
+    // En vivo: refresca solo mientras la pestaña está visible
+    const intervalo = setInterval(() => {
+      if (!document.hidden) cargar(true);
+    }, REFRESCO_MS);
+    return () => clearInterval(intervalo);
+  }, [cargar]);
+
+  // Monedas que tienen plata en alguna caja (para los filtros y los totales)
+  const monedasConSaldo = useMemo(() => {
+    const codigos = new Map<number, string>();
+    for (const c of cajas) for (const s of c.saldos) if (Number(s.monto) !== 0) codigos.set(s.moneda_id, s.moneda_codigo);
+    return [...codigos.entries()].map(([id, codigo]) => ({ id, codigo })).sort((a, b) => a.codigo.localeCompare(b.codigo));
+  }, [cajas]);
+
+  const cajasFiltradas = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return cajas.filter((c) => {
+      if (tipoFiltro && c.tipo !== tipoFiltro) return false;
+      if (q && !`${c.nombre} ${c.banco ?? ""}`.toLowerCase().includes(q)) return false;
+      if (monedaFiltro !== "") {
+        const tiene = c.saldos.some((s) => s.moneda_id === monedaFiltro) || c.turnos_abiertos.some((t) => t.moneda_id === monedaFiltro);
+        if (!tiene) return false;
+      }
+      return true;
+    });
+  }, [cajas, tipoFiltro, busqueda, monedaFiltro]);
+
+  // Total por moneda de las cajas que quedan con los filtros de tipo y búsqueda
+  const totalesPorMoneda = useMemo(() => {
+    return monedasConSaldo.map((m) => ({
+      ...m,
+      total: cajasFiltradas.reduce((suma, c) => suma + Number(c.saldos.find((s) => s.moneda_id === m.id)?.monto ?? 0), 0),
+    }));
+  }, [monedasConSaldo, cajasFiltradas]);
+
+  // Con una moneda elegida: cuánto tiene cada caja y qué parte del total es
+  const reparto = useMemo(() => {
+    if (monedaFiltro === "") return null;
+    const filas = cajasFiltradas
+      .map((c) => ({ caja: c, monto: c.saldos.find((s) => s.moneda_id === monedaFiltro)?.monto ?? "0" }))
+      .sort((a, b) => Number(b.monto) - Number(a.monto));
+    const total = filas.reduce((suma, f) => suma + Number(f.monto), 0);
+    return { filas, total, codigo: monedasConSaldo.find((m) => m.id === monedaFiltro)?.codigo ?? monedas.find((m) => m.id === monedaFiltro)?.codigo ?? "" };
+  }, [monedaFiltro, cajasFiltradas, monedasConSaldo, monedas]);
+
+  const hayFiltros = monedaFiltro !== "" || tipoFiltro !== "" || busqueda.trim() !== "";
 
   function terminar(mensaje: string) {
     setDialogo(null);
@@ -121,6 +207,10 @@ export function CajasPage() {
         <div>
           <h1>Cajas</h1>
           <p>Alimentá la caja principal y repartí la plata a las demás cajas.</p>
+          <span className="cajas-en-vivo" title="Los saldos se actualizan solos">
+            <span className="cajas-pulso" /> En vivo · cada {REFRESCO_MS / 1000} s
+            {actualizadoEn && <> · actualizado {actualizadoEn.toLocaleTimeString("es-CO")}</>}
+          </span>
         </div>
         <div className="cajas-header-acciones">
           {esAdmin && (
@@ -165,8 +255,82 @@ export function CajasPage() {
         </label>
       )}
 
+      {/* ---------- Filtros y saldos en vivo ---------- */}
+      <section className="cajas-filtros">
+        <div className="cajas-filtros-fila">
+          <div className="cajas-chips" role="group" aria-label="Filtrar por moneda">
+            <button className={monedaFiltro === "" ? "activo" : ""} onClick={() => setMonedaFiltro("")}>Todas las monedas</button>
+            {totalesPorMoneda.map((m) => (
+              <button key={m.id} className={monedaFiltro === m.id ? "activo" : ""} onClick={() => setMonedaFiltro(monedaFiltro === m.id ? "" : m.id)}>
+                <strong>{m.codigo}</strong> {formatearMonto(String(m.total))}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="cajas-filtros-fila">
+          <div className="cajas-chips cajas-chips-tipo" role="group" aria-label="Filtrar por tipo">
+            {FILTROS_TIPO.map((f) => (
+              <button key={f.valor} className={tipoFiltro === f.valor ? "activo" : ""} onClick={() => setTipoFiltro(f.valor)}>
+                {f.etiqueta}
+              </button>
+            ))}
+          </div>
+          <label className="cajas-buscar">
+            <Search size={15} />
+            <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar caja o banco" />
+            {busqueda && <button onClick={() => setBusqueda("")} aria-label="Limpiar búsqueda"><X size={14} /></button>}
+          </label>
+          {hayFiltros && (
+            <button
+              className="cajas-limpiar"
+              onClick={() => {
+                setMonedaFiltro("");
+                setTipoFiltro("");
+                setBusqueda("");
+              }}
+            >
+              Quitar filtros
+            </button>
+          )}
+        </div>
+
+        {reparto && (
+          <div className="cajas-reparto">
+            <div className="cajas-reparto-cabecera">
+              <span>¿Dónde está el {reparto.codigo}?</span>
+              <strong>Total {formatearMonto(String(reparto.total))} {reparto.codigo}</strong>
+            </div>
+            {reparto.filas.length === 0 ? (
+              <p className="caja-tarjeta-vacia">Ninguna caja tiene {reparto.codigo} con estos filtros.</p>
+            ) : (
+              reparto.filas.map((f) => {
+                const porcentaje = reparto.total > 0 ? (Number(f.monto) / reparto.total) * 100 : 0;
+                const cambio = cambiados.has(claveSaldo(f.caja.id, Number(monedaFiltro)));
+                return (
+                  <div key={f.caja.id} className={`cajas-reparto-fila${cambio ? " saldo-cambio" : ""}`}>
+                    <span className="cajas-reparto-nombre">
+                      {f.caja.nombre}
+                      <small>{TIPO_CAJA_LABEL[f.caja.tipo]}</small>
+                    </span>
+                    <span className="cajas-reparto-barra">
+                      <span style={{ width: `${Math.max(porcentaje, Number(f.monto) > 0 ? 1.5 : 0)}%` }} />
+                    </span>
+                    <strong>{formatearMonto(f.monto)}</strong>
+                    <span className="cajas-reparto-pct">{porcentaje.toLocaleString("es-CO", { maximumFractionDigits: 1 })}%</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </section>
+
+      {cajasFiltradas.length === 0 && !cargando && (
+        <p className="cajas-sin-resultados">Ninguna caja coincide con los filtros.</p>
+      )}
+
       <div className="cajas-grilla">
-        {cajas.map((c) => (
+        {cajasFiltradas.map((c) => (
           <article key={c.id} className={`caja-tarjeta${c.es_principal ? " caja-tarjeta-principal" : ""}${c.activo ? "" : " caja-tarjeta-inactiva"}`}>
             <header className="caja-tarjeta-cabecera">
               <div>
@@ -186,8 +350,10 @@ export function CajasPage() {
               {filasPorMoneda(c).length === 0 ? (
                 <p className="caja-tarjeta-vacia">Sin saldo todavía</p>
               ) : (
-                filasPorMoneda(c).map((f) => (
-                  <div key={f.monedaId} className="caja-tarjeta-saldo">
+                filasPorMoneda(c)
+                  .filter((f) => monedaFiltro === "" || f.monedaId === monedaFiltro)
+                  .map((f) => (
+                  <div key={f.monedaId} className={`caja-tarjeta-saldo${cambiados.has(claveSaldo(c.id, f.monedaId)) ? " saldo-cambio" : ""}`}>
                     <span>{f.codigo}</span>
                     <strong>{formatearMonto(f.monto)}</strong>
                     {f.abierto ? (
