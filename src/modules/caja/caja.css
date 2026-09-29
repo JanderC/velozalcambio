@@ -3,3 +3,5 @@
 .cliente-panel-botones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .cliente-panel-ficha { background: var(--color-navy); color: white; padding: 7px 14px; border-radius: 4px; text-decoration: none; font-family: "Inter", sans-serif; font-size: 0.85rem; font-weight: 600; }
 .cliente-panel-ficha:hover { background: var(--color-navy-dark); }
+
+.caja-cuenta-cliente { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #374151; }

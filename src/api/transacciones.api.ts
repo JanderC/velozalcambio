@@ -68,6 +68,8 @@ export type RegistrarCambioInput = CalculoCambioInput & {
   cajaExtranjeraId: number;
   cajaLocalId: number;
   terceroId?: number;
+  // Cuenta del cliente a donde se le paga (exige terceroId; debe ser suya y estar activa)
+  cuentaTerceroId?: number;
   metodoPagoId?: number;
   referenciaCodigo?: string;
   bancoOrigen?: string;

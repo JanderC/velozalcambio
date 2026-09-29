@@ -14,6 +14,7 @@ import { Modal } from "../../components/common/Modal";
 import { AvisoVerificacion } from "../documentosCliente/AvisoVerificacion";
 import { SubirDocumentoForm } from "../documentosCliente/SubirDocumentoForm";
 import { SoporteOperacion } from "../documentosCliente/SoporteOperacion";
+import { SelectorCuentaCliente } from "../cuentasCliente/SelectorCuentaCliente";
 import "./caja.css";
 
 interface Registrado {
@@ -24,11 +25,14 @@ interface Registrado {
 
 export function RegistrarOperacionForm({
   terceroId,
+  titularSugerido,
   onCompletado,
   versionDocumentos = 0,
   onDocumentoSubido,
 }: {
   terceroId: number;
+  // Nombre del cliente, para prellenar el titular al crear una cuenta
+  titularSugerido?: string;
   onCompletado: () => void;
   // Sube cuando cambian los documentos del cliente en la misma ficha, para refrescar el aviso
   versionDocumentos?: number;
@@ -51,6 +55,7 @@ export function RegistrarOperacionForm({
   const [metodoPagoId, setMetodoPagoId] = useState<number | "">("");
   const [referenciaCodigo, setReferenciaCodigo] = useState("");
   const [bancoOrigen, setBancoOrigen] = useState("");
+  const [cuentaTerceroId, setCuentaTerceroId] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
   const [registrado, setRegistrado] = useState<Registrado | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -116,6 +121,7 @@ export function RegistrarOperacionForm({
       const resultado = await registrarCambioDivisa({
         ...calculoInput,
         terceroId,
+        cuentaTerceroId: pagoPorTransferencia && cuentaTerceroId ? cuentaTerceroId : undefined,
         cajaExtranjeraId,
         cajaLocalId,
         metodoPagoId: metodoPagoId || undefined,
@@ -126,6 +132,7 @@ export function RegistrarOperacionForm({
       setMonto("");
       setReferenciaCodigo("");
       setBancoOrigen("");
+      setCuentaTerceroId("");
       setCotizacionId("");
       setTasaManual("");
       onCompletado();
@@ -136,6 +143,12 @@ export function RegistrarOperacionForm({
       setEnviando(false);
     }
   }
+
+  // Se le paga al cliente desde la caja de lo que él recibe; si es un banco, es una transferencia.
+  const cajaPagoId = tipo === "COMPRA_DIVISA" ? cajaLocalId : cajaExtranjeraId;
+  const pagoPorTransferencia = cajas.find((c) => c.id === cajaPagoId)?.tipo === "BANCO";
+  const monedaPagoId = tipo === "COMPRA_DIVISA" ? monedaLocalId : monedaExtranjeraId;
+  const monedaPagoCodigo = monedas.find((m) => m.id === monedaPagoId)?.codigo;
 
   const pesos = (v: string) => `$${formatearMonto(v)} COP`;
   const extranjera = (v: string, d: string) => `${formatearMonto(v)} ${d}`;
@@ -294,6 +307,20 @@ export function RegistrarOperacionForm({
         Banco de origen (si aplica)
         <input type="text" value={bancoOrigen} onChange={(e) => setBancoOrigen(e.target.value)} placeholder="ej. Bancolombia" />
       </label>
+
+      {pagoPorTransferencia && (
+        <div className="caja-cuenta-cliente">
+          Cuenta del cliente (a dónde se le transfiere)
+          <SelectorCuentaCliente
+            terceroId={terceroId}
+            titularSugerido={titularSugerido}
+            monedaCodigo={monedaPagoCodigo}
+            monedaId={monedaPagoId || undefined}
+            value={cuentaTerceroId}
+            onChange={setCuentaTerceroId}
+          />
+        </div>
+      )}
 
       {error && <ErrorCambio error={error} />}
       {errorValidacion && <p className="operacion-form-error">{errorValidacion}</p>}

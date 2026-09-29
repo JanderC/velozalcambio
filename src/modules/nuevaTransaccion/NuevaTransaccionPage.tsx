@@ -24,6 +24,7 @@ import { Modal } from "../../components/common/Modal";
 import { AvisoVerificacion } from "../documentosCliente/AvisoVerificacion";
 import { SubirDocumentoForm } from "../documentosCliente/SubirDocumentoForm";
 import { SoporteOperacion } from "../documentosCliente/SoporteOperacion";
+import { SelectorCuentaCliente } from "../cuentasCliente/SelectorCuentaCliente";
 import { ClienteRapidoForm } from "./ClienteRapidoForm";
 import "./nuevaTransaccion.css";
 
@@ -69,6 +70,7 @@ export function NuevaTransaccionPage() {
   const [metodoPagoId, setMetodoPagoId] = useState<number | "">("");
   const [referenciaCodigo, setReferenciaCodigo] = useState("");
   const [bancoOrigen, setBancoOrigen] = useState("");
+  const [cuentaTerceroId, setCuentaTerceroId] = useState<number | "">("");
 
   // Documentos del cliente: subir desde el aviso sin salir del wizard
   const [subiendoDocumento, setSubiendoDocumento] = useState(false);
@@ -158,6 +160,13 @@ export function NuevaTransaccionPage() {
     if (cajaExtranjeraId && !cajaLocalId) setCajaLocalId(cajaExtranjeraId);
   }, [cajaExtranjeraId, cajaLocalId]);
 
+  // Se le paga al cliente desde la caja de lo que él recibe: pesos en COMPRA_DIVISA, la divisa en VENTA_DIVISA.
+  // Si esa caja es un banco, es una transferencia y corresponde elegir la cuenta del cliente.
+  const cajaPagoId = tipo === "COMPRA_DIVISA" ? cajaLocalId : cajaExtranjeraId;
+  const pagoPorTransferencia = cliente != null && cajas.find((c) => c.id === cajaPagoId)?.tipo === "BANCO";
+  const monedaPagoId = tipo === "COMPRA_DIVISA" ? monedaLocalId : monedaExtranjeraId;
+  const monedaPagoCodigo = monedas.find((m) => m.id === monedaPagoId)?.codigo;
+
   const nombreCaja = (id: number | "") => cajas.find((c) => c.id === id)?.nombre ?? null;
   const nombreMetodo = (id: number | "") => metodos.find((m) => m.id === id)?.nombre ?? null;
 
@@ -193,6 +202,7 @@ export function NuevaTransaccionPage() {
         cajaExtranjeraId,
         cajaLocalId,
         terceroId: cliente?.id,
+        cuentaTerceroId: pagoPorTransferencia && cuentaTerceroId ? cuentaTerceroId : undefined,
         metodoPagoId: metodoPagoId || undefined,
         referenciaCodigo: referenciaCodigo.trim() || undefined,
         bancoOrigen: bancoOrigen.trim() || undefined,
@@ -221,6 +231,7 @@ export function NuevaTransaccionPage() {
     setMetodoPagoId("");
     setReferenciaCodigo("");
     setBancoOrigen("");
+    setCuentaTerceroId("");
     setSubiendoDocumento(false);
     setError(null);
     setErrorGenerico(null);
@@ -466,6 +477,19 @@ export function NuevaTransaccionPage() {
                     Banco de origen (si aplica)
                     <input type="text" value={bancoOrigen} onChange={(e) => setBancoOrigen(e.target.value)} placeholder="ej. Bancolombia" />
                   </label>
+                  {pagoPorTransferencia && cliente && (
+                    <div className="nt-campo">
+                      Cuenta del cliente (a dónde se le transfiere)
+                      <SelectorCuentaCliente
+                        terceroId={cliente.id}
+                        titularSugerido={cliente.nombre}
+                        monedaCodigo={monedaPagoCodigo}
+                        monedaId={monedaPagoId || undefined}
+                        value={cuentaTerceroId}
+                        onChange={setCuentaTerceroId}
+                      />
+                    </div>
+                  )}
                 </>
               )}
 
@@ -512,6 +536,9 @@ export function NuevaTransaccionPage() {
                 <FilaResumen label="Caja divisa" valor={nombreCaja(cajaExtranjeraId)} />
                 <FilaResumen label="Caja pesos" valor={nombreCaja(cajaLocalId)} />
                 <FilaResumen label="Método de pago" valor={nombreMetodo(metodoPagoId)} vacio="—" />
+                {pagoPorTransferencia && (
+                  <FilaResumen label="Cuenta del cliente" valor={cuentaTerceroId ? "Elegida" : null} vacio="sin elegir" />
+                )}
 
                 <div className="nt-resumen-total">
                   <span className="nt-resumen-total-label">Le entregamos</span>

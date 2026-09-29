@@ -104,6 +104,7 @@ export function ClienteAccionesPanel({
           <div className="opciones-contenido">
             <RegistrarOperacionForm
               terceroId={tercero.id}
+              titularSugerido={tercero.nombre}
               onCompletado={onActualizar}
               versionDocumentos={versionDocumentos}
               onDocumentoSubido={documentosCambiaron}

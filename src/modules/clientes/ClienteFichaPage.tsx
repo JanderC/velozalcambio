@@ -10,7 +10,6 @@ import {
   Pencil,
   Scale,
   ShieldCheck,
-  Wallet,
 } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
@@ -22,7 +21,7 @@ import {
   type TipoTercero,
 } from "../../api/terceros.api";
 import { getVerificacionTercero, type VerificacionTercero } from "../../api/documentosTercero.api";
-import { getCuentasTercero, ETIQUETA_TIPO_CUENTA, type CuentaTercero } from "../../api/cuentasTercero.api";
+import { getCuentasTercero, type CuentaTercero } from "../../api/cuentasTercero.api";
 import { cambiarEstadoCuentaCorriente } from "../../api/cuentasCorrientes.api";
 import { getSolicitudesPorCliente, type Solicitud } from "../../api/transacciones.api";
 import { ApiError } from "../../api/client";
@@ -32,6 +31,7 @@ import { formatearMonto } from "../../utils/montos";
 import { DocumentosCliente } from "../documentosCliente/DocumentosCliente";
 import { EstadoVerificacionBadge } from "../documentosCliente/EstadoVerificacionBadge";
 import { RegistrarOperacionForm } from "../caja/RegistrarOperacionForm";
+import { CuentasCliente } from "../cuentasCliente/CuentasCliente";
 import "./clientes.css";
 
 const ROLES_EDITAR: Rol[] = ["ADMIN", "ASESOR"];
@@ -212,7 +212,9 @@ export function ClienteFichaPage() {
           <DocumentosCliente terceroId={terceroId} recargar={version} onCambio={refrescar} />
         )}
 
-        {seccion === "pagos" && <CuentasPago cuentas={cuentasPago} />}
+        {seccion === "pagos" && (
+          <CuentasCliente terceroId={terceroId} titularSugerido={tercero?.nombre} onCambio={refrescar} />
+        )}
 
         {seccion === "cuentas" && resumen && (
           todasCuentas.length === 0 ? (
@@ -292,6 +294,7 @@ export function ClienteFichaPage() {
             </p>
             <RegistrarOperacionForm
               terceroId={terceroId}
+              titularSugerido={tercero?.nombre}
               onCompletado={refrescar}
               versionDocumentos={version}
               onDocumentoSubido={refrescar}
@@ -338,34 +341,6 @@ function Kpi({ titulo, valor, detalle, alerta = false }: { titulo: string; valor
       <span className="ficha-kpi-titulo">{titulo}</span>
       <span className="ficha-kpi-valor">{valor ?? "—"}</span>
       {detalle && <span className="ficha-kpi-detalle">{detalle}</span>}
-    </div>
-  );
-}
-
-function CuentasPago({ cuentas }: { cuentas: CuentaTercero[] | null }) {
-  if (cuentas === null) return <p className="ficha-vacio-texto">Cargando…</p>;
-  if (cuentas.length === 0) return <p className="ficha-vacio-texto">Este cliente no tiene cuentas de pago registradas.</p>;
-
-  return (
-    <div className="ficha-cuentas-pago">
-      {cuentas.map((c) => (
-        <div key={c.id} className={`ficha-cuenta-pago ${c.activo ? "" : "inactiva"}`}>
-          <div className="ficha-cuenta-pago-top">
-            <span className="ficha-cuenta-pago-tipo"><Wallet size={15} /> {ETIQUETA_TIPO_CUENTA[c.tipo]}</span>
-            {c.moneda_codigo && <span className="ficha-cuenta-pago-moneda">{c.moneda_codigo}</span>}
-            {!c.activo && <span className="ficha-estado ficha-estado-cerrada">Inactiva</span>}
-          </div>
-          {c.alias && <strong className="ficha-cuenta-pago-alias">{c.alias}</strong>}
-          <dl>
-            {c.banco && <div><dt>Banco</dt><dd>{c.banco}</dd></div>}
-            {c.numero_cuenta && <div><dt>Número</dt><dd>{c.numero_cuenta}{c.tipo_cuenta ? ` · ${c.tipo_cuenta === "AHORRO" ? "Ahorro" : "Corriente"}` : ""}</dd></div>}
-            <div><dt>Titular</dt><dd>{c.titular}</dd></div>
-            {c.identificacion_titular && <div><dt>Identificación</dt><dd>{c.identificacion_titular}</dd></div>}
-            {c.telefono && <div><dt>Teléfono</dt><dd>{c.telefono}</dd></div>}
-            {c.email && <div><dt>Email</dt><dd>{c.email}</dd></div>}
-          </dl>
-        </div>
-      ))}
     </div>
   );
 }
