@@ -12,6 +12,7 @@ import {
   PlusCircle,
   MessageCircle,
   PencilLine,
+  Wallet,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
 import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
@@ -52,6 +53,15 @@ export const MODULOS: ModuloConfig[] = [
     icono: Lock,
     ruta: "/cierre-caja",
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "cajas",
+    titulo: "Cajas y Fondeo",
+    categoria: "Operación diaria",
+    acento: ACENTO_OPERACION,
+    icono: Wallet,
+    ruta: "/cajas",
+    rolesPermitidos: ["ADMIN", "CAJERO"],
   },
   {
     id: "solicitudes",

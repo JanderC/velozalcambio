@@ -18,6 +18,7 @@ import { ReportesPage } from "../modules/reportes/ReportesPage";
 import { UsuariosPage } from "../modules/usuarios/UsuariosPage";
 import { NuevaTransaccionPage } from "../modules/nuevaTransaccion/NuevaTransaccionPage";
 import { WhatsAppPage } from "../modules/whatsapp/WhatsAppPage";
+import { CajasPage } from "../modules/cajas/CajasPage";
 
 
 
@@ -43,6 +44,10 @@ export function AppRoutes() {
         {/* Mismos roles que el backend acepta en POST /transacciones/cambio */}
         <Route element={<RequireRole roles={["ADMIN", "ASESOR", "CAJERO"]} />}>
           <Route path="/nueva-transaccion" element={<NuevaTransaccionPage />} />
+        </Route>
+        {/* Mismos roles que el backend acepta en /cajas/tablero y /cajas/transferencias */}
+        <Route element={<RequireRole roles={["ADMIN", "CAJERO"]} />}>
+          <Route path="/cajas" element={<CajasPage />} />
         </Route>
         <Route element={<RequireRole roles={["ADMIN"]} />}>
         <Route path="/usuarios" element={<UsuariosPage />} />

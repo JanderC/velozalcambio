@@ -6,7 +6,7 @@ import { getTransacciones, type Transaccion } from "../../api/transacciones.api"
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 
-const TIPOS = ["COMPRA_DIVISA", "VENTA_DIVISA", "DEPOSITO", "RETIRO", "TRANSFERENCIA_INTERNA", "ABONO_CXC", "ABONO_CXP"];
+const TIPOS = ["COMPRA_DIVISA", "VENTA_DIVISA", "DEPOSITO", "RETIRO", "TRANSFERENCIA_INTERNA", "FONDEO", "ABONO_CXC", "ABONO_CXP"];
 const ESTADOS = ["PENDIENTE", "BLOQUEADA", "CONFIRMADA", "RECHAZADA", "ANULADA"];
 
 export function TransaccionesPage() {

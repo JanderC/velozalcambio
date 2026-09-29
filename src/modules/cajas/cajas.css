@@ -1,0 +1,63 @@
+.cajas-page { min-height: 100vh; background: #f2f4f7; }
+.cajas-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 28px 40px 12px; flex-wrap: wrap; gap: 12px; }
+.cajas-header h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
+.cajas-header p { font-family: "Inter", sans-serif; color: #5b6472; margin: 0; }
+.cajas-header-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.cajas-btn-primario, .cajas-btn-secundario { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-family: "Inter", sans-serif; font-weight: 600; font-size: 0.88rem; }
+.cajas-btn-primario { background: var(--color-navy); color: white; border: none; }
+.cajas-btn-secundario { background: white; color: var(--color-navy-dark); border: 1px solid #d7dbe2; }
+.cajas-btn-secundario:hover { border-color: var(--color-gold-dark); }
+
+.cajas-banner { margin: 0 40px 12px; padding: 10px 14px; border-radius: 6px; font-family: "Inter", sans-serif; font-size: 0.88rem; background: #fff8e6; border: 1px dashed var(--color-gold-dark); color: #5b4a12; }
+.cajas-banner-error { background: #fdecea; border: 1px solid #f5c2bd; color: #c0392b; }
+.cajas-banner-ok { background: #e8f5ec; border: 1px solid #b7e0c3; color: #1a7f37; }
+
+.cajas-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0 40px 12px; font-family: "Inter", sans-serif; font-size: 0.85rem; color: #374151; }
+
+.cajas-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 0 40px 28px; }
+.caja-tarjeta { background: white; border-radius: 8px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; display: flex; flex-direction: column; gap: 12px; border-top: 3px solid #d7dbe2; }
+.caja-tarjeta-principal { border-top-color: var(--color-gold); }
+.caja-tarjeta-inactiva { opacity: 0.6; }
+.caja-tarjeta-cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.caja-tarjeta-cabecera h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; font-size: 1.05rem; }
+.caja-tarjeta-tipo { display: inline-block; font-size: 0.72rem; color: #5b6472; background: #f2f4f7; padding: 2px 8px; border-radius: 10px; margin-right: 6px; }
+.caja-tarjeta-tipo-inactiva { background: #fdecea; color: #c0392b; }
+.caja-tarjeta-principal-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 700; color: var(--color-navy-dark); background: var(--color-gold); padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+.caja-tarjeta-descripcion { margin: 0; font-size: 0.84rem; color: #5b6472; }
+.caja-tarjeta-saldos { display: flex; flex-direction: column; }
+.caja-tarjeta-saldo { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f1f2f4; font-size: 0.88rem; }
+.caja-tarjeta-saldo span:first-child { color: #6b7280; font-weight: 600; }
+.caja-tarjeta-saldo strong { color: var(--color-navy-dark); text-align: right; font-variant-numeric: tabular-nums; }
+.caja-tarjeta-vacia { margin: 0; color: #6b7280; font-size: 0.85rem; font-family: "Inter", sans-serif; }
+.caja-turno { font-size: 0.7rem; color: #6b7280; }
+.caja-turno-abierto { color: #1a7f37; font-weight: 600; }
+.caja-tarjeta-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.caja-tarjeta-acciones button { background: transparent; border: 1px solid #d7dbe2; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.caja-tarjeta-acciones button:hover { border-color: var(--color-gold-dark); }
+
+.cajas-historial { padding: 0 40px 40px; }
+.cajas-historial h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; font-size: 1rem; }
+.cajas-historial-nota { font-family: "Inter", sans-serif; font-size: 0.82rem; color: #6b7280; margin: 0 0 12px; }
+.cajas-tabla-wrap { overflow-x: auto; }
+.cajas-tabla { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: "Inter", sans-serif; }
+.cajas-tabla th { text-align: left; font-size: 0.76rem; color: #6b7280; padding: 10px 14px; border-bottom: 2px solid #e5e7eb; }
+.cajas-tabla td { padding: 10px 14px; border-bottom: 1px solid #f1f2f4; font-size: 0.86rem; }
+.cajas-tabla-monto { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.cajas-form { display: flex; flex-direction: column; gap: 12px; font-family: "Inter", sans-serif; }
+.cajas-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #374151; }
+.cajas-form input, .cajas-form select { padding: 9px; border: 1px solid #d7dbe2; border-radius: 4px; font-family: "Inter", sans-serif; }
+.cajas-form-fila { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cajas-form .cajas-form-check { flex-direction: row; align-items: center; gap: 8px; }
+.cajas-form-nota { margin: 0; font-size: 0.82rem; color: #5b6472; }
+.cajas-texto-alerta { color: #c0392b; font-weight: 600; }
+.cajas-error { color: #c0392b; font-size: 0.85rem; margin: 0; }
+.cajas-form-acciones { display: flex; justify-content: flex-end; gap: 10px; }
+.cajas-form-acciones button[type="button"] { background: transparent; border: 1px solid #d7dbe2; padding: 9px 16px; border-radius: 4px; cursor: pointer; }
+.cajas-form-acciones button[type="submit"] { background: var(--color-navy); color: white; border: none; padding: 9px 16px; border-radius: 4px; cursor: pointer; }
+
+@media (max-width: 640px) {
+  .cajas-header, .cajas-grilla, .cajas-historial { padding-left: 16px; padding-right: 16px; }
+  .cajas-banner, .cajas-toggle { margin-left: 16px; margin-right: 16px; }
+  .cajas-form-fila { grid-template-columns: 1fr; }
+}
