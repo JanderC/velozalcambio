@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { CreditCard, FileText, Settings, ShieldCheck, User } from "lucide-react";
 import type { ResumenTercero, CuentaCorriente } from "../../api/terceros.api";
 import { cambiarEstadoCuentaCorriente } from "../../api/cuentasCorrientes.api";
@@ -52,9 +53,12 @@ export function ClienteAccionesPanel({
           <dt>Cliente desde</dt>
           <dd>{new Date(tercero.created_at).toLocaleDateString("es-CO")}</dd>
         </dl>
-        <button className="cliente-panel-cerrar" onClick={onCerrar}>
-          Buscar otro cliente
-        </button>
+        <div className="cliente-panel-botones">
+          <Link className="cliente-panel-ficha" to={`/clientes/${tercero.id}`}>Ver ficha completa</Link>
+          <button className="cliente-panel-cerrar" onClick={onCerrar}>
+            Buscar otro cliente
+          </button>
+        </div>
       </AccordionSection>
 
       <AccordionSection titulo="Seguimiento de Solicitudes" icono={<FileText size={18} />}>

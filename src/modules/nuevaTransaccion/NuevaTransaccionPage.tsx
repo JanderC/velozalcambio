@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -10,7 +10,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { Header } from "../../components/common/Header";
-import { buscarTerceros, type Tercero } from "../../api/terceros.api";
+import { buscarTerceros, obtenerTercero, type Tercero } from "../../api/terceros.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
@@ -90,6 +90,18 @@ export function NuevaTransaccionPage() {
     getMetodosPago().then(setMetodos);
     getCotizacionesDetalle().then(setCotizaciones);
   }, []);
+
+  // Desde la ficha del cliente se llega con ?cliente=ID: se precarga y se salta al paso 2.
+  const [searchParams] = useSearchParams();
+  const clienteParam = Number(searchParams.get("cliente"));
+  useEffect(() => {
+    if (!Number.isInteger(clienteParam) || clienteParam <= 0) return;
+    let vigente = true;
+    obtenerTercero(clienteParam)
+      .then((t) => { if (!vigente) return; setCliente(t); setPaso(2); })
+      .catch(() => undefined); // si no existe, se busca a mano como siempre
+    return () => { vigente = false; };
+  }, [clienteParam]);
 
   useEffect(() => {
     const termino = busqueda.trim();

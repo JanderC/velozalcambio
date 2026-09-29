@@ -5,6 +5,7 @@ import { LoginPage } from "../auth/LoginPage";
 import { LauncherPage } from "../modules/launcher/LauncherPage";
 import { CajaPage } from "../modules/caja/CajaPage";
 import { ClientesPage } from "../modules/clientes/ClientesPage";
+import { ClienteFichaPage } from "../modules/clientes/ClienteFichaPage";
 import { SolicitudesPage } from "../modules/solicitudes/SolicitudesPage";
 import { TransaccionesPage } from "../modules/transacciones/TransaccionesPage";
 import { CuentasPorCobrarPagarPage } from "../modules/cuentasPorCobrarPagar/CuentasPorCobrarPagarPage";
@@ -31,6 +32,7 @@ export function AppRoutes() {
         <Route path="/tasas" element={<TasasPage />} />
         <Route path="/cuentas-por-cobrar-pagar" element={<CuentasPorCobrarPagarPage />} />
         <Route path="/clientes" element={<ClientesPage />} />
+        <Route path="/clientes/:id" element={<ClienteFichaPage />} />
         <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
         <Route path="/reportes" element={<ReportesPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />

@@ -1,4 +1,6 @@
 import { api } from "./client";
+import type { CuentaPorCobrar } from "./cuentasPorCobrar.api";
+import type { CuentaPorPagar } from "./cuentasPorPagar.api";
 
 export interface Tercero {
   id: number;
@@ -24,8 +26,9 @@ export interface ResumenTercero {
     bloqueadas: CuentaCorriente[];
     cerradas: CuentaCorriente[];
   };
-  cuentasPorCobrar: unknown[];
-  cuentasPorPagar: unknown[];
+  // Solo las que no están PAGADAS; el resumen no trae tercero_nombre (es el mismo cliente)
+  cuentasPorCobrar: Omit<CuentaPorCobrar, "tercero_nombre">[];
+  cuentasPorPagar: Omit<CuentaPorPagar, "tercero_nombre">[];
 }
 
 export const TIPOS_DOCUMENTO = ["Cédula", "NIT", "Pasaporte", "Cédula de Extranjería"] as const;
@@ -36,6 +39,17 @@ export function buscarTerceros(query: string) {
 
 export function crearTercero(data: { nombre: string; identificacion?: string; telefono?: string; tipo: string }) {
   return api.post<Tercero>("/terceros", data);
+}
+
+export type TipoTercero = Tercero["tipo"];
+
+export function obtenerTercero(id: number) {
+  return api.get<Tercero>(`/terceros/${id}`);
+}
+
+// El backend solo reemplaza lo que se manda; un campo vacío no borra el valor guardado.
+export function actualizarTercero(id: number, data: { nombre?: string; identificacion?: string; telefono?: string; tipo?: TipoTercero }) {
+  return api.put<Tercero>(`/terceros/${id}`, data);
 }
 
 export function obtenerResumenTercero(id: number) {

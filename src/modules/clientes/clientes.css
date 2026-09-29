@@ -1,0 +1,144 @@
+/* ---------- Ficha del cliente (/clientes/:id) ---------- */
+.ficha-page { min-height: 100vh; background: #eef0f4; padding-bottom: 40px; }
+
+.ficha-migas { display: flex; align-items: center; gap: 8px; padding: 18px 40px 10px; font-family: "Inter", sans-serif; font-size: 0.82rem; color: #6b7280; }
+.ficha-migas a { display: inline-flex; align-items: center; gap: 2px; color: var(--color-navy); text-decoration: none; font-weight: 600; }
+.ficha-migas a:hover { text-decoration: underline; }
+
+/* Encabezado navy con la textura dorada de la marca */
+.ficha-hero {
+  position: relative; overflow: hidden;
+  margin: 0 40px; border-radius: 14px; padding: 26px 28px;
+  background: linear-gradient(160deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
+  color: white; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;
+  box-shadow: 0 10px 30px -8px rgba(11,14,19,0.45);
+}
+.ficha-hero::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(115deg, rgba(244,215,81,0.04) 0px, rgba(244,215,81,0.04) 1.5px, transparent 1.5px, transparent 24px);
+}
+.ficha-hero > * { position: relative; }
+.ficha-hero-principal { display: flex; gap: 20px; align-items: flex-start; min-width: 0; }
+.ficha-avatar {
+  width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-gold); color: var(--color-navy-dark);
+  font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 1.4rem;
+}
+.ficha-hero h1 { font-family: "Space Grotesk", sans-serif; margin: 6px 0 14px; font-size: 1.7rem; overflow-wrap: anywhere; }
+.ficha-hero-etiquetas { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ficha-tipo { font-family: "Inter", sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-gold); border: 1px solid rgba(244,215,81,0.4); padding: 3px 10px; border-radius: 12px; }
+.ficha-datos { display: flex; flex-wrap: wrap; gap: 10px 32px; margin: 0; font-family: "Inter", sans-serif; }
+.ficha-datos dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.5); }
+.ficha-datos dd { margin: 2px 0 0; font-weight: 600; font-size: 0.95rem; }
+.ficha-hero-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Botones */
+.ficha-btn-primario, .ficha-btn-claro, .ficha-btn-secundario {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none; cursor: pointer;
+  padding: 10px 18px; border-radius: 6px; font-family: "Inter", sans-serif; font-weight: 700; font-size: 0.88rem;
+}
+.ficha-btn-primario { background: var(--color-gold); color: var(--color-navy-dark); border: none; }
+.ficha-btn-primario:hover { background: #e0c23f; }
+.ficha-btn-primario:disabled { opacity: 0.6; cursor: default; }
+.ficha-btn-claro { background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.3); }
+.ficha-btn-claro:hover { border-color: var(--color-gold); }
+.ficha-btn-secundario { background: white; color: #5b6472; border: 1px solid #d7dbe2; }
+
+/* Indicadores */
+.ficha-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 40px 0; }
+.ficha-kpi { background: white; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); border-top: 3px solid var(--color-navy); }
+.ficha-kpi.alerta { border-top-color: var(--color-gold-dark); }
+.ficha-kpi-titulo { font-family: "Inter", sans-serif; font-size: 0.72rem; color: #6b7280; }
+.ficha-kpi-valor { font-family: "Space Grotesk", sans-serif; font-size: 1.6rem; font-weight: 700; color: var(--color-navy-dark); line-height: 1.2; }
+.ficha-kpi-detalle { font-family: "Inter", sans-serif; font-size: 0.72rem; color: #9ca3af; }
+
+/* Pestañas */
+.ficha-tabs {
+  position: sticky; top: 0; z-index: 10; display: flex; gap: 4px; overflow-x: auto;
+  margin: 20px 40px 0; padding: 6px; background: white; border-radius: 12px 12px 0 0; border-bottom: 1px solid #e5e7eb;
+}
+.ficha-tabs button {
+  display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; white-space: nowrap;
+  background: none; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer;
+  font-family: "Inter", sans-serif; font-size: 0.86rem; color: #5b6472; font-weight: 500;
+}
+.ficha-tabs button:hover { background: #f2f4f7; }
+.ficha-tabs button.activo { background: var(--color-navy); color: white; font-weight: 600; }
+.ficha-tab-conteo { font-size: 0.72rem; font-weight: 700; background: #eef0f4; color: var(--color-navy-dark); border-radius: 10px; padding: 1px 7px; }
+.ficha-tabs button.activo .ficha-tab-conteo { background: var(--color-gold); }
+
+.ficha-contenido { margin: 0 40px; background: white; border-radius: 0 0 12px 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); min-height: 200px; }
+.ficha-vacio-texto { font-family: "Inter", sans-serif; color: #6b7280; font-size: 0.9rem; margin: 0 0 12px; }
+.ficha-vacio-texto a, .ficha-enlace { color: var(--color-navy); font-weight: 700; }
+.ficha-enlace { font-family: "Inter", sans-serif; font-size: 0.85rem; text-decoration: none; }
+.ficha-enlace:hover { text-decoration: underline; }
+.ficha-error { color: #c0392b; font-family: "Inter", sans-serif; font-size: 0.85rem; margin: 12px 40px 0; }
+.ficha-form .ficha-error { margin: 0; }
+
+/* Tablas */
+.ficha-tabla-scroll { overflow-x: auto; }
+.ficha-tabla { width: 100%; border-collapse: collapse; font-family: "Inter", sans-serif; font-size: 0.86rem; }
+.ficha-tabla th { text-align: left; font-size: 0.72rem; color: #6b7280; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+.ficha-tabla td { padding: 10px 12px; border-bottom: 1px solid #f1f2f4; }
+.ficha-tabla .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ficha-fila-apagada td { color: #9ca3af; }
+.ficha-tabla-acciones { display: flex; gap: 6px; justify-content: flex-end; }
+.ficha-tabla-acciones button { background: white; border: 1px solid #d7dbe2; color: var(--color-navy); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-family: "Inter", sans-serif; font-size: 0.78rem; font-weight: 600; }
+.ficha-tabla-acciones button:hover { border-color: var(--color-navy); }
+
+.ficha-estado { display: inline-block; font-family: "Inter", sans-serif; font-size: 0.72rem; font-weight: 700; padding: 2px 9px; border-radius: 10px; }
+.ficha-estado-disponible, .ficha-estado-pagada { background: #e3f4e7; color: #1a7f37; }
+.ficha-estado-bloqueada, .ficha-estado-pendiente, .ficha-estado-abonada { background: #fff4cc; color: #8a6d1f; }
+.ficha-estado-cerrada { background: #eef0f4; color: #5b6472; }
+.ficha-estado-vencida { background: #fde8e6; color: #c0392b; }
+
+/* Cuentas de pago */
+.ficha-cuentas-pago { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.ficha-cuenta-pago { border: 1px solid #e5e7eb; border-left: 4px solid var(--color-accent-blue); border-radius: 10px; padding: 14px 16px; font-family: "Inter", sans-serif; }
+.ficha-cuenta-pago.inactiva { border-left-color: #c7ccd6; opacity: 0.7; }
+.ficha-cuenta-pago-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ficha-cuenta-pago-tipo { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--color-navy-dark); font-size: 0.88rem; }
+.ficha-cuenta-pago-moneda { font-size: 0.7rem; font-weight: 700; background: #eaf1f8; color: var(--color-navy); padding: 2px 8px; border-radius: 8px; }
+.ficha-cuenta-pago-alias { display: block; font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin-bottom: 6px; }
+.ficha-cuenta-pago dl { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.ficha-cuenta-pago dl div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.82rem; }
+.ficha-cuenta-pago dt { color: #6b7280; }
+.ficha-cuenta-pago dd { margin: 0; font-weight: 600; color: #1f2937; text-align: right; overflow-wrap: anywhere; }
+
+/* Por cobrar / por pagar */
+.ficha-deudas { display: flex; flex-direction: column; gap: 22px; }
+.ficha-deuda h3 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0; font-size: 1rem; }
+.ficha-deuda-sub { display: block; font-family: "Inter", sans-serif; font-size: 0.78rem; color: #6b7280; margin: 2px 0 10px; }
+
+.ficha-operar .operacion-form { max-width: 560px; }
+
+/* Formulario de edición */
+.ficha-form { display: flex; flex-direction: column; gap: 14px; font-family: "Inter", sans-serif; }
+.ficha-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: #374151; flex: 1; min-width: 160px; }
+.ficha-form input, .ficha-form select { padding: 10px 12px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: "Inter", sans-serif; font-size: 0.92rem; }
+.ficha-form input:focus, .ficha-form select:focus { outline: none; border-color: var(--color-gold); }
+.ficha-form-fila { display: flex; gap: 14px; flex-wrap: wrap; }
+.ficha-form-nota { font-size: 0.75rem; color: #6b7280; margin: 0; }
+.ficha-form-acciones { display: flex; justify-content: flex-end; gap: 10px; }
+.ficha-form .ficha-btn-primario { background: var(--color-navy); color: white; }
+.ficha-form .ficha-btn-primario:hover { background: var(--color-navy-dark); }
+
+/* Cliente inexistente */
+.ficha-vacia { max-width: 480px; margin: 60px auto; text-align: center; font-family: "Inter", sans-serif; padding: 0 16px; }
+.ficha-vacia h1 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); }
+.ficha-vacia p { color: #6b7280; margin-bottom: 20px; }
+
+@media (max-width: 720px) {
+  .ficha-migas { padding-left: 16px; padding-right: 16px; }
+  .ficha-hero, .ficha-kpis, .ficha-tabs, .ficha-contenido { margin-left: 16px; margin-right: 16px; }
+  .ficha-hero { padding: 20px; }
+  .ficha-hero-principal { flex-direction: column; }
+  .ficha-contenido { padding: 16px; }
+  .ficha-error { margin-left: 16px; margin-right: 16px; }
+}
+
+/* ---------- Lista de clientes: toda la fila abre la ficha ---------- */
+.clientes-fila { cursor: pointer; }
+.clientes-fila:hover td { background: #f7f8fa; }
+a.clientes-ver-btn { display: inline-block; text-decoration: none; white-space: nowrap; }

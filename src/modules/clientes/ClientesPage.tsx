@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { buscarTerceros, obtenerResumenTercero, type Tercero, type ResumenTercero } from "../../api/terceros.api";
+import { Link, useNavigate } from "react-router-dom";
+import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { Header } from "../../components/common/Header";
 import { ClienteForm } from "./ClienteForm";
-import { ClienteAccionesPanel } from "../caja/ClienteAccionesPanel";
+import "./clientes.css";
 
 export function ClientesPage() {
   const [query, setQuery] = useState("");
@@ -10,8 +11,7 @@ export function ClientesPage() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
-  const [seleccionado, setSeleccionado] = useState<Tercero | null>(null);
-  const [resumen, setResumen] = useState<ResumenTercero | null>(null);
+  const navigate = useNavigate();
 
   async function cargarClientes(busqueda: string) {
     setCargando(true);
@@ -36,25 +36,9 @@ export function ClientesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  async function verDetalle(tercero: Tercero) {
-    setSeleccionado(tercero);
-    try {
-      const data = await obtenerResumenTercero(tercero.id);
-      setResumen(data);
-    } catch {
-      setError("No se pudo cargar la información del cliente.");
-    }
-  }
-
   function handleClienteCreado(nuevo: Tercero) {
     setMostrarFormNuevo(false);
-    cargarClientes(query);
-    verDetalle(nuevo);
-  }
-
-  function cerrarDetalle() {
-    setSeleccionado(null);
-    setResumen(null);
+    navigate(`/clientes/${nuevo.id}`);
   }
 
   return (
@@ -86,48 +70,42 @@ export function ClientesPage() {
 
       {error && <p className="clientes-error">{error}</p>}
 
-      {!seleccionado && (
-        <div className="clientes-tabla-wrap">
-          {cargando ? (
-            <p className="clientes-hint">Cargando…</p>
-          ) : clientes.length === 0 ? (
-            <p className="clientes-hint">No hay clientes que coincidan con la búsqueda.</p>
-          ) : (
-            <table className="clientes-tabla">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Identificación</th>
-                  <th>Teléfono</th>
-                  <th>Tipo</th>
-                  <th></th>
+      <div className="clientes-tabla-wrap">
+        {cargando ? (
+          <p className="clientes-hint">Cargando…</p>
+        ) : clientes.length === 0 ? (
+          <p className="clientes-hint">No hay clientes que coincidan con la búsqueda.</p>
+        ) : (
+          <table className="clientes-tabla">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Identificación</th>
+                <th>Teléfono</th>
+                <th>Tipo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientes.map((c) => (
+                <tr key={c.id} className="clientes-fila" onClick={() => navigate(`/clientes/${c.id}`)}>
+                  <td>{c.nombre}</td>
+                  <td>{c.identificacion ?? "—"}</td>
+                  <td>{c.telefono ?? "—"}</td>
+                  <td>
+                    <span className={`cliente-tipo cliente-tipo-${c.tipo.toLowerCase()}`}>{c.tipo}</span>
+                  </td>
+                  <td>
+                    <Link className="clientes-ver-btn" to={`/clientes/${c.id}`} onClick={(e) => e.stopPropagation()}>
+                      Ver ficha
+                    </Link>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {clientes.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.nombre}</td>
-                    <td>{c.identificacion ?? "—"}</td>
-                    <td>{c.telefono ?? "—"}</td>
-                    <td>
-                      <span className={`cliente-tipo cliente-tipo-${c.tipo.toLowerCase()}`}>{c.tipo}</span>
-                    </td>
-                    <td>
-                      <button className="clientes-ver-btn" onClick={() => verDetalle(c)}>
-                        Ver detalle
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {seleccionado && resumen && (
-        <ClienteAccionesPanel resumen={resumen} onCerrar={cerrarDetalle} onActualizar={() => verDetalle(seleccionado)} />
-      )}
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

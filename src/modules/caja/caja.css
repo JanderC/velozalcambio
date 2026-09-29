@@ -1,24 +1,5 @@
-/* Estilos propios del módulo Caja. Los anteriores (.operacion-*, .cliente-*) siguen en global.css. */
 
-.caja-monto-lectura { font-size: 0.82rem; color: var(--color-navy-dark); background: #eaf1f8; border-radius: 6px; padding: 5px 10px; align-self: flex-start; }
-.caja-monto-ayuda { font-size: 0.75rem; color: #6b7280; }
-
-.caja-calculo-estado { font-size: 0.85rem; color: #6b7280; margin: 0; }
-.caja-calculo { border: 1px solid #d7dbe2; border-radius: 8px; overflow: hidden; }
-.caja-calculo-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f1f2f4; font-size: 0.85rem; color: #5b6472; }
-.caja-calculo-fila:last-child { border-bottom: none; }
-.caja-calculo-fila strong { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); font-size: 1rem; }
-.caja-calculo-destacado { background: linear-gradient(160deg, var(--color-navy) 0%, var(--color-navy-dark) 100%); color: rgba(255,255,255,0.75); }
-.caja-calculo-destacado strong { color: var(--color-gold); font-size: 1.2rem; }
-
-.caja-registrado { border-radius: 8px; padding: 12px 14px; font-size: 0.85rem; }
-.caja-registrado p { margin: 0; }
-.caja-registrado p + p { margin-top: 4px; }
-.caja-registrado.completada { background: #eaf6ec; border: 1px solid #b7e0bd; color: #1a5d2b; }
-.caja-registrado.pendiente { background: #fff8e6; border: 1px solid var(--color-gold-dark); color: #5b4a14; }
-.caja-registrado a { color: var(--color-navy); font-weight: 700; }
-
-/* 4 operaciones en grilla 2x2: compras arriba, ventas abajo */
-.caja-operaciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.caja-operaciones button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
-.caja-operacion-flujo { font-size: 0.72rem; font-weight: 400; opacity: 0.75; }
+/* Datos del cliente: enlace a la ficha completa junto a "Buscar otro cliente" */
+.cliente-panel-botones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.cliente-panel-ficha { background: var(--color-navy); color: white; padding: 7px 14px; border-radius: 4px; text-decoration: none; font-family: "Inter", sans-serif; font-size: 0.85rem; font-weight: 600; }
+.cliente-panel-ficha:hover { background: var(--color-navy-dark); }
