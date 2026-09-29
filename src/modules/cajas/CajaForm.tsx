@@ -50,7 +50,7 @@ export function CajaForm({ caja, onGuardada, onCancelar }: { caja?: Caja; onGuar
         </select>
       </label>
       {tipo === "BANCO" && (
-        <p className="cajas-form-nota">Los depósitos y retiros de clientes en un banco quedan pendientes de confirmación.</p>
+        <p className="cajas-form-nota">Los depósitos y retiros de clientes en un banco quedan pendientes de confirmación. Los datos bancarios (número, titular…) se cargan en Cuentas y Métodos de Pago.</p>
       )}
       <label>
         Descripción (opcional)

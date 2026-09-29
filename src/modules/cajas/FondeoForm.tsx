@@ -26,6 +26,10 @@ export function FondeoForm({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const caja = activas.find((c) => c.id === cajaId);
+  const cajaConTurno = caja?.turnos_abiertos.some((t) => t.moneda_id === monedaId) ?? false;
+  const monedaCodigo = monedas.find((m) => m.id === monedaId)?.codigo ?? "";
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -84,6 +88,15 @@ export function FondeoForm({
         <input type="checkbox" checked={abrirTurno} onChange={(e) => setAbrirTurno(e.target.checked)} />
         Abrir el turno de la caja en esta moneda si está cerrado
       </label>
+      {caja && monedaId && !cajaConTurno && (
+        <p className="cajas-form-nota">
+          {abrirTurno ? (
+            <>Se abrirá un turno de <strong>{caja.nombre}</strong> en <strong>{monedaCodigo}</strong>. Recordá cerrarlo al final del día.</>
+          ) : (
+            <span className="cajas-texto-alerta">{caja.nombre} no tiene turno abierto en {monedaCodigo}: el fondeo será rechazado.</span>
+          )}
+        </p>
+      )}
 
       {error && <p className="cajas-error">{error}</p>}
 

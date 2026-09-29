@@ -19,6 +19,7 @@ import { UsuariosPage } from "../modules/usuarios/UsuariosPage";
 import { NuevaTransaccionPage } from "../modules/nuevaTransaccion/NuevaTransaccionPage";
 import { WhatsAppPage } from "../modules/whatsapp/WhatsAppPage";
 import { CajasPage } from "../modules/cajas/CajasPage";
+import { CuentasEmpresaPage } from "../modules/cuentasEmpresa/CuentasEmpresaPage";
 
 
 
@@ -51,6 +52,7 @@ export function AppRoutes() {
         </Route>
         <Route element={<RequireRole roles={["ADMIN"]} />}>
         <Route path="/usuarios" element={<UsuariosPage />} />
+        <Route path="/cuentas-empresa" element={<CuentasEmpresaPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
         </Route>
       </Route>

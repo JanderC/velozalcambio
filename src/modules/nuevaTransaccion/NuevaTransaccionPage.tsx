@@ -13,7 +13,7 @@ import { Header } from "../../components/common/Header";
 import { buscarTerceros, obtenerTercero, type Tercero } from "../../api/terceros.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
-import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
+import { etiquetaMetodoPago, getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
 import { getCotizacionesDetalle, type CotizacionDetalle } from "../../api/tasas.api";
 import { registrarCambioDivisa, type CalculoCambio, type ResultadoCambio } from "../../api/transacciones.api";
 import { ApiError } from "../../api/client";
@@ -168,7 +168,10 @@ export function NuevaTransaccionPage() {
   const monedaPagoCodigo = monedas.find((m) => m.id === monedaPagoId)?.codigo;
 
   const nombreCaja = (id: number | "") => cajas.find((c) => c.id === id)?.nombre ?? null;
-  const nombreMetodo = (id: number | "") => metodos.find((m) => m.id === id)?.nombre ?? null;
+  const nombreMetodo = (id: number | "") => {
+    const metodo = metodos.find((m) => m.id === id);
+    return metodo ? etiquetaMetodoPago(metodo) : null;
+  };
 
   function elegirOperacion(op: OperacionCambio) {
     if (op === operacion) return;
@@ -465,7 +468,7 @@ export function NuevaTransaccionPage() {
                       Método de pago
                       <select value={metodoPagoId} onChange={(e) => setMetodoPagoId(e.target.value ? Number(e.target.value) : "")}>
                         <option value="">Seleccionar…</option>
-                        {metodos.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                        {metodos.map((m) => <option key={m.id} value={m.id}>{etiquetaMetodoPago(m)}</option>)}
                       </select>
                     </label>
                     <label className="nt-campo">

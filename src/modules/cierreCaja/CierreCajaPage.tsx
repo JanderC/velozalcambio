@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Header } from "../../components/common/Header";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
@@ -8,11 +9,18 @@ import { CerrarTurnoForm } from "./CerrarTurnoForm";
 import { ApiError } from "../../api/client";
 import "./cierreCaja.css";
 
+// ?cajaId=&monedaId= preselecciona el turno (enlace "cerrar" desde el módulo Cajas)
+function leerIdParam(valor: string | null): number | "" {
+  const id = Number(valor);
+  return valor && Number.isInteger(id) ? id : "";
+}
+
 export function CierreCajaPage() {
+  const [searchParams] = useSearchParams();
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [monedas, setMonedas] = useState<Moneda[]>([]);
-  const [cajaId, setCajaId] = useState<number | "">("");
-  const [monedaId, setMonedaId] = useState<number | "">("");
+  const [cajaId, setCajaId] = useState<number | "">(() => leerIdParam(searchParams.get("cajaId")));
+  const [monedaId, setMonedaId] = useState<number | "">(() => leerIdParam(searchParams.get("monedaId")));
   const [cierreActual, setCierreActual] = useState<CierreCaja | null>(null);
   const [historial, setHistorial] = useState<CierreCaja[]>([]);
   const [error, setError] = useState<string | null>(null);

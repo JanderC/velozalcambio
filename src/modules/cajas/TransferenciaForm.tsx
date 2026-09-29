@@ -32,6 +32,7 @@ export function TransferenciaForm({
   const destino = activas.find((c) => c.id === destinoId);
   const saldoOrigen = origen?.saldos.find((s) => s.moneda_id === monedaId)?.monto ?? "0";
   const origenConTurno = origen?.turnos_abiertos.some((t) => t.moneda_id === monedaId) ?? false;
+  const destinoConTurno = destino?.turnos_abiertos.some((t) => t.moneda_id === monedaId) ?? false;
   const monedaCodigo = monedas.find((m) => m.id === monedaId)?.codigo ?? "";
 
   async function handleSubmit(e: FormEvent) {
@@ -119,6 +120,15 @@ export function TransferenciaForm({
         <input type="checkbox" checked={abrirTurnoDestino} onChange={(e) => setAbrirTurnoDestino(e.target.checked)} />
         Abrir el turno de {destino?.nombre ?? "la caja destino"} si está cerrado
       </label>
+      {destino && monedaId && !destinoConTurno && (
+        <p className="cajas-form-nota">
+          {abrirTurnoDestino ? (
+            <>Se abrirá un turno de <strong>{destino.nombre}</strong> en <strong>{monedaCodigo}</strong>. Recordá cerrarlo al final del día.</>
+          ) : (
+            <span className="cajas-texto-alerta">{destino.nombre} no tiene turno abierto en {monedaCodigo}: la transferencia será rechazada.</span>
+          )}
+        </p>
+      )}
 
       {error && <p className="cajas-error">{error}</p>}
 

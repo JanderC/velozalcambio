@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { getCajas, type Caja } from "../../api/cajas.api";
-import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
+import { etiquetaMetodoPago, getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
 import { ApiError } from "../../api/client";
 
 export function AbonoForm({
@@ -68,7 +68,7 @@ export function AbonoForm({
           <select value={metodoPagoId} onChange={(e) => setMetodoPagoId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">(opcional)</option>
             {metodos.map((m) => (
-              <option key={m.id} value={m.id}>{m.nombre}</option>
+              <option key={m.id} value={m.id}>{etiquetaMetodoPago(m)}</option>
             ))}
           </select>
         </label>

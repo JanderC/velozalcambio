@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
-import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
+import { etiquetaMetodoPago, getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
 import { getCotizacionesDetalle, type CotizacionDetalle } from "../../api/tasas.api";
 import { registrarCambioDivisa, type ResultadoCambio } from "../../api/transacciones.api";
 import { ApiError } from "../../api/client";
@@ -293,7 +293,7 @@ export function RegistrarOperacionForm({
           <select value={metodoPagoId} onChange={(e) => setMetodoPagoId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">Seleccionar…</option>
             {metodos.map((m) => (
-              <option key={m.id} value={m.id}>{m.nombre}</option>
+              <option key={m.id} value={m.id}>{etiquetaMetodoPago(m)}</option>
             ))}
           </select>
         </label>

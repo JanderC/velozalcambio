@@ -20,6 +20,36 @@ import { TransferenciaForm } from "./TransferenciaForm";
 import { formatearMonto } from "./montos";
 import "./cajas.css";
 
+// Una fila por moneda con saldo O con turno abierto: un turno en una moneda
+// sin saldo también hay que cerrarlo, así que no puede quedar oculto.
+function filasPorMoneda(caja: CajaTablero) {
+  const filas = caja.saldos.map((s) => ({
+    monedaId: s.moneda_id,
+    codigo: s.moneda_codigo,
+    monto: s.monto,
+    abierto: caja.turnos_abiertos.some((t) => t.moneda_id === s.moneda_id),
+  }));
+  for (const t of caja.turnos_abiertos) {
+    if (!filas.some((f) => f.monedaId === t.moneda_id)) {
+      filas.push({ monedaId: t.moneda_id, codigo: t.moneda_codigo, monto: "0", abierto: true });
+    }
+  }
+  return filas.sort((a, b) => a.codigo.localeCompare(b.codigo));
+}
+
+// Mismas reglas que valida el backend al desactivar; se muestran antes de intentarlo.
+function motivosParaNoDesactivar(caja: CajaTablero) {
+  const motivos: string[] = [];
+  if (caja.turnos_abiertos.length > 0) {
+    motivos.push(`tiene turnos abiertos en ${caja.turnos_abiertos.map((t) => t.moneda_codigo).join(", ")} (cerralos en Cierre de Caja)`);
+  }
+  const conSaldo = caja.saldos.filter((s) => Number(s.monto) !== 0);
+  if (conSaldo.length > 0) {
+    motivos.push(`todavía tiene saldo: ${conSaldo.map((s) => `${s.moneda_codigo} ${formatearMonto(s.monto)}`).join(", ")} (transferilo a otra caja)`);
+  }
+  return motivos;
+}
+
 type Dialogo =
   | { tipo: "nueva" }
   | { tipo: "editar"; caja: CajaTablero }
@@ -80,6 +110,9 @@ export function CajasPage() {
   }
 
   const principal = cajas.find((c) => c.es_principal);
+  const turnosAbiertos = cajas.flatMap((c) =>
+    c.turnos_abiertos.map((t) => ({ cajaId: c.id, caja: c.nombre, monedaId: t.moneda_id, codigo: t.moneda_codigo }))
+  );
 
   return (
     <div className="cajas-page">
@@ -111,6 +144,17 @@ export function CajasPage() {
           No hay una caja principal configurada.{esAdmin ? " Marcá una con \"Hacer principal\"." : " Pedile al administrador que configure una."}
         </p>
       )}
+      {turnosAbiertos.length > 0 && (
+        <p className="cajas-banner cajas-banner-info">
+          {turnosAbiertos.length === 1 ? "Hay 1 turno abierto" : `Hay ${turnosAbiertos.length} turnos abiertos`} (se abren por moneda, cerralos al final del día):{" "}
+          {turnosAbiertos.map((t, i) => (
+            <span key={`${t.cajaId}-${t.monedaId}`}>
+              {i > 0 && ", "}
+              <Link to={`/cierre-caja?cajaId=${t.cajaId}&monedaId=${t.monedaId}`}>{t.caja} {t.codigo}</Link>
+            </span>
+          ))}
+        </p>
+      )}
       {error && <p className="cajas-banner cajas-banner-error">{error}</p>}
       {aviso && <p className="cajas-banner cajas-banner-ok">{aviso}</p>}
 
@@ -139,19 +183,26 @@ export function CajasPage() {
             {c.descripcion && <p className="caja-tarjeta-descripcion">{c.descripcion}</p>}
 
             <div className="caja-tarjeta-saldos">
-              {c.saldos.length === 0 ? (
+              {filasPorMoneda(c).length === 0 ? (
                 <p className="caja-tarjeta-vacia">Sin saldo todavía</p>
               ) : (
-                c.saldos.map((s) => {
-                  const abierto = c.turnos_abiertos.some((t) => t.moneda_id === s.moneda_id);
-                  return (
-                    <div key={s.moneda_id} className="caja-tarjeta-saldo">
-                      <span>{s.moneda_codigo}</span>
-                      <strong>{formatearMonto(s.monto)}</strong>
-                      <span className={abierto ? "caja-turno caja-turno-abierto" : "caja-turno"}>{abierto ? "Turno abierto" : "Cerrado"}</span>
-                    </div>
-                  );
-                })
+                filasPorMoneda(c).map((f) => (
+                  <div key={f.monedaId} className="caja-tarjeta-saldo">
+                    <span>{f.codigo}</span>
+                    <strong>{formatearMonto(f.monto)}</strong>
+                    {f.abierto ? (
+                      <Link
+                        to={`/cierre-caja?cajaId=${c.id}&monedaId=${f.monedaId}`}
+                        className="caja-turno caja-turno-abierto"
+                        title={`Cerrar el turno de ${c.nombre} en ${f.codigo}`}
+                      >
+                        Turno abierto · cerrar
+                      </Link>
+                    ) : (
+                      <span className="caja-turno">Cerrado</span>
+                    )}
+                  </div>
+                ))
               )}
             </div>
 
@@ -167,7 +218,13 @@ export function CajasPage() {
                 {esAdmin && !c.es_principal && (
                   <button
                     onClick={() => {
-                      if (window.confirm(`¿Desactivar ${c.nombre}? Debe estar en cero y sin turnos abiertos.`)) {
+                      const motivos = motivosParaNoDesactivar(c);
+                      if (motivos.length > 0) {
+                        setAviso(null);
+                        setError(`No se puede desactivar "${c.nombre}": ${motivos.join("; y ")}.`);
+                        return;
+                      }
+                      if (window.confirm(`¿Desactivar ${c.nombre}? Dejará de aparecer en las operaciones.`)) {
                         ejecutar(() => actualizarCaja(c.id, { activo: false }), `${c.nombre} quedó inactiva.`);
                       }
                     }}

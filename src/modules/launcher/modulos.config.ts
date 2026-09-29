@@ -13,6 +13,7 @@ import {
   MessageCircle,
   PencilLine,
   Wallet,
+  Landmark,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
 import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
@@ -89,6 +90,15 @@ export const MODULOS: ModuloConfig[] = [
     icono: PencilLine,
     ruta: "/tasas/registro",
     rolesPermitidos: ROLES_REGISTRO_TASAS,
+  },
+  {
+    id: "cuentas-empresa",
+    titulo: "Cuentas y Métodos de Pago",
+    categoria: "Configuración",
+    acento: ACENTO_CONFIG,
+    icono: Landmark,
+    ruta: "/cuentas-empresa",
+    rolesPermitidos: ["ADMIN"],
   },
   {
     id: "cuentas",

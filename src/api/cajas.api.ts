@@ -2,6 +2,8 @@ import { api } from "./client";
 
 export type TipoCaja = "FISICA" | "FUERTE" | "BANCO";
 
+export type TipoCuentaBancaria = "AHORRO" | "CORRIENTE" | "BILLETERA";
+
 export interface Caja {
   id: number;
   nombre: string;
@@ -9,6 +11,29 @@ export interface Caja {
   activo: boolean;
   es_principal: boolean;
   descripcion: string | null;
+  // Datos bancarios: solo se usan en las cuentas de la empresa (tipo BANCO)
+  banco: string | null;
+  numero_cuenta: string | null;
+  tipo_cuenta: TipoCuentaBancaria | null;
+  titular: string | null;
+  identificacion_titular: string | null;
+  telefono: string | null;
+  email: string | null;
+  pais: string | null;
+  moneda_id: number | null;
+}
+
+// Como lo recibe el backend: undefined = no tocar, null = borrar
+export interface DatosCuenta {
+  banco?: string | null;
+  numeroCuenta?: string | null;
+  tipoCuenta?: TipoCuentaBancaria | null;
+  titular?: string | null;
+  identificacionTitular?: string | null;
+  telefono?: string | null;
+  email?: string | null;
+  pais?: string | null;
+  monedaId?: number | null;
 }
 
 export interface SaldoCaja {
@@ -26,6 +51,8 @@ export interface TurnoAbierto {
 export interface CajaTablero extends Caja {
   saldos: SaldoCaja[];
   turnos_abiertos: TurnoAbierto[];
+  moneda_codigo: string | null;
+  metodos_pago: { id: number; nombre: string }[];
 }
 
 export interface MovimientoInterno {
@@ -51,13 +78,13 @@ export function getTableroCajas(incluirInactivas = false) {
   return api.get<CajaTablero[]>(`/cajas/tablero${incluirInactivas ? "?incluirInactivas=true" : ""}`);
 }
 
-export function crearCaja(data: { nombre: string; tipo: TipoCaja; descripcion?: string; esPrincipal?: boolean }) {
+export function crearCaja(data: { nombre: string; tipo: TipoCaja; descripcion?: string; esPrincipal?: boolean } & DatosCuenta) {
   return api.post<Caja>("/cajas", data);
 }
 
 export function actualizarCaja(
   id: number,
-  data: { nombre?: string; tipo?: TipoCaja; descripcion?: string | null; activo?: boolean }
+  data: { nombre?: string; tipo?: TipoCaja; descripcion?: string | null; activo?: boolean } & DatosCuenta
 ) {
   return api.put<Caja>(`/cajas/${id}`, data);
 }
