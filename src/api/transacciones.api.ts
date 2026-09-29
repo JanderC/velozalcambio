@@ -16,10 +16,105 @@ export interface Solicitud {
   moneda_codigo: string;
   caja_id: number;
   caja_nombre: string;
+  tercero_id: number | null;
   tercero_nombre: string | null;
   creado_por_nombre: string;
   referencia_codigo: string | null;
   created_at: string;
+  usuario_id: number;
+  // Contexto extra para la bandeja
+  caja_tipo?: "FISICA" | "FUERTE" | "BANCO";
+  caja_destino_id?: number | null;
+  caja_destino_nombre?: string | null;
+  caja_destino_tipo?: "FISICA" | "FUERTE" | "BANCO" | null;
+  monto_destino?: string | null;
+  moneda_destino_codigo?: string | null;
+  tasa_aplicada?: string | null;
+  tercero_identificacion?: string | null;
+  metodo_pago_nombre?: string | null;
+  referencia_banco_origen?: string | null;
+  documentos?: number;
+}
+
+export interface CajaDePata {
+  id: number;
+  nombre: string;
+  tipo: "FISICA" | "FUERTE" | "BANCO";
+  banco: string | null;
+  numeroCuenta: string | null;
+  tipoCuenta: string | null;
+  titular: string | null;
+  identificacionTitular: string | null;
+  telefono: string | null;
+  email: string | null;
+}
+
+// Un movimiento que aplicaría confirmar: qué entra o sale, dónde, y cómo queda esa caja
+export interface PataSolicitud {
+  tipo: "INGRESO" | "EGRESO";
+  monto: string;
+  monedaId: number;
+  monedaCodigo: string;
+  decimales: number;
+  caja: CajaDePata;
+  saldoActual: string;
+  saldoDespues: string;
+  turnoAbierto: boolean;
+  saldoSuficiente: boolean;
+}
+
+export interface DocumentoSolicitud {
+  id: number;
+  tipo: string;
+  descripcion: string | null;
+  nombre_original: string;
+  mime_type: string;
+  tamano_bytes: number;
+  estado: string;
+  created_at: string;
+  subido_por_nombre: string;
+}
+
+export interface DetalleSolicitud {
+  transaccion: Solicitud & {
+    estado: string;
+    operacion_calculo: "MULTIPLICACION" | "DIVISION" | null;
+    metodo_pago_cuenta_nombre: string | null;
+    referencia_estado: string | null;
+  };
+  patas: PataSolicitud[];
+  cliente: {
+    id: number;
+    nombre: string;
+    identificacion: string | null;
+    telefono: string | null;
+    clienteDesde: string;
+    operacionesConfirmadas: number;
+    operacionesRechazadas: number;
+    otrasPendientes: number;
+    verificacion: { estado: "VERIFICADO" | "PENDIENTE_REVISION" | "NO_VERIFICADO" | "SIN_DOCUMENTOS" };
+  } | null;
+  cuentaCliente: {
+    id: number;
+    tipo: string;
+    banco: string | null;
+    numero_cuenta: string | null;
+    tipo_cuenta: string | null;
+    titular: string;
+    identificacion_titular: string | null;
+    telefono: string | null;
+    email: string | null;
+    alias: string | null;
+    moneda_codigo: string | null;
+  } | null;
+  documentos: DocumentoSolicitud[];
+  alertas: { nivel: "bloqueante" | "advertencia" | "info"; mensaje: string }[];
+}
+
+export interface VerificacionConfirmacion {
+  montoVerificado?: string;
+  checklist?: string[];
+  nota?: string;
 }
 
 export interface Transaccion {
@@ -119,8 +214,12 @@ export function getSolicitudesPendientes(cajaId?: number) {
   return api.get<Solicitud[]>(`/transacciones/solicitudes${query}`);
 }
 
-export function confirmarSolicitud(id: number) {
-  return api.post(`/transacciones/${id}/confirmar`);
+export function confirmarSolicitud(id: number, verificacion?: VerificacionConfirmacion) {
+  return api.post(`/transacciones/${id}/confirmar`, verificacion);
+}
+
+export function getDetalleSolicitud(id: number) {
+  return api.get<DetalleSolicitud>(`/transacciones/${id}/detalle`);
 }
 
 export function rechazarSolicitud(id: number, motivo?: string) {

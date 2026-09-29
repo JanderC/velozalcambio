@@ -1,6 +1,6 @@
 import { api } from "./client";
 
-export type TipoDocumento = "CEDULA" | "RIF" | "PASAPORTE" | "COMPROBANTE_DOMICILIO" | "ORIGEN_FONDOS" | "OTRO";
+export type TipoDocumento = "CEDULA" | "RIF" | "PASAPORTE" | "COMPROBANTE_DOMICILIO" | "ORIGEN_FONDOS" | "COMPROBANTE_PAGO" | "OTRO";
 export type EstadoDocumento = "PENDIENTE" | "APROBADO" | "RECHAZADO";
 export type EstadoVerificacion = "VERIFICADO" | "PENDIENTE_REVISION" | "NO_VERIFICADO" | "SIN_DOCUMENTOS";
 
@@ -10,6 +10,7 @@ export const TIPOS_DOCUMENTO: { valor: TipoDocumento; label: string }[] = [
   { valor: "PASAPORTE", label: "Pasaporte" },
   { valor: "COMPROBANTE_DOMICILIO", label: "Comprobante de domicilio" },
   { valor: "ORIGEN_FONDOS", label: "Soporte de origen de fondos" },
+  { valor: "COMPROBANTE_PAGO", label: "Comprobante de pago (captura)" },
   { valor: "OTRO", label: "Otro" },
 ];
 
