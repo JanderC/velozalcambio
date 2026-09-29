@@ -73,7 +73,7 @@ export const api = {
     return fetch(`${BASE_URL}${path}`, { method: "POST", headers, body: formData }).then(async (r) => {
       if (!r.ok) {
         const body = await r.json().catch(() => null);
-        throw new ApiError(r.status, body?.error ?? `Error ${r.status}`);
+        throw new ApiError(r.status, body?.error ?? `Error ${r.status}`, leerDetalles(body));
       }
       return r.json() as Promise<T>;
     });

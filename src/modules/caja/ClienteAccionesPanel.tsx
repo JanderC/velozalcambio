@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { CreditCard, FileText, Settings, User } from "lucide-react";
+import { CreditCard, FileText, Settings, ShieldCheck, User } from "lucide-react";
 import type { ResumenTercero, CuentaCorriente } from "../../api/terceros.api";
 import { cambiarEstadoCuentaCorriente } from "../../api/cuentasCorrientes.api";
 import { getSolicitudesPorCliente, type Solicitud } from "../../api/transacciones.api";
 import { RegistrarOperacionForm } from "./RegistrarOperacionForm";
 import { AccordionSection } from "../../components/common/AccordionSection";
+import { DocumentosCliente } from "../documentosCliente/DocumentosCliente";
 
 type VistaCuentas = "disponibles" | "bloqueadas" | "cerradas" | null;
 
@@ -21,6 +22,9 @@ export function ClienteAccionesPanel({
   const [vistaCuentas, setVistaCuentas] = useState<VistaCuentas>(null);
   const [mostrarPagos, setMostrarPagos] = useState(false);
   const [solicitudes, setSolicitudes] = useState<Solicitud[] | null>(null);
+  // Sube cada vez que cambian los documentos, para que la sección y el aviso del cambio se refresquen
+  const [versionDocumentos, setVersionDocumentos] = useState(0);
+  const documentosCambiaron = () => setVersionDocumentos((v) => v + 1);
 
   useEffect(() => {
     getSolicitudesPorCliente(tercero.id)
@@ -82,6 +86,10 @@ export function ClienteAccionesPanel({
         )}
       </AccordionSection>
 
+      <AccordionSection titulo="Documentos del Cliente" icono={<ShieldCheck size={18} />}>
+        <DocumentosCliente terceroId={tercero.id} recargar={versionDocumentos} onCambio={documentosCambiaron} />
+      </AccordionSection>
+
       <AccordionSection titulo="Opciones del Cliente" icono={<Settings size={18} />}>
         <div className="opciones-botones">
           <button className="btn-opcion btn-opcion-dorado" onClick={() => setMostrarPagos((v) => !v)}>
@@ -90,7 +98,12 @@ export function ClienteAccionesPanel({
         </div>
         {mostrarPagos && (
           <div className="opciones-contenido">
-            <RegistrarOperacionForm terceroId={tercero.id} onCompletado={onActualizar} />
+            <RegistrarOperacionForm
+              terceroId={tercero.id}
+              onCompletado={onActualizar}
+              versionDocumentos={versionDocumentos}
+              onDocumentoSubido={documentosCambiaron}
+            />
           </div>
         )}
       </AccordionSection>

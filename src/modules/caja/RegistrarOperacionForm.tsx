@@ -10,6 +10,10 @@ import { ApiError } from "../../api/client";
 import { esDecimalValido, formatearMonto, normalizarDecimal } from "../../utils/montos";
 import { nombreDivisa, ORDEN_OPERACIONES, textosOperacion, useCalculoCambio, type OperacionCambio } from "../../hooks/useCalculoCambio";
 import { ErrorCambio } from "../../components/common/ErrorCambio";
+import { Modal } from "../../components/common/Modal";
+import { AvisoVerificacion } from "../documentosCliente/AvisoVerificacion";
+import { SubirDocumentoForm } from "../documentosCliente/SubirDocumentoForm";
+import { SoporteOperacion } from "../documentosCliente/SoporteOperacion";
 import "./caja.css";
 
 interface Registrado {
@@ -18,7 +22,19 @@ interface Registrado {
   clienteTraePesos: boolean;
 }
 
-export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId: number; onCompletado: () => void }) {
+export function RegistrarOperacionForm({
+  terceroId,
+  onCompletado,
+  versionDocumentos = 0,
+  onDocumentoSubido,
+}: {
+  terceroId: number;
+  onCompletado: () => void;
+  // Sube cuando cambian los documentos del cliente en la misma ficha, para refrescar el aviso
+  versionDocumentos?: number;
+  onDocumentoSubido?: () => void;
+}) {
+  const [subiendoDocumento, setSubiendoDocumento] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [monedas, setMonedas] = useState<Moneda[]>([]);
   const [metodos, setMetodos] = useState<MetodoPago[]>([]);
@@ -126,6 +142,22 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
 
   return (
     <form className="operacion-form" onSubmit={handleSubmit}>
+      <AvisoVerificacion
+        terceroId={terceroId}
+        recargar={versionDocumentos}
+        onSubirDocumento={() => setSubiendoDocumento(true)}
+      />
+      {subiendoDocumento && (
+        <Modal titulo="Subir documento del cliente" onCerrar={() => setSubiendoDocumento(false)}>
+          <SubirDocumentoForm
+            terceroId={terceroId}
+            tipoInicial="CEDULA"
+            onSubido={() => { setSubiendoDocumento(false); onDocumentoSubido?.(); }}
+            onCancelar={() => setSubiendoDocumento(false)}
+          />
+        </Modal>
+      )}
+
       <div className="operacion-billetes-chips">
         {monedas.filter((m) => m.codigo !== "COP").map((m) => (
           <button
@@ -285,6 +317,11 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
               ? extranjera(registrado.resultado.calculo.cantidadExtranjera, registrado.divisa)
               : pesos(registrado.resultado.calculo.montoLocal)}
           </p>
+          <SoporteOperacion
+            terceroId={terceroId}
+            transaccionId={registrado.resultado.transaccion.id}
+            onSubido={onDocumentoSubido}
+          />
         </div>
       )}
 

@@ -20,6 +20,10 @@ import { ApiError } from "../../api/client";
 import { esDecimalValido, formatearMonto, normalizarDecimal } from "../../utils/montos";
 import { nombreDivisa, ORDEN_OPERACIONES, textosOperacion, useCalculoCambio, type OperacionCambio } from "../../hooks/useCalculoCambio";
 import { ErrorCambio } from "../../components/common/ErrorCambio";
+import { Modal } from "../../components/common/Modal";
+import { AvisoVerificacion } from "../documentosCliente/AvisoVerificacion";
+import { SubirDocumentoForm } from "../documentosCliente/SubirDocumentoForm";
+import { SoporteOperacion } from "../documentosCliente/SoporteOperacion";
 import { ClienteRapidoForm } from "./ClienteRapidoForm";
 import "./nuevaTransaccion.css";
 
@@ -65,6 +69,10 @@ export function NuevaTransaccionPage() {
   const [metodoPagoId, setMetodoPagoId] = useState<number | "">("");
   const [referenciaCodigo, setReferenciaCodigo] = useState("");
   const [bancoOrigen, setBancoOrigen] = useState("");
+
+  // Documentos del cliente: subir desde el aviso sin salir del wizard
+  const [subiendoDocumento, setSubiendoDocumento] = useState(false);
+  const [versionDocumentos, setVersionDocumentos] = useState(0);
 
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -201,6 +209,7 @@ export function NuevaTransaccionPage() {
     setMetodoPagoId("");
     setReferenciaCodigo("");
     setBancoOrigen("");
+    setSubiendoDocumento(false);
     setError(null);
     setErrorGenerico(null);
   }
@@ -237,6 +246,23 @@ export function NuevaTransaccionPage() {
 
           <div className="nt-layout">
             <div className="nt-form-panel">
+              {cliente && (
+                <AvisoVerificacion
+                  terceroId={cliente.id}
+                  recargar={versionDocumentos}
+                  onSubirDocumento={() => setSubiendoDocumento(true)}
+                />
+              )}
+              {cliente && subiendoDocumento && (
+                <Modal titulo={`Documento de ${cliente.nombre}`} onCerrar={() => setSubiendoDocumento(false)}>
+                  <SubirDocumentoForm
+                    terceroId={cliente.id}
+                    tipoInicial="CEDULA"
+                    onSubido={() => { setSubiendoDocumento(false); setVersionDocumentos((v) => v + 1); }}
+                    onCancelar={() => setSubiendoDocumento(false)}
+                  />
+                </Modal>
+              )}
               {paso === 1 && (
                 <>
                   <h2>¿Quién es el cliente?</h2>
@@ -502,6 +528,11 @@ export function NuevaTransaccionPage() {
                 <p>La operación se aplicó al instante.</p>
               )}
               <ResumenCalculo calculo={resultado.calculo} divisa={divisa} clienteTraePesos={clienteTraePesos} />
+              {cliente && (
+                <div className="nt-exito-soporte">
+                  <SoporteOperacion terceroId={cliente.id} transaccionId={resultado.transaccion.id} />
+                </div>
+              )}
               <button onClick={nuevaOperacion}>+ Registrar otra operación</button>
             </div>
           </div>

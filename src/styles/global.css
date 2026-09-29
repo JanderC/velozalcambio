@@ -658,3 +658,14 @@ body {
 .error-cambio-detalles { margin: 6px 0 0; padding-left: 18px; font-size: 0.82rem; color: #c0392b; }
 .error-cambio-accion { margin: 8px 0 0; font-size: 0.85rem; color: #5b4a14; }
 .error-cambio-accion a { color: var(--color-navy); font-weight: 700; }
+
+/* ---------- Modal (compartido) ---------- */
+.modal-fondo { position: fixed; inset: 0; z-index: 100; background: rgba(11,14,19,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal-caja { background: white; border-radius: 12px; width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+.modal-angosto { max-width: 520px; }
+.modal-ancho { max-width: 960px; }
+.modal-encabezado { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #eef0f4; }
+.modal-encabezado h3 { margin: 0; font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); font-size: 1.05rem; overflow-wrap: anywhere; }
+.modal-cerrar { background: none; border: none; color: #6b7280; cursor: pointer; padding: 4px; display: inline-flex; border-radius: 6px; }
+.modal-cerrar:hover { background: #f2f4f7; color: var(--color-navy-dark); }
+.modal-cuerpo { padding: 20px; overflow-y: auto; }
