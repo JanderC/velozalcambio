@@ -17,3 +17,8 @@
 .caja-registrado.completada { background: #eaf6ec; border: 1px solid #b7e0bd; color: #1a5d2b; }
 .caja-registrado.pendiente { background: #fff8e6; border: 1px solid var(--color-gold-dark); color: #5b4a14; }
 .caja-registrado a { color: var(--color-navy); font-weight: 700; }
+
+/* 4 operaciones en grilla 2x2: compras arriba, ventas abajo */
+.caja-operaciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.caja-operaciones button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.caja-operacion-flujo { font-size: 0.72rem; font-weight: 400; opacity: 0.75; }

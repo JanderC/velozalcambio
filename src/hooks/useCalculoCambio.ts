@@ -11,8 +11,48 @@ export function nombreDivisa(codigo: string | undefined) {
   return codigo === "VES" ? "Bs" : codigo;
 }
 
+/**
+ * Las 4 operaciones de la casa de cambio, vistas desde la empresa: "Compra/Venta de X"
+ * = la casa compra o vende X, y la cajera escribe el monto de X.
+ * Al backend solo le importan dos cosas: el tipo (qué divisa entra o sale) y qué monto
+ * se conoce (divisa -> multiplica, pesos -> divide).
+ */
+export type OperacionCambio = "COMPRA_DIVISA" | "VENTA_DIVISA" | "COMPRA_PESOS" | "VENTA_PESOS";
+
+interface DefinicionOperacion {
+  tipo: TipoCambio;
+  montoEnPesos: boolean;
+}
+
+export const OPERACIONES: Record<OperacionCambio, DefinicionOperacion> = {
+  COMPRA_DIVISA: { tipo: "COMPRA_DIVISA", montoEnPesos: false }, // trae Bs, se escriben los Bs que trae
+  VENTA_DIVISA: { tipo: "VENTA_DIVISA", montoEnPesos: false }, // trae pesos, se escriben los Bs que se lleva
+  COMPRA_PESOS: { tipo: "VENTA_DIVISA", montoEnPesos: true }, // trae pesos, se escriben los pesos que trae
+  VENTA_PESOS: { tipo: "COMPRA_DIVISA", montoEnPesos: true }, // trae Bs, se escriben los pesos que se lleva
+};
+
+// Orden en pantalla: primero lo que la casa compra, después lo que vende.
+export const ORDEN_OPERACIONES: OperacionCambio[] = ["COMPRA_DIVISA", "COMPRA_PESOS", "VENTA_DIVISA", "VENTA_PESOS"];
+
+export function textosOperacion(op: OperacionCambio, divisa: string) {
+  const { tipo, montoEnPesos } = OPERACIONES[op];
+  const trae = tipo === "VENTA_DIVISA" ? "pesos" : divisa;
+  const lleva = tipo === "VENTA_DIVISA" ? divisa : "pesos";
+  const esCompra = op === "COMPRA_DIVISA" || op === "COMPRA_PESOS";
+  return {
+    esCompra,
+    titulo: `${esCompra ? "Compra" : "Venta"} de ${montoEnPesos ? "pesos" : divisa}`,
+    flujo: `Trae ${trae} → se lleva ${lleva}`,
+    // Lo que se escribe es lo que la casa compra (el cliente lo trae) o vende (el cliente se lo lleva).
+    etiquetaMonto: `${montoEnPesos ? "Pesos (COP)" : divisa} que ${esCompra ? "trae" : "se lleva"} el cliente`,
+    ayudaMonto: montoEnPesos
+      ? `Se divide por la tasa para saber cuántos ${divisa} ${esCompra ? "entregar" : "debe traer"}.`
+      : `Se multiplica por la tasa para saber cuántos pesos ${esCompra ? "entregar" : "debe traer"}.`,
+  };
+}
+
 interface Params {
-  tipo: TipoCambio | null;
+  operacion: OperacionCambio | null;
   monedas: Moneda[];
   monedaExtranjeraId: number | "";
   monedaLocalId: number | "";
@@ -29,7 +69,7 @@ interface Params {
  * exactamente lo que después se manda a registrar, así lo registrado es lo que se vio.
  */
 export function useCalculoCambio({
-  tipo,
+  operacion,
   monedas,
   monedaExtranjeraId,
   monedaLocalId,
@@ -45,6 +85,9 @@ export function useCalculoCambio({
 
   const monedaCodigo = monedas.find((m) => m.id === monedaExtranjeraId)?.codigo;
   const divisa = nombreDivisa(monedaCodigo);
+  const tipo = operacion ? OPERACIONES[operacion].tipo : null;
+  const montoEnPesos = operacion ? OPERACIONES[operacion].montoEnPesos : false;
+  // En VENTA_DIVISA el cliente entrega pesos y recibe la divisa; en COMPRA_DIVISA, al revés.
   const clienteTraePesos = tipo === "VENTA_DIVISA";
   const tipoCotizacion: "COMPRA" | "VENTA" = tipo === "COMPRA_DIVISA" ? "COMPRA" : "VENTA";
 
@@ -61,13 +104,13 @@ export function useCalculoCambio({
   const calculoInput = useMemo<CalculoCambioInput | null>(() => {
     if (!tipo || !monedaExtranjeraId || !monedaLocalId || !esDecimalValido(monto)) return null;
     const base = { tipo, monedaExtranjeraId, monedaLocalId };
-    const montoCampo = clienteTraePesos ? { montoLocal: monto } : { cantidadExtranjera: monto };
+    const montoCampo = montoEnPesos ? { montoLocal: monto } : { cantidadExtranjera: monto };
     if (!usaTasaManual && cotizacionId && tasasDisponibles.some((t) => t.id === cotizacionId)) {
       return { ...base, ...montoCampo, cotizacionDetalleId: cotizacionId };
     }
     if (usaTasaManual && esDecimalValido(tasaManual)) return { ...base, ...montoCampo, tasaManual };
     return null;
-  }, [tipo, monedaExtranjeraId, monedaLocalId, monto, clienteTraePesos, usaTasaManual, cotizacionId, tasasDisponibles, tasaManual]);
+  }, [tipo, monedaExtranjeraId, monedaLocalId, monto, montoEnPesos, usaTasaManual, cotizacionId, tasasDisponibles, tasaManual]);
 
   const claveActual = calculoInput ? JSON.stringify(calculoInput) : "";
   // Solo vale el resultado calculado para los datos que están en pantalla ahora.
@@ -104,6 +147,8 @@ export function useCalculoCambio({
 
   return {
     divisa,
+    tipo,
+    montoEnPesos,
     clienteTraePesos,
     tipoCotizacion,
     tasasDisponibles,

@@ -15,10 +15,10 @@ import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
 import { getCotizacionesDetalle, type CotizacionDetalle } from "../../api/tasas.api";
-import { registrarCambioDivisa, type CalculoCambio, type ResultadoCambio, type TipoCambio } from "../../api/transacciones.api";
+import { registrarCambioDivisa, type CalculoCambio, type ResultadoCambio } from "../../api/transacciones.api";
 import { ApiError } from "../../api/client";
 import { esDecimalValido, formatearMonto, normalizarDecimal } from "../../utils/montos";
-import { nombreDivisa, useCalculoCambio } from "../../hooks/useCalculoCambio";
+import { nombreDivisa, ORDEN_OPERACIONES, textosOperacion, useCalculoCambio, type OperacionCambio } from "../../hooks/useCalculoCambio";
 import { ErrorCambio } from "../../components/common/ErrorCambio";
 import { ClienteRapidoForm } from "./ClienteRapidoForm";
 import "./nuevaTransaccion.css";
@@ -50,7 +50,7 @@ export function NuevaTransaccionPage() {
   const [creandoCliente, setCreandoCliente] = useState(false);
 
   // Paso 2: operación, divisa y el monto que trae el cliente
-  const [direccion, setDireccion] = useState<TipoCambio | null>(null);
+  const [operacion, setOperacion] = useState<OperacionCambio | null>(null);
   const [monedaExtranjeraId, setMonedaExtranjeraId] = useState<number | "">("");
   const [monto, setMonto] = useState("");
 
@@ -113,7 +113,9 @@ export function NuevaTransaccionPage() {
 
   const {
     divisa,
+    tipo,
     clienteTraePesos,
+    montoEnPesos,
     tipoCotizacion,
     tasasDisponibles,
     usaTasaManual,
@@ -122,7 +124,7 @@ export function NuevaTransaccionPage() {
     calculando,
     errorCalculo,
   } = useCalculoCambio({
-    tipo: direccion,
+    operacion,
     monedas,
     monedaExtranjeraId,
     monedaLocalId,
@@ -139,10 +141,10 @@ export function NuevaTransaccionPage() {
   const nombreCaja = (id: number | "") => cajas.find((c) => c.id === id)?.nombre ?? null;
   const nombreMetodo = (id: number | "") => metodos.find((m) => m.id === id)?.nombre ?? null;
 
-  function elegirDireccion(d: TipoCambio) {
-    if (d === direccion) return;
-    // Cambia qué monto trae el cliente y el tipo de tasa: lo anterior ya no aplica.
-    setDireccion(d);
+  function elegirOperacion(op: OperacionCambio) {
+    if (op === operacion) return;
+    // Cambia qué monto se escribe y el tipo de tasa: lo anterior ya no aplica.
+    setOperacion(op);
     setMonto("");
     setCotizacionId("");
   }
@@ -154,7 +156,7 @@ export function NuevaTransaccionPage() {
 
   function puedeAvanzar(): boolean {
     if (paso === 1) return cliente != null;
-    if (paso === 2) return direccion != null && !!monedaExtranjeraId && esDecimalValido(monto);
+    if (paso === 2) return operacion != null && !!monedaExtranjeraId && esDecimalValido(monto);
     if (paso === 3) return calculoVigente != null;
     if (paso === 4) return !!cajaExtranjeraId && !!monedaLocalId && !!cajaLocalId;
     return true;
@@ -190,7 +192,7 @@ export function NuevaTransaccionPage() {
     setCliente(null);
     setBusqueda("");
     setCreandoCliente(false);
-    setDireccion(null);
+    setOperacion(null);
     setMonto("");
     setCotizacionId("");
     setTasaManual("");
@@ -296,40 +298,38 @@ export function NuevaTransaccionPage() {
                     ))}
                   </div>
 
-                  <div className="nt-direccion-cards">
-                    <div className={`nt-direccion-card ${direccion === "COMPRA_DIVISA" ? "activa" : ""}`} onClick={() => elegirDireccion("COMPRA_DIVISA")}>
-                      <div className="nt-direccion-icono"><ArrowDownToLine size={34} /></div>
-                      <div className="nt-direccion-titulo">Compra de {divisa}</div>
-                      <div className="nt-direccion-sub">El cliente trae {divisa} — le entregamos pesos</div>
-                    </div>
-                    <div className={`nt-direccion-card ${direccion === "VENTA_DIVISA" ? "activa" : ""}`} onClick={() => elegirDireccion("VENTA_DIVISA")}>
-                      <div className="nt-direccion-icono"><ArrowUpFromLine size={34} /></div>
-                      <div className="nt-direccion-titulo">Venta de {divisa}</div>
-                      <div className="nt-direccion-sub">El cliente trae pesos — le entregamos {divisa}</div>
-                    </div>
+                  <div className="nt-direccion-cards nt-direccion-cards-cuatro">
+                    {ORDEN_OPERACIONES.map((op) => {
+                      const t = textosOperacion(op, divisa);
+                      return (
+                        <div key={op} className={`nt-direccion-card ${operacion === op ? "activa" : ""}`} onClick={() => elegirOperacion(op)}>
+                          <div className="nt-direccion-icono">{t.esCompra ? <ArrowDownToLine size={28} /> : <ArrowUpFromLine size={28} />}</div>
+                          <div className="nt-direccion-titulo">{t.titulo}</div>
+                          <div className="nt-direccion-sub">{t.flujo}</div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  {direccion && (
+                  {operacion && (
                     <label className="nt-campo" style={{ marginTop: 20 }}>
-                      {clienteTraePesos ? "Pesos (COP) que trae el cliente" : `${divisa} que trae el cliente`}
+                      {textosOperacion(operacion, divisa).etiquetaMonto}
                       <input
                         type="text"
                         inputMode="decimal"
                         value={monto}
                         onChange={(e) => setMonto(normalizarDecimal(e.target.value))}
-                        placeholder={clienteTraePesos ? "ej. 300000" : "ej. 1500.50"}
+                        placeholder={montoEnPesos ? "ej. 300000" : "ej. 1500.50"}
                         autoFocus
                       />
                       {esDecimalValido(monto) && (
                         <span className="nt-campo-lectura">
-                          Se registra como: <strong>{clienteTraePesos ? `$${formatearMonto(monto)} COP` : `${formatearMonto(monto)} ${divisa}`}</strong>
+                          Se registra como: <strong>{montoEnPesos ? `$${formatearMonto(monto)} COP` : `${formatearMonto(monto)} ${divisa}`}</strong>
                         </span>
                       )}
                       <span className="nt-campo-ayuda">
                         Sin puntos de miles; la coma o el punto solo para decimales.{" "}
-                        {clienteTraePesos
-                          ? `Se divide por la tasa para saber cuántos ${divisa} entregar.`
-                          : "Se multiplica por la tasa para saber cuántos pesos entregar."}
+                        {textosOperacion(operacion, divisa).ayudaMonto}
                       </span>
                     </label>
                   )}
@@ -404,7 +404,7 @@ export function NuevaTransaccionPage() {
                       </select>
                     </label>
                     <label className="nt-campo">
-                      {direccion === "COMPRA_DIVISA" ? "Pagamos los pesos por" : "Cobramos los pesos por"}
+                      {tipo === "COMPRA_DIVISA" ? "Pagamos los pesos por" : "Cobramos los pesos por"}
                       <select value={cajaLocalId} onChange={(e) => setCajaLocalId(e.target.value ? Number(e.target.value) : "")}>
                         <option value="">Seleccionar…</option>
                         {cajas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -467,7 +467,7 @@ export function NuevaTransaccionPage() {
                 <FilaResumen label="Cliente" valor={cliente?.nombre} />
                 <FilaResumen
                   label="Operación"
-                  valor={direccion === "COMPRA_DIVISA" ? `Compra de ${divisa}` : direccion === "VENTA_DIVISA" ? `Venta de ${divisa}` : null}
+                  valor={operacion ? textosOperacion(operacion, divisa).titulo : null}
                 />
                 <FilaResumen label="Tasa aplicada" valor={calculoVigente ? formatearMonto(calculoVigente.tasa) : null} />
                 <FilaResumen label="El cliente entrega" valor={entregaCliente} />

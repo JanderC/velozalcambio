@@ -5,10 +5,10 @@ import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
 import { getCotizacionesDetalle, type CotizacionDetalle } from "../../api/tasas.api";
-import { registrarCambioDivisa, type ResultadoCambio, type TipoCambio } from "../../api/transacciones.api";
+import { registrarCambioDivisa, type ResultadoCambio } from "../../api/transacciones.api";
 import { ApiError } from "../../api/client";
 import { esDecimalValido, formatearMonto, normalizarDecimal } from "../../utils/montos";
-import { nombreDivisa, useCalculoCambio } from "../../hooks/useCalculoCambio";
+import { nombreDivisa, ORDEN_OPERACIONES, textosOperacion, useCalculoCambio, type OperacionCambio } from "../../hooks/useCalculoCambio";
 import { ErrorCambio } from "../../components/common/ErrorCambio";
 import "./caja.css";
 
@@ -24,7 +24,7 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
   const [metodos, setMetodos] = useState<MetodoPago[]>([]);
   const [cotizaciones, setCotizaciones] = useState<CotizacionDetalle[]>([]);
 
-  const [tipo, setTipo] = useState<TipoCambio>("COMPRA_DIVISA");
+  const [operacion, setOperacion] = useState<OperacionCambio>("COMPRA_DIVISA");
   const [monedaExtranjeraId, setMonedaExtranjeraId] = useState<number | "">("");
   const [monto, setMonto] = useState("");
   const [cotizacionId, setCotizacionId] = useState<number | "">("");
@@ -55,6 +55,8 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
 
   const {
     divisa,
+    tipo,
+    montoEnPesos,
     clienteTraePesos,
     tipoCotizacion,
     tasasDisponibles,
@@ -63,17 +65,17 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
     calculoVigente,
     calculando,
     errorCalculo,
-  } = useCalculoCambio({ tipo, monedas, monedaExtranjeraId, monedaLocalId, monto, cotizaciones, cotizacionId, tasaManual });
+  } = useCalculoCambio({ operacion, monedas, monedaExtranjeraId, monedaLocalId, monto, cotizaciones, cotizacionId, tasaManual });
 
   useEffect(() => {
     // Si la caja de pesos no se eligió todavía, sugerí la misma caja que la de la divisa
     if (cajaExtranjeraId && !cajaLocalId) setCajaLocalId(cajaExtranjeraId);
   }, [cajaExtranjeraId, cajaLocalId]);
 
-  function elegirTipo(t: TipoCambio) {
-    if (t === tipo) return;
-    // Cambia qué monto trae el cliente y el tipo de tasa: lo anterior ya no aplica.
-    setTipo(t);
+  function elegirOperacion(op: OperacionCambio) {
+    if (op === operacion) return;
+    // Cambia qué monto se escribe y el tipo de tasa: lo anterior ya no aplica.
+    setOperacion(op);
     setMonto("");
     setCotizacionId("");
   }
@@ -137,30 +139,37 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
         ))}
       </div>
 
-      <div className="operacion-tipo-toggle">
-        <button type="button" className={tipo === "COMPRA_DIVISA" ? "activo" : ""} onClick={() => elegirTipo("COMPRA_DIVISA")}>
-          <ArrowDownToLine size={16} className="icono-inline" /> Compra de {divisa}
-        </button>
-        <button type="button" className={tipo === "VENTA_DIVISA" ? "activo" : ""} onClick={() => elegirTipo("VENTA_DIVISA")}>
-          <ArrowUpFromLine size={16} className="icono-inline" /> Venta de {divisa}
-        </button>
+      <div className="operacion-tipo-toggle caja-operaciones">
+        {ORDEN_OPERACIONES.map((op) => {
+          const t = textosOperacion(op, divisa);
+          return (
+            <button type="button" key={op} className={operacion === op ? "activo" : ""} onClick={() => elegirOperacion(op)}>
+              <span>
+                {t.esCompra ? <ArrowDownToLine size={16} className="icono-inline" /> : <ArrowUpFromLine size={16} className="icono-inline" />} {t.titulo}
+              </span>
+              <span className="caja-operacion-flujo">{t.flujo}</span>
+            </button>
+          );
+        })}
       </div>
 
       <label>
-        {clienteTraePesos ? "Pesos (COP) que trae el cliente" : `${divisa} que trae el cliente`}
+        {textosOperacion(operacion, divisa).etiquetaMonto}
         <input
           type="text"
           inputMode="decimal"
           value={monto}
           onChange={(e) => setMonto(normalizarDecimal(e.target.value))}
-          placeholder={clienteTraePesos ? "ej. 300000" : "ej. 1500.50"}
+          placeholder={montoEnPesos ? "ej. 300000" : "ej. 1500.50"}
         />
         {esDecimalValido(monto) && (
           <span className="caja-monto-lectura">
-            Se registra como: <strong>{clienteTraePesos ? pesos(monto) : extranjera(monto, divisa)}</strong>
+            Se registra como: <strong>{montoEnPesos ? pesos(monto) : extranjera(monto, divisa)}</strong>
           </span>
         )}
-        <span className="caja-monto-ayuda">Sin puntos de miles; la coma o el punto solo para decimales.</span>
+        <span className="caja-monto-ayuda">
+          Sin puntos de miles; la coma o el punto solo para decimales. {textosOperacion(operacion, divisa).ayudaMonto}
+        </span>
       </label>
 
       {monedaExtranjeraId && (

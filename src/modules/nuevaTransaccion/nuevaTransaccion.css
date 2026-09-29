@@ -162,3 +162,7 @@
 
 .nt-exito p a { color: var(--color-navy); font-weight: 700; }
 .nt-campo-lectura { font-size: 0.85rem; color: var(--color-navy-dark); background: #eaf1f8; border-radius: 6px; padding: 6px 10px; align-self: flex-start; }
+
+/* 4 operaciones: compras arriba, ventas abajo */
+.nt-direccion-cards-cuatro .nt-direccion-card { padding: 18px 14px; }
+.nt-direccion-cards-cuatro .nt-direccion-icono { font-size: 1rem; margin-bottom: 6px; }
