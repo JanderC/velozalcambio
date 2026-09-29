@@ -108,6 +108,59 @@ export function transferirEntreCajas(data: {
   return api.post<{ saldoOrigen: string; saldoDestino: string }>("/cajas/transferencias", data);
 }
 
+export interface MonedaEstadoCaja {
+  monedaId: number;
+  monedaCodigo: string;
+  decimales: number;
+  saldoActual: string;
+  turnoAbierto: boolean;
+  turnoAbiertoDesde: string | null;
+  periodo: {
+    movimientos: number;
+    saldoInicial: string;
+    ingresos: string;
+    egresos: string;
+    saldoFinal: string;
+    cuadra: boolean;
+  };
+}
+
+export interface MovimientoDeCaja {
+  id: number;
+  tipo: "INGRESO" | "EGRESO";
+  monto: string;
+  saldo_anterior: string;
+  saldo_nuevo: string;
+  created_at: string;
+  moneda_id: number;
+  moneda_codigo: string;
+  usuario_nombre: string;
+  metodo_pago_nombre: string | null;
+  transaccion_id: number | null;
+  transaccion_tipo: string | null;
+  observacion: string | null;
+  tercero_nombre: string | null;
+  referencia_codigo: string | null;
+  contraparte_nombre: string | null;
+}
+
+export interface EstadoCaja {
+  caja: Caja & { moneda_codigo: string | null };
+  monedas: MonedaEstadoCaja[];
+  movimientos: MovimientoDeCaja[];
+  hayMas: boolean;
+}
+
+export function getEstadoCaja(
+  cajaId: number,
+  filtros: { monedaId?: number; desde?: string; hasta?: string; tipo?: "INGRESO" | "EGRESO"; limite?: number } = {}
+) {
+  const params = new URLSearchParams();
+  for (const [clave, valor] of Object.entries(filtros)) if (valor !== undefined && valor !== "") params.set(clave, String(valor));
+  const q = params.toString();
+  return api.get<EstadoCaja>(`/cajas/${cajaId}/estado${q ? `?${q}` : ""}`);
+}
+
 export function getMovimientosInternos(cajaId?: number) {
   return api.get<MovimientoInterno[]>(`/cajas/movimientos-internos${cajaId ? `?cajaId=${cajaId}` : ""}`);
 }

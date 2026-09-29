@@ -309,7 +309,7 @@ export function CajasPage() {
                 return (
                   <div key={f.caja.id} className={`cajas-reparto-fila${cambio ? " saldo-cambio" : ""}`}>
                     <span className="cajas-reparto-nombre">
-                      {f.caja.nombre}
+                      <Link to={`/cajas/${f.caja.id}`}>{f.caja.nombre}</Link>
                       <small>{TIPO_CAJA_LABEL[f.caja.tipo]}</small>
                     </span>
                     <span className="cajas-reparto-barra">
@@ -334,7 +334,7 @@ export function CajasPage() {
           <article key={c.id} className={`caja-tarjeta${c.es_principal ? " caja-tarjeta-principal" : ""}${c.activo ? "" : " caja-tarjeta-inactiva"}`}>
             <header className="caja-tarjeta-cabecera">
               <div>
-                <h3>{c.nombre}</h3>
+                <h3><Link to={`/cajas/${c.id}`} title="Ver saldos y movimientos de esta caja">{c.nombre}</Link></h3>
                 <span className="caja-tarjeta-tipo">{TIPO_CAJA_LABEL[c.tipo]}</span>
                 {!c.activo && <span className="caja-tarjeta-tipo caja-tarjeta-tipo-inactiva">Inactiva</span>}
               </div>
@@ -374,6 +374,7 @@ export function CajasPage() {
 
             {c.activo && (
               <footer className="caja-tarjeta-acciones">
+                <Link to={`/cajas/${c.id}`} className="caja-btn-movimientos">Ver movimientos</Link>
                 <button onClick={() => setDialogo({ tipo: "transferir", origenId: c.id })}>Transferir desde aquí</button>
                 {esAdmin && <button onClick={() => setDialogo({ tipo: "editar", caja: c })}>Editar</button>}
                 {esAdmin && !c.es_principal && (

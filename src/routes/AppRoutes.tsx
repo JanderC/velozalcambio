@@ -19,6 +19,7 @@ import { UsuariosPage } from "../modules/usuarios/UsuariosPage";
 import { NuevaTransaccionPage } from "../modules/nuevaTransaccion/NuevaTransaccionPage";
 import { WhatsAppPage } from "../modules/whatsapp/WhatsAppPage";
 import { CajasPage } from "../modules/cajas/CajasPage";
+import { CajaDetallePage } from "../modules/cajas/CajaDetallePage";
 import { CuentasEmpresaPage } from "../modules/cuentasEmpresa/CuentasEmpresaPage";
 
 
@@ -49,6 +50,7 @@ export function AppRoutes() {
         {/* Mismos roles que el backend acepta en /cajas/tablero y /cajas/transferencias */}
         <Route element={<RequireRole roles={["ADMIN", "CAJERO"]} />}>
           <Route path="/cajas" element={<CajasPage />} />
+          <Route path="/cajas/:id" element={<CajaDetallePage />} />
         </Route>
         <Route element={<RequireRole roles={["ADMIN"]} />}>
         <Route path="/usuarios" element={<UsuariosPage />} />
