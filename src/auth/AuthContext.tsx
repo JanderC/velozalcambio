@@ -1,35 +1,28 @@
 import { createContext, useEffect, useState, type ReactNode } from "react";
-import type { Rol, Usuario } from "../types/auth.types";
+import { esUsuario, type Usuario } from "../types/auth.types";
 
-interface JwtPayload {
-  id: number;
-  rol: Rol;
-}
+const CLAVE_TOKEN = "token";
+const CLAVE_USUARIO = "usuario";
 
 interface AuthContextValue {
   usuario: Usuario | null;
   token: string | null;
   cargando: boolean;
-  iniciarSesion: (token: string) => void;
+  // Mensaje para la pantalla de login cuando la sesión guardada ya no sirve
+  avisoSesion: string | null;
+  iniciarSesion: (token: string, usuario: Usuario) => void;
   cerrarSesion: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Decodifica el payload del JWT SOLO para leer id/rol en el cliente y
-// pintar la interfaz -- nunca se confía en esto para autorizar nada,
-// esa validación real siempre la hace el backend en cada petición.
-function decodificarPayload(token: string): JwtPayload | null {
+// El usuario guardado se valida al leerlo: localStorage puede tener datos viejos o editados a mano.
+function leerUsuarioGuardado(): Usuario | null {
   try {
-    const partes = token.split(".");
-    const payloadBase64 = partes[1];
-    if (!payloadBase64) return null;
-    const json = atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"));
-    const payload = JSON.parse(json);
-    if (typeof payload.id === "number" && typeof payload.rol === "string") {
-      return { id: payload.id, rol: payload.rol as Rol };
-    }
-    return null;
+    const crudo = localStorage.getItem(CLAVE_USUARIO);
+    if (!crudo) return null;
+    const valor: unknown = JSON.parse(crudo);
+    return esUsuario(valor) ? valor : null;
   } catch {
     return null;
   }
@@ -39,37 +32,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [avisoSesion, setAvisoSesion] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("token");
-    if (stored) {
-      const payload = decodificarPayload(stored);
-      if (payload) {
-        setToken(stored);
-        setUsuario({ id: payload.id, rol: payload.rol });
+    const tokenGuardado = localStorage.getItem(CLAVE_TOKEN);
+    if (tokenGuardado) {
+      const usuarioGuardado = leerUsuarioGuardado();
+      if (usuarioGuardado) {
+        setToken(tokenGuardado);
+        setUsuario(usuarioGuardado);
       } else {
-        localStorage.removeItem("token");
+        // Sesión abierta antes de que el login devolviera el usuario: hay que entrar de nuevo.
+        localStorage.removeItem(CLAVE_TOKEN);
+        localStorage.removeItem(CLAVE_USUARIO);
+        setAvisoSesion("Tu sesión se actualizó. Volvé a iniciar sesión, por favor.");
       }
     }
     setCargando(false);
   }, []);
 
-  function iniciarSesion(nuevoToken: string) {
-    const payload = decodificarPayload(nuevoToken);
-    if (!payload) return;
-    localStorage.setItem("token", nuevoToken);
+  function iniciarSesion(nuevoToken: string, nuevoUsuario: Usuario) {
+    localStorage.setItem(CLAVE_TOKEN, nuevoToken);
+    localStorage.setItem(CLAVE_USUARIO, JSON.stringify(nuevoUsuario));
     setToken(nuevoToken);
-    setUsuario({ id: payload.id, rol: payload.rol });
+    setUsuario(nuevoUsuario);
+    setAvisoSesion(null);
   }
 
   function cerrarSesion() {
-    localStorage.removeItem("token");
+    localStorage.removeItem(CLAVE_TOKEN);
+    localStorage.removeItem(CLAVE_USUARIO);
     setToken(null);
     setUsuario(null);
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, token, cargando, iniciarSesion, cerrarSesion }}>
+    <AuthContext.Provider value={{ usuario, token, cargando, avisoSesion, iniciarSesion, cerrarSesion }}>
       {children}
     </AuthContext.Provider>
   );

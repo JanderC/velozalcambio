@@ -41,7 +41,9 @@ export interface DocumentoTercero {
   revisado_en: string | null;
   created_at: string;
   vencido: boolean;
+  subido_por_id: number;
   subido_por_nombre: string;
+  revisado_por_id: number | null;
   revisado_por_nombre: string | null;
 }
 

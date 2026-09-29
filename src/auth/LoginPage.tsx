@@ -11,7 +11,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [tasas, setTasas] = useState<TasaPublica[] | null>(null);
-  const { iniciarSesion } = useAuth();
+  const { iniciarSesion, avisoSesion } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,8 +25,8 @@ export function LoginPage() {
     setError(null);
     setCargando(true);
     try {
-      const { token } = await login(email, password);
-      iniciarSesion(token);
+      const { token, usuario } = await login(email, password);
+      iniciarSesion(token, usuario);
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar sesión");
@@ -75,6 +75,7 @@ export function LoginPage() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </label>
 
+          {avisoSesion && !error && <p className="login-error">{avisoSesion}</p>}
           {error && <p className="login-error">{error}</p>}
 
           <button type="submit" disabled={cargando}>

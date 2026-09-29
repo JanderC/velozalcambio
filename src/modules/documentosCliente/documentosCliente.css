@@ -77,6 +77,7 @@
 .doc-estado-doc-aprobado { background: #e3f4e7; color: #1a7f37; }
 .doc-estado-doc-rechazado { background: #fde8e6; color: #c0392b; }
 .doc-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.doc-revision-otro { display: block; margin-top: 6px; font-size: 0.74rem; color: #8a6d1f; font-style: italic; }
 
 /* Visor */
 .doc-visor-img { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto; border-radius: 6px; }

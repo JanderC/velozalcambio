@@ -45,7 +45,10 @@ export function DocumentosCliente({
 }) {
   const { usuario } = useAuth();
   const puedeSubir = usuario != null && ROLES_SUBIR.includes(usuario.rol);
-  const puedeRevisar = usuario != null && ROLES_REVISAR.includes(usuario.rol);
+  const rolRevisa = usuario != null && ROLES_REVISAR.includes(usuario.rol);
+  // Quien subió un documento no puede revisarlo (el backend igual lo valida con 403).
+  const esPropio = (d: DocumentoTercero) => usuario != null && d.subido_por_id === usuario.id;
+  const puedeRevisar = (d: DocumentoTercero) => d.estado === "PENDIENTE" && rolRevisa && !esPropio(d);
 
   const [verificacion, setVerificacion] = useState<VerificacionTercero | null>(null);
   const [documentos, setDocumentos] = useState<DocumentoTercero[] | null>(null);
@@ -223,7 +226,7 @@ export function DocumentosCliente({
                       <button className="doc-btn-mini" onClick={() => ver(d)} disabled={abriendoId === d.id}>
                         <Eye size={14} /> {abriendoId === d.id ? "Abriendo…" : "Ver"}
                       </button>
-                      {puedeRevisar && d.estado === "PENDIENTE" && (
+                      {puedeRevisar(d) && (
                         <>
                           <button className="doc-btn-mini doc-btn-aprobar" onClick={() => aprobar(d)} disabled={revisandoId === d.id}>
                             <Check size={14} /> Aprobar
@@ -238,6 +241,9 @@ export function DocumentosCliente({
                         </>
                       )}
                     </div>
+                    {d.estado === "PENDIENTE" && esPropio(d) && (
+                      <span className="doc-revision-otro">Pendiente de revisión por otro usuario</span>
+                    )}
                     {errorRevision?.id === d.id && !rechazando && <span className="doc-error doc-error-fila">{errorRevision.mensaje}</span>}
                   </td>
                 </tr>
