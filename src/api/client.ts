@@ -1,11 +1,26 @@
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+export interface DetalleError {
+  campo: string;
+  mensaje: string;
+}
+
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  detalles: DetalleError[];
+  constructor(status: number, message: string, detalles: DetalleError[] = []) {
     super(message);
     this.status = status;
+    this.detalles = detalles;
   }
+}
+
+function leerDetalles(body: unknown): DetalleError[] {
+  if (typeof body !== "object" || body === null || !("detalles" in body) || !Array.isArray(body.detalles)) return [];
+  return body.detalles.filter(
+    (d: unknown): d is DetalleError =>
+      typeof d === "object" && d !== null && "campo" in d && "mensaje" in d && typeof d.campo === "string" && typeof d.mensaje === "string"
+  );
 }
 
 function getToken(): string | null {
@@ -30,13 +45,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     let message = `Error ${response.status}`;
+    let detalles: DetalleError[] = [];
     try {
       const body = await response.json();
       if (body?.error) message = body.error;
+      detalles = leerDetalles(body);
     } catch {
       // el body no era JSON -- se deja el mensaje genérico
     }
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, detalles);
   }
 
   if (response.status === 204) return undefined as T;

@@ -44,22 +44,57 @@ interface FiltrosTransacciones {
   tipo?: string;
 }
 
-interface RegistrarCambioInput {
-  tipo: "COMPRA_DIVISA" | "VENTA_DIVISA";
-  terceroId?: number;
+export type TipoCambio = "COMPRA_DIVISA" | "VENTA_DIVISA";
+
+// Exactamente uno de los dos montos: el cliente trae divisa (se multiplica por la tasa)
+// o trae pesos (se divide). El tipo impide mandar los dos a la vez.
+export type MontoCambio =
+  | { cantidadExtranjera: string; montoLocal?: undefined }
+  | { montoLocal: string; cantidadExtranjera?: undefined };
+
+// Exactamente una forma de tasa: la del día (recomendada) o una manual.
+export type TasaCambio =
+  | { cotizacionDetalleId: number; tasaManual?: undefined }
+  | { tasaManual: string; cotizacionDetalleId?: undefined };
+
+export type CalculoCambioInput = {
+  tipo: TipoCambio;
   monedaExtranjeraId: number;
-  cantidadExtranjera: string;
-  cotizacionDetalleId?: number;
-  tasaManual?: string;
-  cajaExtranjeraId: number;
   monedaLocalId: number;
+} & MontoCambio &
+  TasaCambio;
+
+export type RegistrarCambioInput = CalculoCambioInput & {
+  cajaExtranjeraId: number;
   cajaLocalId: number;
+  terceroId?: number;
   metodoPagoId?: number;
   referenciaCodigo?: string;
+  bancoOrigen?: string;
+};
+
+export interface CalculoCambio {
+  operacion: "MULTIPLICACION" | "DIVISION";
+  tasa: string;
+  cotizacionDetalleId: number | null;
+  cantidadExtranjera: string;
+  montoLocal: string;
+}
+
+export interface ResultadoCambio {
+  transaccion: { id: number };
+  calculo: CalculoCambio;
+  montoLocal: string;
+  requiereConfirmacion: boolean;
+}
+
+// Vista previa: no guarda nada. Los montos vuelven como string y se muestran tal cual.
+export function calcularCambio(input: CalculoCambioInput) {
+  return api.post<CalculoCambio>("/transacciones/cambio/calcular", input);
 }
 
 export function registrarCambioDivisa(input: RegistrarCambioInput) {
-  return api.post<{ requiereConfirmacion: boolean; montoLocal: string }>("/transacciones/cambio", input);
+  return api.post<ResultadoCambio>("/transacciones/cambio", input);
 }
 export function getTransacciones(filtros: FiltrosTransacciones) {
   const params = new URLSearchParams();

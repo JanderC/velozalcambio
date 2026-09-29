@@ -652,3 +652,9 @@ body {
   background: #eaf6ec; border: 1px solid #b7e0bd; border-radius: 6px; padding: 10px 14px;
   font-family: "Inter", sans-serif; font-size: 0.9rem; color: #1a7f37;
 }
+/* ---------- Error al registrar un cambio (Nueva Transacción y Caja) ---------- */
+.error-cambio { background: #fdf0ee; border: 1px solid #f3c5bd; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-family: "Inter", sans-serif; }
+.error-cambio-mensaje { color: #c0392b; font-size: 0.88rem; font-weight: 600; margin: 0; }
+.error-cambio-detalles { margin: 6px 0 0; padding-left: 18px; font-size: 0.82rem; color: #c0392b; }
+.error-cambio-accion { margin: 8px 0 0; font-size: 0.85rem; color: #5b4a14; }
+.error-cambio-accion a { color: var(--color-navy); font-weight: 700; }

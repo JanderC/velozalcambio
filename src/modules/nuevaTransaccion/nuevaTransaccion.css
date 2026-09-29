@@ -147,3 +147,18 @@
 .nt-resumen-titulo, .nt-btn-confirmar { display: inline-flex; align-items: center; gap: 8px; }
 .nt-resumen-titulo { display: flex; }
 .nt-exito-icono { color: var(--color-navy); }
+
+/* ---------- Cálculo del backend (paso 3, resumen y éxito) ---------- */
+.nt-direccion-cards { margin-top: 18px; }
+.nt-campo-ayuda { font-size: 0.78rem; color: #6b7280; }
+.nt-calculo-estado { font-family: "Inter", sans-serif; font-size: 0.85rem; color: #6b7280; margin: 8px 0 0; }
+.nt-calculo { margin-top: 16px; border: 1px solid #d7dbe2; border-radius: 10px; overflow: hidden; font-family: "Inter", sans-serif; }
+.nt-calculo-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f1f2f4; font-size: 0.9rem; color: #5b6472; }
+.nt-calculo-fila:last-child { border-bottom: none; }
+.nt-calculo-fila strong { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); font-size: 1.05rem; }
+.nt-calculo-destacado { background: linear-gradient(160deg, var(--color-navy) 0%, var(--color-navy-dark) 100%); color: rgba(255,255,255,0.75); }
+.nt-calculo-destacado strong { color: var(--color-gold); font-size: 1.35rem; }
+.nt-calculo-exito { max-width: 420px; margin: 0 auto 24px; text-align: left; }
+
+.nt-exito p a { color: var(--color-navy); font-weight: 700; }
+.nt-campo-lectura { font-size: 0.85rem; color: var(--color-navy-dark); background: #eaf1f8; border-radius: 6px; padding: 6px 10px; align-self: flex-start; }

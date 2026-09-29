@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { getMetodosPago, type MetodoPago } from "../../api/metodosPago.api";
 import { getCotizacionesDetalle, type CotizacionDetalle } from "../../api/tasas.api";
-import { registrarCambioDivisa } from "../../api/transacciones.api";
+import { registrarCambioDivisa, type ResultadoCambio, type TipoCambio } from "../../api/transacciones.api";
 import { ApiError } from "../../api/client";
+import { esDecimalValido, formatearMonto, normalizarDecimal } from "../../utils/montos";
+import { nombreDivisa, useCalculoCambio } from "../../hooks/useCalculoCambio";
+import { ErrorCambio } from "../../components/common/ErrorCambio";
+import "./caja.css";
+
+interface Registrado {
+  resultado: ResultadoCambio;
+  divisa: string;
+  clienteTraePesos: boolean;
+}
 
 export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId: number; onCompletado: () => void }) {
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -13,19 +24,21 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
   const [metodos, setMetodos] = useState<MetodoPago[]>([]);
   const [cotizaciones, setCotizaciones] = useState<CotizacionDetalle[]>([]);
 
-  const [tipo, setTipo] = useState<"COMPRA_DIVISA" | "VENTA_DIVISA">("COMPRA_DIVISA");
+  const [tipo, setTipo] = useState<TipoCambio>("COMPRA_DIVISA");
   const [monedaExtranjeraId, setMonedaExtranjeraId] = useState<number | "">("");
-  const [cotizacionSeleccionadaId, setCotizacionSeleccionadaId] = useState<number | "">("");
+  const [monto, setMonto] = useState("");
+  const [cotizacionId, setCotizacionId] = useState<number | "">("");
   const [tasaManual, setTasaManual] = useState("");
-  const [cantidad, setCantidad] = useState("");
   const [cajaExtranjeraId, setCajaExtranjeraId] = useState<number | "">("");
   const [monedaLocalId, setMonedaLocalId] = useState<number | "">("");
   const [cajaLocalId, setCajaLocalId] = useState<number | "">("");
   const [metodoPagoId, setMetodoPagoId] = useState<number | "">("");
   const [referenciaCodigo, setReferenciaCodigo] = useState("");
+  const [bancoOrigen, setBancoOrigen] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [mensaje, setMensaje] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [registrado, setRegistrado] = useState<Registrado | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
 
   useEffect(() => {
     getCajas().then(setCajas).catch(() => setCajas([]));
@@ -33,147 +46,175 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
       setMonedas(m);
       const cop = m.find((x) => x.codigo === "COP");
       if (cop) setMonedaLocalId(cop.id);
+      const ves = m.find((x) => x.codigo === "VES");
+      if (ves) setMonedaExtranjeraId(ves.id);
     }).catch(() => setMonedas([]));
     getMetodosPago().then(setMetodos).catch(() => setMetodos([]));
     getCotizacionesDetalle().then(setCotizaciones).catch(() => setCotizaciones([]));
   }, []);
 
-  // El tipo de cotización que corresponde según la dirección de la operación:
-  // le compramos al cliente -> usamos NUESTRA tasa de COMPRA; le vendemos -> tasa de VENTA.
-  const tipoCotizacion = tipo === "COMPRA_DIVISA" ? "COMPRA" : "VENTA";
-
-  const billetesDisponibles = useMemo(() => {
-    const monedaCodigo = monedas.find((m) => m.id === monedaExtranjeraId)?.codigo;
-    if (!monedaCodigo) return [];
-    return cotizaciones.filter(
-      (c) => c.moneda_codigo === monedaCodigo && c.tipo === tipoCotizacion && c.categoria === "EFECTIVO" && c.valor != null
-    );
-  }, [cotizaciones, monedas, monedaExtranjeraId, tipoCotizacion]);
-
-  const tasaAplicada = useMemo(() => {
-    if (cotizacionSeleccionadaId) {
-      const c = billetesDisponibles.find((b) => b.id === cotizacionSeleccionadaId);
-      return c?.valor ? Number(c.valor) : null;
-    }
-    return tasaManual ? Number(tasaManual) : null;
-  }, [cotizacionSeleccionadaId, tasaManual, billetesDisponibles]);
-
-  const montoLocalEstimado = tasaAplicada && cantidad ? Number(cantidad) * tasaAplicada : null;
+  const {
+    divisa,
+    clienteTraePesos,
+    tipoCotizacion,
+    tasasDisponibles,
+    usaTasaManual,
+    calculoInput,
+    calculoVigente,
+    calculando,
+    errorCalculo,
+  } = useCalculoCambio({ tipo, monedas, monedaExtranjeraId, monedaLocalId, monto, cotizaciones, cotizacionId, tasaManual });
 
   useEffect(() => {
     // Si la caja de pesos no se eligió todavía, sugerí la misma caja que la de la divisa
     if (cajaExtranjeraId && !cajaLocalId) setCajaLocalId(cajaExtranjeraId);
   }, [cajaExtranjeraId, cajaLocalId]);
 
+  function elegirTipo(t: TipoCambio) {
+    if (t === tipo) return;
+    // Cambia qué monto trae el cliente y el tipo de tasa: lo anterior ya no aplica.
+    setTipo(t);
+    setMonto("");
+    setCotizacionId("");
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setMensaje(null);
+    setErrorValidacion(null);
+    setRegistrado(null);
 
-    if (!monedaExtranjeraId || !cantidad || !cajaExtranjeraId || !monedaLocalId || !cajaLocalId) {
-      setError("Completá moneda, cantidad, y las cajas de origen y destino.");
+    if (!cajaExtranjeraId || !cajaLocalId) {
+      setErrorValidacion("Elegí la caja de la divisa y la de los pesos.");
       return;
     }
-    if (!cotizacionSeleccionadaId && !tasaManual) {
-      setError("Elegí un billete de la Tasa del Día, o ingresá una tasa manual.");
+    if (!calculoInput || !calculoVigente) {
+      setErrorValidacion("Completá el monto y la tasa, y esperá el cálculo antes de registrar.");
       return;
     }
 
     setEnviando(true);
     try {
       const resultado = await registrarCambioDivisa({
-        tipo,
+        ...calculoInput,
         terceroId,
-        monedaExtranjeraId: Number(monedaExtranjeraId),
-        cantidadExtranjera: cantidad,
-        cotizacionDetalleId: cotizacionSeleccionadaId || undefined,
-        tasaManual: !cotizacionSeleccionadaId ? tasaManual : undefined,
-        cajaExtranjeraId: Number(cajaExtranjeraId),
-        monedaLocalId: Number(monedaLocalId),
-        cajaLocalId: Number(cajaLocalId),
+        cajaExtranjeraId,
+        cajaLocalId,
         metodoPagoId: metodoPagoId || undefined,
-        referenciaCodigo: referenciaCodigo || undefined,
+        referenciaCodigo: referenciaCodigo.trim() || undefined,
+        bancoOrigen: bancoOrigen.trim() || undefined,
       });
-
-      setMensaje(
-        resultado.requiereConfirmacion
-          ? `Solicitud registrada por $${Number(resultado.montoLocal).toLocaleString("es-CO")} COP — queda pendiente de confirmación (pago por banco).`
-          : `Operación confirmada: $${Number(resultado.montoLocal).toLocaleString("es-CO")} COP.`
-      );
-      setCantidad("");
+      setRegistrado({ resultado, divisa, clienteTraePesos });
+      setMonto("");
       setReferenciaCodigo("");
-      setCotizacionSeleccionadaId("");
+      setBancoOrigen("");
+      setCotizacionId("");
       setTasaManual("");
       onCompletado();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo registrar la operación.");
+      if (err instanceof ApiError) setError(err);
+      else setErrorValidacion("No se pudo registrar la operación.");
     } finally {
       setEnviando(false);
     }
   }
 
+  const pesos = (v: string) => `$${formatearMonto(v)} COP`;
+  const extranjera = (v: string, d: string) => `${formatearMonto(v)} ${d}`;
+
   return (
     <form className="operacion-form" onSubmit={handleSubmit}>
+      <div className="operacion-billetes-chips">
+        {monedas.filter((m) => m.codigo !== "COP").map((m) => (
+          <button
+            type="button"
+            key={m.id}
+            className={monedaExtranjeraId === m.id ? "activo" : ""}
+            onClick={() => { setMonedaExtranjeraId(m.id); setCotizacionId(""); }}
+          >
+            {nombreDivisa(m.codigo)}
+          </button>
+        ))}
+      </div>
+
       <div className="operacion-tipo-toggle">
-        <button type="button" className={tipo === "COMPRA_DIVISA" ? "activo" : ""} onClick={() => { setTipo("COMPRA_DIVISA"); setCotizacionSeleccionadaId(""); }}>
-          <ArrowDownToLine size={16} className="icono-inline" /> Le compramos al cliente
+        <button type="button" className={tipo === "COMPRA_DIVISA" ? "activo" : ""} onClick={() => elegirTipo("COMPRA_DIVISA")}>
+          <ArrowDownToLine size={16} className="icono-inline" /> Compra de {divisa}
         </button>
-        <button type="button" className={tipo === "VENTA_DIVISA" ? "activo" : ""} onClick={() => { setTipo("VENTA_DIVISA"); setCotizacionSeleccionadaId(""); }}>
-          <ArrowUpFromLine size={16} className="icono-inline" /> Le vendemos al cliente
+        <button type="button" className={tipo === "VENTA_DIVISA" ? "activo" : ""} onClick={() => elegirTipo("VENTA_DIVISA")}>
+          <ArrowUpFromLine size={16} className="icono-inline" /> Venta de {divisa}
         </button>
       </div>
 
-      <div className="operacion-form-row">
-        <label>
-          Divisa
-          <select value={monedaExtranjeraId} onChange={(e) => { setMonedaExtranjeraId(e.target.value ? Number(e.target.value) : ""); setCotizacionSeleccionadaId(""); }}>
-            <option value="">Seleccionar…</option>
-            {monedas.filter((m) => m.codigo !== "COP").map((m) => (
-              <option key={m.id} value={m.id}>{m.codigo}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Cantidad
-          <input type="text" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="0.00" />
-        </label>
-      </div>
+      <label>
+        {clienteTraePesos ? "Pesos (COP) que trae el cliente" : `${divisa} que trae el cliente`}
+        <input
+          type="text"
+          inputMode="decimal"
+          value={monto}
+          onChange={(e) => setMonto(normalizarDecimal(e.target.value))}
+          placeholder={clienteTraePesos ? "ej. 300000" : "ej. 1500.50"}
+        />
+        {esDecimalValido(monto) && (
+          <span className="caja-monto-lectura">
+            Se registra como: <strong>{clienteTraePesos ? pesos(monto) : extranjera(monto, divisa)}</strong>
+          </span>
+        )}
+        <span className="caja-monto-ayuda">Sin puntos de miles; la coma o el punto solo para decimales.</span>
+      </label>
 
       {monedaExtranjeraId && (
         <div className="operacion-billetes">
-          <span className="operacion-billetes-label">Nuestra tasa de {tipoCotizacion.toLowerCase()} hoy:</span>
-          {billetesDisponibles.length === 0 ? (
-            <p className="operacion-billetes-vacio">No hay cotización cargada para esta divisa — ingresá una tasa manual abajo.</p>
+          <span className="operacion-billetes-label">Nuestra tasa de {tipoCotizacion.toLowerCase()} hoy para {divisa}:</span>
+          {usaTasaManual ? (
+            <>
+              <p className="operacion-billetes-vacio">No hay tasa de {tipoCotizacion.toLowerCase()} cargada hoy — ingresá una tasa manual.</p>
+              <label className="operacion-tasa-manual">
+                Tasa manual
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={tasaManual}
+                  onChange={(e) => setTasaManual(normalizarDecimal(e.target.value))}
+                  placeholder="ej. 3.2"
+                />
+              </label>
+            </>
           ) : (
             <div className="operacion-billetes-chips">
-              {billetesDisponibles.map((b) => (
-                <button
-                  type="button"
-                  key={b.id}
-                  className={cotizacionSeleccionadaId === b.id ? "activo" : ""}
-                  onClick={() => { setCotizacionSeleccionadaId(b.id); setTasaManual(""); }}
-                >
-                  {b.etiqueta}: ${Number(b.valor).toLocaleString("es-CO")}
+              {tasasDisponibles.map((b) => (
+                <button type="button" key={b.id} className={cotizacionId === b.id ? "activo" : ""} onClick={() => setCotizacionId(b.id)}>
+                  {b.etiqueta}
+                  {b.categoria === "GIRO" ? " (giro)" : ""}: {b.valor != null ? formatearMonto(b.valor) : ""}
                 </button>
               ))}
             </div>
           )}
-          <label className="operacion-tasa-manual">
-            O tasa manual
-            <input type="text" inputMode="decimal" value={tasaManual} onChange={(e) => { setTasaManual(e.target.value); setCotizacionSeleccionadaId(""); }} placeholder="ej. 3270" />
-          </label>
         </div>
       )}
 
-      {montoLocalEstimado != null && (
-        <div className="operacion-total-estimado">
-          Total en pesos: <strong>${montoLocalEstimado.toLocaleString("es-CO", { maximumFractionDigits: 0 })} COP</strong>
+      {calculando && <p className="caja-calculo-estado">Calculando…</p>}
+      {errorCalculo && !calculando && <p className="operacion-form-error">{errorCalculo}</p>}
+      {calculoVigente && !calculando && (
+        <div className="caja-calculo">
+          <div className="caja-calculo-fila">
+            <span>El cliente entrega</span>
+            <strong>{clienteTraePesos ? pesos(calculoVigente.montoLocal) : extranjera(calculoVigente.cantidadExtranjera, divisa)}</strong>
+          </div>
+          <div className="caja-calculo-fila">
+            <span>Tasa aplicada</span>
+            <strong>{formatearMonto(calculoVigente.tasa)}</strong>
+          </div>
+          <div className="caja-calculo-fila caja-calculo-destacado">
+            <span>Le entregamos</span>
+            <strong>{clienteTraePesos ? extranjera(calculoVigente.cantidadExtranjera, divisa) : pesos(calculoVigente.montoLocal)}</strong>
+          </div>
         </div>
       )}
 
       <div className="operacion-form-row">
         <label>
-          Caja de la divisa
+          Caja de {divisa}
           <select value={cajaExtranjeraId} onChange={(e) => setCajaExtranjeraId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">Seleccionar…</option>
             {cajas.map((c) => (
@@ -182,7 +223,7 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
           </select>
         </label>
         <label>
-          {tipo === "COMPRA_DIVISA" ? "Pagamos por" : "Cobramos por"}
+          {tipo === "COMPRA_DIVISA" ? "Pagamos los pesos por" : "Cobramos los pesos por"}
           <select value={cajaLocalId} onChange={(e) => setCajaLocalId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">Seleccionar…</option>
             {cajas.map((c) => (
@@ -208,11 +249,38 @@ export function RegistrarOperacionForm({ terceroId, onCompletado }: { terceroId:
         </label>
       </div>
 
-      {error && <p className="operacion-form-error">{error}</p>}
-      {mensaje && <p className="operacion-form-exito">{mensaje}</p>}
+      <label>
+        Banco de origen (si aplica)
+        <input type="text" value={bancoOrigen} onChange={(e) => setBancoOrigen(e.target.value)} placeholder="ej. Bancolombia" />
+      </label>
 
-      <button type="submit" disabled={enviando}>
-        {enviando ? "Registrando…" : "Registrar operación"}
+      {error && <ErrorCambio error={error} />}
+      {errorValidacion && <p className="operacion-form-error">{errorValidacion}</p>}
+
+      {registrado && (
+        <div className={`caja-registrado ${registrado.resultado.requiereConfirmacion ? "pendiente" : "completada"}`}>
+          {registrado.resultado.requiereConfirmacion ? (
+            <p>
+              <strong>Pendiente de confirmación.</strong> Una de las cajas es un banco: la tiene que confirmar otro usuario en{" "}
+              <Link to="/solicitudes">Solicitudes por Confirmar</Link>.
+            </p>
+          ) : (
+            <p><strong>Operación completada.</strong></p>
+          )}
+          <p>
+            Entregó {registrado.clienteTraePesos
+              ? pesos(registrado.resultado.calculo.montoLocal)
+              : extranjera(registrado.resultado.calculo.cantidadExtranjera, registrado.divisa)}
+            {" · "}tasa {formatearMonto(registrado.resultado.calculo.tasa)}
+            {" · "}recibió {registrado.clienteTraePesos
+              ? extranjera(registrado.resultado.calculo.cantidadExtranjera, registrado.divisa)
+              : pesos(registrado.resultado.calculo.montoLocal)}
+          </p>
+        </div>
+      )}
+
+      <button type="submit" disabled={enviando || !calculoVigente}>
+        {enviando ? "Registrando…" : "Registrar"}
       </button>
     </form>
   );

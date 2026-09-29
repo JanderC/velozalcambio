@@ -38,8 +38,11 @@ export function AppRoutes() {
         <Route element={<RequireRole roles={ROLES_REGISTRO_TASAS} />}>
           <Route path="/tasas/registro" element={<RegistroTasasPage />} />
         </Route>
+        {/* Mismos roles que el backend acepta en POST /transacciones/cambio */}
+        <Route element={<RequireRole roles={["ADMIN", "ASESOR", "CAJERO"]} />}>
+          <Route path="/nueva-transaccion" element={<NuevaTransaccionPage />} />
+        </Route>
         <Route element={<RequireRole roles={["ADMIN"]} />}>
-        <Route path="/nueva-transaccion" element={<NuevaTransaccionPage />} />
         <Route path="/usuarios" element={<UsuariosPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
         </Route>
