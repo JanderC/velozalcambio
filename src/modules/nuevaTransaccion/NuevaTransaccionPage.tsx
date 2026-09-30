@@ -26,6 +26,7 @@ import { SubirDocumentoForm } from "../documentosCliente/SubirDocumentoForm";
 import { SoporteOperacion } from "../documentosCliente/SoporteOperacion";
 import { SelectorCuentaCliente } from "../cuentasCliente/SelectorCuentaCliente";
 import { ClienteRapidoForm } from "./ClienteRapidoForm";
+import { RecibirPorWhatsapp } from "../whatsapp/RecibirPorWhatsapp";
 import "./nuevaTransaccion.css";
 
 const PASOS = [
@@ -575,6 +576,7 @@ export function NuevaTransaccionPage() {
                   <SoporteOperacion terceroId={cliente.id} transaccionId={resultado.transaccion.id} />
                 </div>
               )}
+              <RecibirPorWhatsapp transaccionId={resultado.transaccion.id} />
               <button onClick={nuevaOperacion}>+ Registrar otra operación</button>
             </div>
           </div>
