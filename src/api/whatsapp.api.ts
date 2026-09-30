@@ -1,38 +1,217 @@
 import { api } from "./client";
 
-export interface EstadoWhatsapp {
-  estado: "DESCONECTADO" | "ESPERANDO_QR" | "CONECTADO";
+export type EstadoConexionWa = "DESCONECTADO" | "CONECTANDO" | "ESPERANDO_QR" | "CONECTADO" | "REEMPLAZADA";
+
+export interface ConexionWa {
+  estado: EstadoConexionWa;
   qr: string | null;
+  numero: string | null;
+  nombre: string | null;
+  ultimoError: string | null;
+  conectadoDesde: string | null;
+  cola?: { enCola: number; enviadosUltimoMinuto: number; enviadosHoy: number };
 }
 
-export interface MensajeWhatsapp {
-  id: number;
+export interface ChatWa {
+  jid: string;
   telefono: string;
-  nombre_contacto: string | null;
-  mensaje: string;
-  monto_detectado: string | null;
-  moneda_codigo: string | null;
-  tercero_id: number | null;
-  tercero_nombre: string | null;
-  estado: "SIN_REVISAR" | "CONVERTIDO" | "DESCARTADO";
-  created_at: string;
+  nombre: string;
+  nombreWhatsapp: string | null;
+  nombreGuardado: string | null;
+  terceroId: number | null;
+  terceroNombre: string | null;
+  ultimoMensaje: string | null;
+  ultimoMensajeEn: string | null;
+  noLeidos: number;
+  botActivo: boolean;
+  necesitaHumano: boolean;
+  motivo: string | null;
+  necesitaHumanoDesde: string | null;
+  archivado: boolean;
+  frio: boolean;
 }
 
-export function getEstadoWhatsapp() {
-  return api.get<EstadoWhatsapp>("/whatsapp/estado");
+export type AutorWa = "cliente" | "bot" | "humano" | "telefono" | "sistema";
+export type EstadoMensajeWa = "pendiente" | "enviado" | "entregado" | "leido" | "error";
+
+export interface MensajeWa {
+  id: string;
+  jid: string;
+  deMi: boolean;
+  autor: AutorWa;
+  tipo: "texto" | "imagen" | "audio" | "documento" | "sticker" | "video";
+  texto: string | null;
+  mediaUrl: string | null;
+  mediaMime: string | null;
+  estado: EstadoMensajeWa;
+  error: string | null;
+  interno: boolean;
+  fecha: string;
 }
-export function iniciarWhatsapp() {
-  return api.post<EstadoWhatsapp>("/whatsapp/iniciar");
+
+export type FiltroChats = "todos" | "no_leidos" | "atencion" | "bot" | "humano" | "archivados";
+
+export interface ClienteLateral {
+  chat: ChatWa;
+  cliente: {
+    id: number;
+    nombre: string;
+    identificacion: string | null;
+    telefono: string | null;
+    created_at: string;
+    verificacion: { estado: string };
+  } | null;
+  operaciones: {
+    id: number;
+    tipo: string;
+    estado: string;
+    monto_origen: string;
+    monto_destino: string | null;
+    moneda_origen: string;
+    moneda_destino: string | null;
+    created_at: string;
+    origen: string;
+  }[];
+  cuentas: { id: number; tipo: string; banco: string | null; numero_cuenta: string | null; titular: string }[];
 }
-export function getMensajesWhatsapp(estado?: string) {
-  return api.get<MensajeWhatsapp[]>(`/whatsapp/mensajes${estado ? `?estado=${estado}` : ""}`);
+
+export interface OutboxWa {
+  id: string;
+  jid: string;
+  texto: string;
+  estado: "EN_COLA" | "ESPERA_CLIENTE" | "ENVIANDO" | "ENVIADO" | "ERROR";
+  intentos: number;
+  proximo_intento: string;
+  error: string | null;
+  frio: boolean;
+  origen: string | null;
+  created_at: string;
+  enviado_en: string | null;
+  nombre?: string | null;
+  nombre_guardado?: string | null;
+  telefono?: string | null;
 }
-export function marcarMensajeWhatsapp(id: number, estado: "CONVERTIDO" | "DESCARTADO", terceroId?: number) {
-  return api.put(`/whatsapp/mensajes/${id}`, { estado, terceroId });
+
+export type Proveedor = "gemini" | "openai" | "groq" | "openrouter" | "deepseek" | "anthropic";
+
+export interface ConfigWa {
+  ia: { activa: boolean; proveedor: Proveedor; modelo: string; modelosRespaldo: string[]; vision: boolean };
+  personalidad: { nombreAsistente: string; instrucciones: string };
+  negocio: {
+    nombre: string;
+    descripcion: string;
+    direccion: string;
+    zonaHoraria: string;
+    numeroWhatsapp: string;
+    infoAdicional: string;
+    cotizacionesPermitidas: string[];
+    cajasPorMoneda: Record<string, number>;
+    minutosTasa: number;
+  };
+  horario: { dias: { dia: number; desde: string; hasta: string }[]; responderFueraDeHorario: boolean };
+  antibloqueo: {
+    porMinuto: number;
+    porDia: number;
+    pausaMinMs: number;
+    pausaMaxMs: number;
+    friosPorDia: number;
+    friosPausaMinS: number;
+    friosPausaMaxS: number;
+    friosDesde: string;
+    friosHasta: string;
+    antiBucleMax: number;
+    viejosMinutos: number;
+  };
+  dueno: { nombre: string; telefono: string; avisos: boolean; resumenCadaMin: number; silencioDesde: string; silencioHasta: string };
+  panel: { respuestasRapidas: string[] };
 }
-export function getConfiguracionWhatsapp() {
-  return api.get<{ respuesta_automatica_activa: boolean; mensaje_automatico: string }>("/whatsapp/configuracion");
+
+export interface RespuestaConfig {
+  config: ConfigWa;
+  claves: Partial<Record<Proveedor, string>>;
+  porDefecto?: ConfigWa;
 }
-export function actualizarConfiguracionWhatsapp(activa: boolean, mensaje: string) {
-  return api.put("/whatsapp/configuracion", { activa, mensaje });
+
+export interface OpcionesConfig {
+  cotizaciones: { id: number; monedaCodigo: string; tipo: "COMPRA" | "VENTA"; etiqueta: string; categoria: string; valor: string; clave: string }[];
+  cajas: { id: number; nombre: string; banco: string | null; numero_cuenta: string | null; moneda: string | null }[];
+  monedas: { codigo: string; nombre: string }[];
+}
+
+export interface ModeloIa {
+  id: string;
+  nombre: string;
+  vision: boolean;
+}
+
+export interface ResultadoSimulacion {
+  respuestas: string[];
+  sistema: string[];
+  herramientas: { nombre: string; args: Record<string, unknown>; resultado: unknown }[];
+  efectos: string[];
+  derivaciones: string[];
+  estado: Record<string, unknown>;
+  registrado: boolean;
+  modelo: string;
+}
+
+const j = (jid: string) => encodeURIComponent(jid);
+
+export const whatsappApi = {
+  estado: () => api.get<ConexionWa>("/whatsapp/estado"),
+  iniciar: () => api.post<ConexionWa>("/whatsapp/conexion/iniciar"),
+  reconectar: () => api.post<ConexionWa>("/whatsapp/conexion/reconectar"),
+  pedirCodigo: (numero: string) => api.post<{ codigo: string }>("/whatsapp/conexion/codigo", { numero }),
+  cerrarSesion: () => api.post<ConexionWa>("/whatsapp/conexion/cerrar-sesion"),
+  reset: () => api.post<ConexionWa>("/whatsapp/conexion/reset"),
+
+  chats: (filtro: FiltroChats, q: string) =>
+    api.get<ChatWa[]>(`/whatsapp/chats?filtro=${filtro}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""}`),
+  mensajes: (jid: string, opciones: { antesDe?: string; q?: string } = {}) => {
+    const p = new URLSearchParams();
+    if (opciones.antesDe) p.set("antesDe", opciones.antesDe);
+    if (opciones.q?.trim()) p.set("q", opciones.q.trim());
+    return api.get<{ mensajes: MensajeWa[]; hayMas: boolean }>(`/whatsapp/chats/${j(jid)}/mensajes?${p}`);
+  },
+  leer: (jid: string) => api.post<void>(`/whatsapp/chats/${j(jid)}/leer`),
+  enviar: (jid: string, texto: string) => api.post<{ id: string }>(`/whatsapp/chats/${j(jid)}/mensajes`, { texto }),
+  enviarImagen: (jid: string, archivo: File, texto: string) => {
+    const fd = new FormData();
+    fd.append("archivo", archivo);
+    if (texto.trim()) fd.append("texto", texto.trim());
+    return api.postForm<{ id: string }>(`/whatsapp/chats/${j(jid)}/imagen`, fd);
+  },
+  actualizarChat: (jid: string, cambios: { nombreGuardado?: string | null; archivado?: boolean; terceroId?: number | null }) =>
+    api.put<ChatWa>(`/whatsapp/chats/${j(jid)}`, cambios),
+  devolverAlBot: (jid: string) => api.post<ChatWa>(`/whatsapp/chats/${j(jid)}/devolver-bot`),
+  tomar: (jid: string) => api.post<ChatWa>(`/whatsapp/chats/${j(jid)}/tomar`),
+  instruccion: (jid: string, texto: string) => api.post<{ enviado: string }>(`/whatsapp/chats/${j(jid)}/instruccion`, { texto }),
+  cliente: (jid: string) => api.get<ClienteLateral>(`/whatsapp/chats/${j(jid)}/cliente`),
+  marcarComprobante: (mensajeId: string, datos: { monto?: string; referencia?: string; banco?: string }) =>
+    api.post<{ registrado: true; solicitud: number; alerta?: string }>(`/whatsapp/mensajes/${mensajeId}/comprobante`, datos),
+  esperando: () => api.get<ChatWa[]>("/whatsapp/atencion"),
+
+  outbox: () => api.get<OutboxWa[]>("/whatsapp/outbox"),
+  reintentarOutbox: (id: string) => api.post<void>(`/whatsapp/outbox/${id}/reintentar`),
+  recibirPorWhatsapp: (txId: number) => api.get<{ url: string; codigo: string; qr: string }>(`/whatsapp/recibir/${txId}`),
+
+  config: () => api.get<RespuestaConfig>("/whatsapp/config"),
+  guardarConfig: (config: ConfigWa) => api.put<RespuestaConfig>("/whatsapp/config", config),
+  guardarClave: (clave: string, proveedor?: Proveedor) =>
+    api.put<RespuestaConfig & { proveedor: Proveedor }>("/whatsapp/config/clave", { clave, proveedor }),
+  opciones: () => api.get<OpcionesConfig>("/whatsapp/config/opciones"),
+  modelos: (proveedor: Proveedor) => api.get<ModeloIa[]>(`/whatsapp/ia/modelos?proveedor=${proveedor}`),
+  probar: (proveedor: Proveedor, modelo: string) =>
+    api.post<{ ok: boolean; usaHerramientas?: boolean; respuesta?: string; modelo?: string; ms?: number; error?: string }>("/whatsapp/ia/probar", {
+      proveedor,
+      modelo,
+    }),
+  simular: (entrada: { historial: { rol: "cliente" | "bot" | "sistema"; texto: string }[]; estado?: Record<string, unknown>; registrado?: boolean }) =>
+    api.post<ResultadoSimulacion>("/whatsapp/ia/simular", entrada),
+};
+
+/** URL del stream SSE (EventSource no manda cabeceras: el token va en la query). */
+export function urlStreamWhatsapp() {
+  const token = localStorage.getItem("token") ?? "";
+  return `${import.meta.env.VITE_API_URL}/whatsapp/stream?token=${encodeURIComponent(token)}`;
 }
