@@ -55,7 +55,10 @@ export function AppRoutes() {
         <Route element={<RequireRole roles={["ADMIN"]} />}>
         <Route path="/usuarios" element={<UsuariosPage />} />
         <Route path="/cuentas-empresa" element={<CuentasEmpresaPage />} />
-        <Route path="/whatsapp" element={<WhatsAppPage />} />
+        </Route>
+        {/* Panel de chats: admin y asesor. Conexión y configuración de la IA: solo admin (lo decide la página y el backend) */}
+        <Route element={<RequireRole roles={["ADMIN", "ASESOR"]} />}>
+          <Route path="/whatsapp/*" element={<WhatsAppPage />} />
         </Route>
       </Route>
     </Routes>
