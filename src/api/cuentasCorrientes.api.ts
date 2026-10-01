@@ -20,6 +20,34 @@ export interface CuentaCorrienteResumen {
   moneda_codigo: string;
   saldo_actual: string;
   estado: "DISPONIBLE" | "BLOQUEADA" | "CERRADA";
+  tercero_tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO";
+  moneda_decimales: number;
+  ultimo_movimiento: string | null;
+}
+
+/** Una fila de la hoja: como en el Excel (fecha, referencia, cantidad, tasa, monto, total). */
+export interface FilaEstadoCuenta {
+  id: number;
+  fecha: string;
+  descripcion: string | null;
+  tipo: string;
+  cantidad_base: string | null;
+  tasa: string | null;
+  monto: string;
+  total: string;
+  anulado: boolean;
+  reverso_de_id: number | null;
+  movimiento_caja_id: number | null;
+  usuario_nombre: string;
+}
+
+export interface EstadoCuenta {
+  cuenta: CuentaCorrienteResumen;
+  saldoAnterior: string;
+  movimientos: FilaEstadoCuenta[];
+  sumas: string;
+  abonos: string;
+  saldoFinal: string;
 }
 
 export interface MovimientoCC {
@@ -42,10 +70,37 @@ export function getCategorias() {
   return api.get<Categoria[]>("/cuentas-corrientes/categorias");
 }
 
-export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number }) {
+export function crearCanal(nombre: string) {
+  return api.post<Canal>("/cuentas-corrientes/canales", { nombre });
+}
+
+export function crearCuentaCorriente(data: {
+  terceroId?: number;
+  nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO"; telefono?: string };
+  canalId: number;
+  monedaId: number;
+  saldoInicial?: string;
+}) {
+  return api.post<CuentaCorrienteResumen>("/cuentas-corrientes", data);
+}
+
+export function getEstadoCuenta(cuentaId: number, rango: { desde?: string; hasta?: string }) {
+  const params = new URLSearchParams();
+  if (rango.desde) params.set("desde", rango.desde);
+  if (rango.hasta) params.set("hasta", rango.hasta);
+  return api.get<EstadoCuenta>(`/cuentas-corrientes/${cuentaId}/estado-cuenta?${params}`);
+}
+
+export function anularMovimientoCC(movimientoId: number) {
+  return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
+}
+
+export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string }) {
   const params = new URLSearchParams();
   if (filtros.terceroId) params.set("terceroId", String(filtros.terceroId));
   if (filtros.canalId) params.set("canalId", String(filtros.canalId));
+  if (filtros.buscar?.trim()) params.set("buscar", filtros.buscar.trim());
+  if (filtros.tipoTercero) params.set("tipoTercero", filtros.tipoTercero);
   const q = params.toString();
   return api.get<CuentaCorrienteResumen[]>(`/cuentas-corrientes${q ? `?${q}` : ""}`);
 }
@@ -59,7 +114,8 @@ interface RegistrarMovimientoInput {
   canalId: number;
   monedaId: number;
   tipo: "COMPRA" | "VENTA" | "ABONO" | "CARGO" | "AJUSTE";
-  monto: string;
+  monto?: string; // si falta, el backend lo calcula como cantidadBase x tasa
+  fecha?: string;
   descripcion?: string;
   cantidadBase?: string;
   monedaBaseId?: number;

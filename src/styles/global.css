@@ -669,3 +669,10 @@ body {
 .modal-cerrar { background: none; border: none; color: #6b7280; cursor: pointer; padding: 4px; display: inline-flex; border-radius: 6px; }
 .modal-cerrar:hover { background: #f2f4f7; color: var(--color-navy-dark); }
 .modal-cuerpo { padding: 20px; overflow-y: auto; }
+
+/* Encabezado en pantallas chicas: sin el nombre largo ni el rol, para que no se desborde */
+@media (max-width: 720px) {
+  .app-header { padding: 10px 16px; }
+  .app-header-title, .app-header-role { display: none; }
+  .app-header-volver { margin-left: 10px; }
+}
