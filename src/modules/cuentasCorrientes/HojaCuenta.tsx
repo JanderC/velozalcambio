@@ -16,9 +16,9 @@ import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from
 
 type Periodo = "hoy" | "semana" | "mes" | "todo" | "rango";
 
-const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono dólares", "Abono efectivo", "Abono transferencia"];
+const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
-// En una venta, la referencia lleva a quién se le vendió: "Venta de Zelle · Juan Pérez"
+// La referencia lleva quién envió la transferencia: "Venta de Zelle · Juan Pérez"
 const SEPARADOR_PERSONA = " · ";
 
 /** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
@@ -327,9 +327,9 @@ function FilaNueva({
   const nTasa = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : nEscrita;
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
-  const esVenta = /^s*venta/i.test(referencia) && !referencia.includes(SEPARADOR_PERSONA);
-  // El nombre se puede poner en cualquier venta; solo en Zelle es obligatorio
-  const personaObligatoria = esVenta && /zelle/i.test(referencia);
+  // Ventas y abonos: se puede anotar quién hizo la transferencia; si entró por Zelle es obligatorio
+  const pidePersona = (/^s*(venta|abono|pago)/i.test(referencia) || /zelle/i.test(referencia)) && !referencia.includes(SEPARADOR_PERSONA);
+  const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   const sinSigno = (v: string) => v.replace(/^-/, "");
 
   // MONTO: cantidad x tasa, o el monto escrito a mano si no hay tasa (ej. "Abono efectivo")
@@ -354,7 +354,7 @@ function FilaNueva({
     e.preventDefault();
     setError(null);
     if (!referencia.trim()) return setError("Escribí la referencia (a quién o qué es).");
-    if (personaObligatoria && persona.trim().length < 2) return setError("En una venta de Zelle hace falta el nombre de la persona.");
+    if (personaObligatoria && persona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
     if (conTasa && (!nTasa || !/[1-9]/.test(nTasa) || nTasa.startsWith("-"))) return setError(esPorcentaje ? "El porcentaje no es un número válido." : "La tasa no es un número válido.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
@@ -379,7 +379,7 @@ function FilaNueva({
       canalId: cuenta.canal_id,
       monedaId: cuenta.moneda_id,
       tipo: resta ? ("ABONO" as const) : ("CARGO" as const),
-      descripcion: esVenta && persona.trim() ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim(),
+      descripcion: pidePersona && persona.trim() ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim(),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
@@ -445,10 +445,10 @@ function FilaNueva({
             ))}
           </datalist>
         </label>
-        {esVenta && (
+        {pidePersona && (
           <label className="cc-c-persona">
-            Nombre de la persona{personaObligatoria ? "" : " (opcional)"}
-            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="A quién se le vendió" autoComplete="off" />
+            Quién envió la transferencia{personaObligatoria ? "" : " (opcional)"}
+            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Nombre de quien hizo el envío" autoComplete="off" />
           </label>
         )}
         <div className="cc-c-signo" role="group" aria-label="Suma o abono">
