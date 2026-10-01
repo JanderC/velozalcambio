@@ -67,6 +67,16 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  // Archivos para descargar (ej. un Excel)
+  getBlob: async (path: string) => {
+    const token = getToken();
+    const r = await fetch(`${BASE_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!r.ok) {
+      const body = await r.json().catch(() => null);
+      throw new ApiError(r.status, body?.error ?? `Error ${r.status}`);
+    }
+    return r.blob();
+  },
   postForm: <T>(path: string, formData: FormData) => {
     const token = getToken();
     const headers: Record<string, string> = {};

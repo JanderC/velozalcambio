@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, Undo2 } from "lucide-react";
 import {
   anularMovimientoCC,
+  descargarExcelEstadoCuenta,
   getEstadoCuenta,
   registrarMovimientoCC,
   type CuentaCorrienteResumen,
@@ -14,7 +15,12 @@ import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from
 
 type Periodo = "hoy" | "semana" | "mes" | "todo" | "rango";
 
-const REFERENCIAS_COMUNES = ["Venta de bss", "Venta de USDT", "Deteriorado", "Abono dólares", "Abono efectivo", "Abono transferencia"];
+const REFERENCIAS_COMUNES = ["Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono dólares", "Abono efectivo", "Abono transferencia"];
+
+/** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
+function tasaTexto(tasa: string, esPorcentaje: boolean) {
+  return esPorcentaje ? `${formatearMonto(multiplicarDecimales(tasa, "100", 6))}%` : formatearMonto(tasa);
+}
 
 /** AAAA-MM-DD de hoy en la zona del negocio. */
 function hoyBogota(desplazarDias = 0) {
@@ -52,6 +58,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const [estado, setEstado] = useState<EstadoCuenta | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -80,8 +87,22 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     }
   }
 
+  async function descargar() {
+    setDescargando(true);
+    try {
+      await descargarExcelEstadoCuenta(cuenta.id, rangoDe(periodo, desde, hasta), `Cuenta ${cuenta.tercero_nombre} ${hoyBogota()}.xlsx`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDescargando(false);
+    }
+  }
+
   const simbolo = cuenta.moneda_codigo === "COP" ? "$" : "";
   const sufijo = cuenta.moneda_codigo === "COP" ? "" : ` ${cuenta.moneda_codigo}`;
+  const saldoActual = estado?.cuenta.saldo_actual ?? cuenta.saldo_actual;
+  // Igual que el Excel: en negativo es lo que yo le debo
+  const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") ? "Yo le debo" : "Me debe";
   const referencias = useMemo(() => {
     const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de"));
     return [...new Set([...usadas.reverse(), ...REFERENCIAS_COMUNES])].slice(0, 30);
@@ -96,14 +117,15 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         <div className="cc-hoja-titulo">
           <h2>{cuenta.tercero_nombre}</h2>
           <span>
-            {cuenta.tercero_tipo === "PROVEEDOR" ? "Proveedor" : cuenta.tercero_tipo === "CLIENTE" ? "Cliente" : "Cliente y proveedor"} · {cuenta.canal_nombre.replace(/_/g, " ")} ·{" "}
+            {cuenta.tercero_tipo === "PROVEEDOR" ? "Proveedor" : cuenta.tercero_tipo === "CLIENTE" ? "Cliente" : "Cliente y proveedor"} ·{" "}
+            {cuenta.canal_nombre === "SIN_BANCO" ? "" : `${cuenta.canal_nombre.replace(/_/g, " ")} · `}
             {cuenta.moneda_codigo}
           </span>
         </div>
         <div className="cc-hoja-saldo">
-          <span>Saldo</span>
+          <span>{lecturaSaldo}</span>
           <strong>
-            <Monto valor={estado?.cuenta.saldo_actual ?? cuenta.saldo_actual} simbolo={simbolo} />
+            <Monto valor={saldoActual} simbolo={simbolo} />
             {sufijo}
           </strong>
         </div>
@@ -130,6 +152,9 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} aria-label="Hasta" />
           </span>
         )}
+        <button className="cc-descargar" onClick={descargar} disabled={descargando} title="Descargar esta hoja en Excel">
+          <Download size={14} /> {descargando ? "Descargando…" : "Descargar Excel"}
+        </button>
       </div>
 
       {error && <p className="cc-form-error">{error}</p>}
@@ -180,7 +205,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   {m.movimiento_caja_id && <span className="cc-chip-caja">caja</span>}
                 </td>
                 <td className="num">{m.cantidad_base ? <Monto valor={m.cantidad_base} simbolo="" /> : ""}</td>
-                <td className="num">{m.tasa ? formatearMonto(m.tasa) : ""}</td>
+                <td className="num">{m.tasa ? tasaTexto(m.tasa, m.tasa_es_porcentaje) : ""}</td>
                 <td className="num">
                   <Monto valor={m.monto} simbolo={simbolo} />
                 </td>
@@ -258,6 +283,7 @@ function FilaNueva({
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
   const [tasa, setTasa] = useState("");
+  const [esPorcentaje, setEsPorcentaje] = useState(false); // comisión: cantidad x % en vez de cantidad x tasa
   const [montoDirecto, setMontoDirecto] = useState("");
   const [masOpciones, setMasOpciones] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -275,7 +301,9 @@ function FilaNueva({
   }, [masOpciones, cajas.length]);
 
   const nCantidad = cantidad.trim() ? leerNumero(cantidad) : null;
-  const nTasa = tasa.trim() ? leerNumero(tasa) : null;
+  // Lo escrito en la casilla (ej. "3" si es comisión) y el multiplicador que se guarda (3% -> "0.03")
+  const nEscrita = tasa.trim() ? leerNumero(tasa.replace(/%/g, "")) : null;
+  const nTasa = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : nEscrita;
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
   const sinSigno = (v: string) => v.replace(/^-/, "");
@@ -295,6 +323,7 @@ function FilaNueva({
     setReferencia(valor);
     // "Abono ..." resta, igual que en el Excel donde va en negativo
     if (/^\s*(abono|pago)/i.test(valor)) setResta(true);
+    if (/comisi[oó]n/i.test(valor)) setEsPorcentaje(true);
   }
 
   async function guardar(e: FormEvent) {
@@ -302,19 +331,20 @@ function FilaNueva({
     setError(null);
     if (!referencia.trim()) return setError("Escribí la referencia (a quién o qué es).");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
-    if (conTasa && !nTasa) return setError("La tasa no es un número válido.");
-    if (conTasa && !nCantidad) return setError("Con tasa hace falta la cantidad.");
+    if (conTasa && (!nTasa || !/[1-9]/.test(nTasa) || nTasa.startsWith("-"))) return setError(esPorcentaje ? "El porcentaje no es un número válido." : "La tasa no es un número válido.");
+    if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
     if (masOpciones && cajaId === "") return setError("Elegí la caja o banco que también se mueve.");
 
     // La fila se limpia ya, para poder seguir cargando la siguiente sin esperar al servidor.
     // Si el guardado falla, se devuelve lo escrito (salvo que ya se esté escribiendo otra).
-    const escrito = { referencia, cantidad, tasa, montoDirecto, resta };
+    const escrito = { referencia, cantidad, tasa, montoDirecto, resta, esPorcentaje };
     setReferencia("");
     setCantidad("");
     setTasa("");
     setMontoDirecto("");
     setResta(false);
+    setEsPorcentaje(false);
     refInput.current?.focus();
     const signo = resta ? "-" : "";
     const datos = {
@@ -325,7 +355,7 @@ function FilaNueva({
       descripcion: referencia.trim(),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
-      ...(conTasa ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa! } : { monto: montoConSigno }),
+      ...(conTasa ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
       cajaId: masOpciones && cajaId !== "" ? cajaId : undefined,
     };
     pendientes.current++;
@@ -344,6 +374,7 @@ function FilaNueva({
         setTasa(escrito.tasa);
         setMontoDirecto(escrito.montoDirecto);
         setResta(escrito.resta);
+        setEsPorcentaje(escrito.esPorcentaje);
       }
     } finally {
       pendientes.current--;
@@ -391,11 +422,25 @@ function FilaNueva({
         <span className="cc-operador" aria-hidden="true">
           ×
         </span>
-        <label className="cc-c-num corto">
-          Tasa
-          <input value={tasa} onChange={(e) => setTasa(e.target.value)} inputMode="decimal" placeholder="3,2" autoComplete="off" />
-          <small>{nTasa ? formatearMonto(nTasa) : " "}</small>
-        </label>
+        <div className="cc-c-num corto">
+          <div className="cc-modo-tasa" role="group" aria-label="Tasa o comisión en porcentaje">
+            <button type="button" className={!esPorcentaje ? "activo" : ""} onClick={() => setEsPorcentaje(false)} aria-pressed={!esPorcentaje}>
+              Tasa
+            </button>
+            <button type="button" className={esPorcentaje ? "activo" : ""} onClick={() => setEsPorcentaje(true)} aria-pressed={esPorcentaje}>
+              Comisión %
+            </button>
+          </div>
+          <input
+            value={tasa}
+            onChange={(e) => setTasa(e.target.value)}
+            inputMode="decimal"
+            placeholder={esPorcentaje ? "3 (%)" : "3,2"}
+            autoComplete="off"
+            aria-label={esPorcentaje ? "Porcentaje de comisión" : "Tasa"}
+          />
+          <small>{nEscrita ? `${formatearMonto(nEscrita)}${esPorcentaje ? "%" : ""}` : " "}</small>
+        </div>
         <span className="cc-operador" aria-hidden="true">
           =
         </span>
@@ -429,6 +474,12 @@ function FilaNueva({
           </select>
         )}
         {enviando && <span className="cc-guardando">Guardando…</span>}
+        {esPorcentaje && monto && nCantidad && nEscrita && (
+          <span className="cc-explica-comision">
+            Comisión: el {formatearMonto(nEscrita)}% de {simbolo}
+            {formatearMonto(sinSigno(nCantidad))} = <strong>{simbolo}{formatearMonto(monto)}</strong>
+          </span>
+        )}
         {totalNuevo && (
           <span className="cc-total-nuevo">
             El total quedaría en{" "}

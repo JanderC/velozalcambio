@@ -116,7 +116,9 @@ export function CuentasCorrientesPage() {
                   </span>
                   <span className={`cc-cuenta-saldo ${c.saldo_actual.startsWith("-") ? "cc-neg" : ""}`}>{saldoTexto(c)}</span>
                   <span className="cc-cuenta-detalle">
-                    {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : "Mixto"} · {c.canal_nombre.replace(/_/g, " ")}
+                    {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : "Mixto"}
+                    {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
+                    {/[1-9]/.test(c.saldo_actual) ? (c.saldo_actual.startsWith("-") ? " · yo le debo" : " · me debe") : ""}
                   </span>
                   <span className="cc-cuenta-detalle derecha">
                     {c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : "sin movimientos"}

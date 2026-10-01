@@ -87,6 +87,15 @@
 .cc-nueva input:focus, .cc-nueva select:focus, .cc-modal input:focus, .cc-modal select:focus { outline: 2px solid rgba(20,64,111,0.25); border-color: var(--color-navy); }
 .cc-nueva small { font-weight: 400; color: #6b7280; font-size: 0.72rem; min-height: 1em; font-variant-numeric: tabular-nums; }
 .cc-c-num input { text-align: right; font-variant-numeric: tabular-nums; }
+/* Tasa o comisión en %: mismo casillero, se elige arriba */
+div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
+.cc-modo-tasa { display: flex; gap: 2px; height: 0.95rem; }
+.cc-modo-tasa button { border: none; background: none; padding: 0 5px; font-family: inherit; font-size: 0.72rem; font-weight: 600; color: #9ca3af; cursor: pointer; border-radius: 4px; white-space: nowrap; }
+.cc-modo-tasa button.activo { background: var(--color-navy); color: white; }
+.cc-explica-comision { font-size: 0.82rem; color: #4b5563; }
+.cc-explica-comision strong { color: var(--color-navy-dark); }
+.cc-descargar { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: white !important; border: 1px solid #1a7f37 !important; color: #1a7f37 !important; font-weight: 600; border-radius: 6px !important; }
+.cc-descargar:disabled { opacity: 0.6; cursor: default; }
 .cc-operador { align-self: flex-start; margin-top: 27px; color: #9ca3af; font-weight: 700; }
 .cc-resultado { display: block; padding: 9px 10px; border: 1px dashed #b8c4d4; border-radius: 6px; background: #eef3f9; text-align: right; font-size: 0.95rem; font-weight: 700; color: var(--color-navy-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cc-resultado.cc-neg { color: #c0392b; }

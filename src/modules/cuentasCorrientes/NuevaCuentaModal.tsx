@@ -58,7 +58,7 @@ export function NuevaCuentaModal({
     setError(null);
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre.");
     if (modo === "existente" && !tercero) return setError("Buscá y elegí a quién le abrís la cuenta.");
-    if (canalId === "" || (canalId === "nuevo" && canalNuevo.trim().length < 2)) return setError("Elegí el canal de pago.");
+    if (canalId === "nuevo" && canalNuevo.trim().length < 2) return setError("Escribí el nombre del banco o canal nuevo.");
     if (monedaId === "") return setError("Elegí la moneda.");
     if (saldo.trim() && !nSaldo) return setError("El saldo inicial no es un número válido.");
 
@@ -72,7 +72,7 @@ export function NuevaCuentaModal({
       }
       const cuenta = await crearCuentaCorriente({
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined } }),
-        canalId: canal as number,
+        canalId: canal === "" ? undefined : canal,
         monedaId,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
       });
@@ -144,10 +144,10 @@ export function NuevaCuentaModal({
 
         <div className="cc-modal-fila">
           <label>
-            Canal de pago
+            Banco o canal de pago (opcional)
             <select value={canalId} onChange={(e) => setCanalId(e.target.value === "nuevo" ? "nuevo" : e.target.value ? Number(e.target.value) : "")}>
-              <option value="">Elegir…</option>
-              {canales.map((c) => (
+              <option value="">Sin banco</option>
+              {canales.filter((c) => c.nombre !== "SIN_BANCO").map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre.replace(/_/g, " ")}
                 </option>
@@ -177,12 +177,16 @@ export function NuevaCuentaModal({
           Saldo pendiente con el que arranca (opcional)
           <span className="cc-saldo-inicial">
             <select value={saldoNegativo ? "-" : "+"} onChange={(e) => setSaldoNegativo(e.target.value === "-")} aria-label="Signo del saldo">
-              <option value="+">+ a favor</option>
-              <option value="-">− en contra</option>
+              <option value="+">+ Me debe</option>
+              <option value="-">− Yo le debo</option>
             </select>
             <input value={saldo} onChange={(e) => setSaldo(e.target.value)} inputMode="decimal" placeholder="ej. 8.026.800" />
           </span>
-          <small>{nSaldo ? `Se carga como ${saldoNegativo ? "- " : ""}${formatearMonto(nSaldo.replace(/^-/, ""))}` : "Lo que venía del Excel. Se puede dejar en cero."}</small>
+          <small>
+            {nSaldo
+              ? `Se carga como ${saldoNegativo ? "- " : ""}${formatearMonto(nSaldo.replace(/^-/, ""))}${saldoNegativo ? " (en negativo: es lo que yo le debo)" : " (lo que me debe)"}`
+              : "Lo que venía del Excel. Si yo le debo, va en negativo. Se puede dejar en cero."}
+          </small>
         </label>
 
         {error && <p className="cc-form-error">{error}</p>}

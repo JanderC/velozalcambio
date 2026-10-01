@@ -33,6 +33,7 @@ export interface FilaEstadoCuenta {
   tipo: string;
   cantidad_base: string | null;
   tasa: string | null;
+  tasa_es_porcentaje: boolean; // comisión en %: la tasa viene como fracción (3% = "0.03")
   monto: string;
   total: string;
   anulado: boolean;
@@ -77,11 +78,25 @@ export function crearCanal(nombre: string) {
 export function crearCuentaCorriente(data: {
   terceroId?: number;
   nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO"; telefono?: string };
-  canalId: number;
+  canalId?: number; // sin banco: no es obligatorio
   monedaId: number;
   saldoInicial?: string;
 }) {
   return api.post<CuentaCorrienteResumen>("/cuentas-corrientes", data);
+}
+
+/** Baja la hoja como .xlsx y la guarda con el nombre indicado. */
+export async function descargarExcelEstadoCuenta(cuentaId: number, rango: { desde?: string; hasta?: string }, nombreArchivo: string) {
+  const params = new URLSearchParams();
+  if (rango.desde) params.set("desde", rango.desde);
+  if (rango.hasta) params.set("hasta", rango.hasta);
+  const blob = await api.getBlob(`/cuentas-corrientes/${cuentaId}/excel?${params}`);
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
 }
 
 export function getEstadoCuenta(cuentaId: number, rango: { desde?: string; hasta?: string }) {
@@ -120,6 +135,7 @@ interface RegistrarMovimientoInput {
   cantidadBase?: string;
   monedaBaseId?: number;
   tasa?: string;
+  tasaEsPorcentaje?: boolean;
   categoriaId?: number;
   cajaId?: number;
   montoCaja?: string;
