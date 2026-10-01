@@ -14,6 +14,7 @@ export interface CuentaCorrienteResumen {
   id: number;
   tercero_id: number;
   tercero_nombre: string;
+  tercero_telefono: string | null;
   canal_id: number;
   canal_nombre: string;
   moneda_id: number;

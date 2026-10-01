@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Download, Plus, Undo2, X } from "lucide-react";
+import { ArrowLeft, Download, MessageCircle, Plus, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   descargarExcelEstadoCuenta,
@@ -20,6 +20,15 @@ const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", 
 
 // La referencia lleva quién envió la transferencia: "Venta de Zelle · Juan Pérez"
 const SEPARADOR_PERSONA = " · ";
+
+/** Teléfono como lo pide wa.me: solo dígitos y con código de país (celular colombiano o venezolano sin él -> se le agrega). */
+function telefonoWhatsApp(telefono: string | null) {
+  const d = (telefono ?? "").replace(/D/g, "").replace(/^00/, "");
+  if (d.length < 8) return null;
+  if (d.length === 10 && d.startsWith("3")) return `57${d}`;
+  if (d.length === 11 && d.startsWith("04")) return `58${d.slice(1)}`;
+  return d;
+}
 
 /** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
 function tasaTexto(tasa: string, esPorcentaje: boolean) {
@@ -121,6 +130,16 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const saldoActual = estado?.cuenta.saldo_actual ?? cuenta.saldo_actual;
   // Igual que el Excel: en negativo es lo que yo le debo
   const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") ? "Yo le debo" : "Me debe";
+  // Enlace a WhatsApp (sin API): abre el chat del cliente con el saldo ya escrito, listo para enviar
+  const telefono = telefonoWhatsApp(estado?.cuenta.tercero_telefono ?? cuenta.tercero_telefono);
+  const saldoSinSigno = `${simbolo}${formatearMonto(saldoActual.replace(/^-/, ""))}${sufijo}`;
+  const mensajeSaldo =
+    `Hola ${cuenta.tercero_nombre}, te comparto tu saldo al ${fechaCorta(new Date().toISOString())}: ` +
+    (lecturaSaldo === "Yo le debo"
+      ? `tienes un saldo a favor de ${saldoSinSigno} (es lo que te debemos).`
+      : lecturaSaldo === "Me debe"
+        ? `tienes un saldo pendiente por pagar de ${saldoSinSigno}.`
+        : "tu cuenta está al día, sin saldo pendiente.");
   const referencias = useMemo(() => {
     const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!);
     return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])];
@@ -169,6 +188,11 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             a
             <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} aria-label="Hasta" />
           </span>
+        )}
+        {telefono && (
+          <a className="cc-whatsapp" href={`https://wa.me/${telefono}?text=${encodeURIComponent(mensajeSaldo)}`} target="_blank" rel="noreferrer" title="Abrir WhatsApp con el saldo listo para enviar">
+            <MessageCircle size={14} /> Enviar saldo
+          </a>
         )}
         <button className="cc-descargar" onClick={descargar} disabled={descargando} title="Descargar esta hoja en Excel">
           <Download size={14} /> {descargando ? "Descargando…" : "Descargar Excel"}
