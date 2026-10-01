@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Plus, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   descargarExcelEstadoCuenta,
+  getCanales,
   getEstadoCuenta,
   registrarMovimientoCC,
   type CuentaCorrienteResumen,
@@ -62,6 +63,20 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
+  // "Venta de <banco>" para cada banco o canal: ZELLE -> "Venta de Zelle"
+  const [ventasPorBanco, setVentasPorBanco] = useState<string[]>([]);
+
+  useEffect(() => {
+    getCanales()
+      .then((canales) =>
+        setVentasPorBanco(
+          canales
+            .filter((c) => c.nombre !== "SIN_BANCO")
+            .map((c) => `Venta de ${c.nombre.replace(/_/g, " ").toLowerCase().replace(/(^|s)S/g, (l) => l.toUpperCase())}`)
+        )
+      )
+      .catch(() => setVentasPorBanco([]));
+  }, []);
 
   const cargar = useCallback(async () => {
     try {
@@ -108,8 +123,8 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") ? "Yo le debo" : "Me debe";
   const referencias = useMemo(() => {
     const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!);
-    return [...new Set([...usadas.reverse(), ...REFERENCIAS_COMUNES])].slice(0, 30);
-  }, [estado]);
+    return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])];
+  }, [estado, ventasPorBanco]);
 
   return (
     <div className="cc-hoja">
@@ -313,6 +328,8 @@ function FilaNueva({
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
   const esVenta = /^s*venta/i.test(referencia) && !referencia.includes(SEPARADOR_PERSONA);
+  // El nombre se puede poner en cualquier venta; solo en Zelle es obligatorio
+  const personaObligatoria = esVenta && /zelle/i.test(referencia);
   const sinSigno = (v: string) => v.replace(/^-/, "");
 
   // MONTO: cantidad x tasa, o el monto escrito a mano si no hay tasa (ej. "Abono efectivo")
@@ -337,7 +354,7 @@ function FilaNueva({
     e.preventDefault();
     setError(null);
     if (!referencia.trim()) return setError("Escribí la referencia (a quién o qué es).");
-    if (esVenta && persona.trim().length < 2) return setError("Es una venta: escribí el nombre de la persona.");
+    if (personaObligatoria && persona.trim().length < 2) return setError("En una venta de Zelle hace falta el nombre de la persona.");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
     if (conTasa && (!nTasa || !/[1-9]/.test(nTasa) || nTasa.startsWith("-"))) return setError(esPorcentaje ? "El porcentaje no es un número válido." : "La tasa no es un número válido.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
@@ -362,7 +379,7 @@ function FilaNueva({
       canalId: cuenta.canal_id,
       monedaId: cuenta.moneda_id,
       tipo: resta ? ("ABONO" as const) : ("CARGO" as const),
-      descripcion: esVenta ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim(),
+      descripcion: esVenta && persona.trim() ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim(),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
@@ -430,7 +447,7 @@ function FilaNueva({
         </label>
         {esVenta && (
           <label className="cc-c-persona">
-            Nombre de la persona
+            Nombre de la persona{personaObligatoria ? "" : " (opcional)"}
             <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="A quién se le vendió" autoComplete="off" />
           </label>
         )}
