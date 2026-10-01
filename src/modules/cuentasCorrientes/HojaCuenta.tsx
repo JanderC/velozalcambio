@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Download, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, Plus, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   descargarExcelEstadoCuenta,
@@ -15,7 +15,10 @@ import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from
 
 type Periodo = "hoy" | "semana" | "mes" | "todo" | "rango";
 
-const REFERENCIAS_COMUNES = ["Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono dólares", "Abono efectivo", "Abono transferencia"];
+const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono dólares", "Abono efectivo", "Abono transferencia"];
+
+// En una venta, la referencia lleva a quién se le vendió: "Venta de Zelle · Juan Pérez"
+const SEPARADOR_PERSONA = " · ";
 
 /** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
 function tasaTexto(tasa: string, esPorcentaje: boolean) {
@@ -104,7 +107,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   // Igual que el Excel: en negativo es lo que yo le debo
   const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") ? "Yo le debo" : "Me debe";
   const referencias = useMemo(() => {
-    const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de"));
+    const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!);
     return [...new Set([...usadas.reverse(), ...REFERENCIAS_COMUNES])].slice(0, 30);
   }, [estado]);
 
@@ -122,7 +125,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             {cuenta.moneda_codigo}
           </span>
         </div>
-        <div className="cc-hoja-saldo">
+        <div className={`cc-hoja-saldo ${lecturaSaldo === "Yo le debo" ? "debo" : ""}`}>
           <span>{lecturaSaldo}</span>
           <strong>
             <Monto valor={saldoActual} simbolo={simbolo} />
@@ -280,6 +283,7 @@ function FilaNueva({
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
+  const [persona, setPersona] = useState("");
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
   const [tasa, setTasa] = useState("");
@@ -290,6 +294,8 @@ function FilaNueva({
   const [cajaId, setCajaId] = useState<number | "">("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // En el teléfono el formulario es un panel que sube desde abajo; en escritorio está siempre a la vista
+  const [abierta, setAbierta] = useState(false);
   const refInput = useRef<HTMLInputElement>(null);
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
@@ -306,6 +312,7 @@ function FilaNueva({
   const nTasa = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : nEscrita;
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
+  const esVenta = /^s*venta/i.test(referencia) && !referencia.includes(SEPARADOR_PERSONA);
   const sinSigno = (v: string) => v.replace(/^-/, "");
 
   // MONTO: cantidad x tasa, o el monto escrito a mano si no hay tasa (ej. "Abono efectivo")
@@ -330,6 +337,7 @@ function FilaNueva({
     e.preventDefault();
     setError(null);
     if (!referencia.trim()) return setError("Escribí la referencia (a quién o qué es).");
+    if (esVenta && persona.trim().length < 2) return setError("Es una venta: escribí el nombre de la persona.");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
     if (conTasa && (!nTasa || !/[1-9]/.test(nTasa) || nTasa.startsWith("-"))) return setError(esPorcentaje ? "El porcentaje no es un número válido." : "La tasa no es un número válido.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
@@ -338,21 +346,23 @@ function FilaNueva({
 
     // La fila se limpia ya, para poder seguir cargando la siguiente sin esperar al servidor.
     // Si el guardado falla, se devuelve lo escrito (salvo que ya se esté escribiendo otra).
-    const escrito = { referencia, cantidad, tasa, montoDirecto, resta, esPorcentaje };
+    const escrito = { referencia, persona, cantidad, tasa, montoDirecto, resta, esPorcentaje };
     setReferencia("");
+    setPersona("");
     setCantidad("");
     setTasa("");
     setMontoDirecto("");
     setResta(false);
     setEsPorcentaje(false);
-    refInput.current?.focus();
+    if (window.matchMedia("(max-width: 860px)").matches) setAbierta(false);
+    else refInput.current?.focus();
     const signo = resta ? "-" : "";
     const datos = {
       terceroId: cuenta.tercero_id,
       canalId: cuenta.canal_id,
       monedaId: cuenta.moneda_id,
       tipo: resta ? ("ABONO" as const) : ("CARGO" as const),
-      descripcion: referencia.trim(),
+      descripcion: esVenta ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim(),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
@@ -368,8 +378,10 @@ function FilaNueva({
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : "No se pudo guardar el movimiento.";
       setError(`"${escrito.referencia.trim()}" no se guardó: ${mensaje}`);
+      setAbierta(true);
       if (!refInput.current?.value) {
         setReferencia(escrito.referencia);
+        setPersona(escrito.persona);
         setCantidad(escrito.cantidad);
         setTasa(escrito.tasa);
         setMontoDirecto(escrito.montoDirecto);
@@ -383,8 +395,18 @@ function FilaNueva({
   }
 
   return (
-    <form className="cc-nueva" onSubmit={guardar}>
-      <div className="cc-nueva-titulo">Nuevo movimiento</div>
+    <>
+    <button type="button" className="cc-fab" onClick={() => setAbierta(true)}>
+      <Plus size={18} /> Nuevo movimiento
+    </button>
+    {abierta && <div className="cc-velo" onClick={() => setAbierta(false)} />}
+    <form className={`cc-nueva ${abierta ? "abierta" : ""}`} onSubmit={guardar}>
+      <div className="cc-nueva-titulo">
+        Nuevo movimiento
+        <button type="button" className="cc-cerrar-panel" onClick={() => setAbierta(false)} aria-label="Cerrar">
+          <X size={18} />
+        </button>
+      </div>
       <div className="cc-nueva-campos">
         <label className="cc-c-fecha">
           Fecha
@@ -397,7 +419,7 @@ function FilaNueva({
             list="cc-referencias"
             value={referencia}
             onChange={(e) => alCambiarReferencia(e.target.value)}
-            placeholder="Cliente, Venta de bss, Abono dólares…"
+            placeholder="Venta de Zelle, Venta de bss, Abono dólares…"
             autoComplete="off"
           />
           <datalist id="cc-referencias">
@@ -406,6 +428,12 @@ function FilaNueva({
             ))}
           </datalist>
         </label>
+        {esVenta && (
+          <label className="cc-c-persona">
+            Nombre de la persona
+            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="A quién se le vendió" autoComplete="off" />
+          </label>
+        )}
         <div className="cc-c-signo" role="group" aria-label="Suma o abono">
           <button type="button" className={!resta ? "activo suma" : ""} onClick={() => setResta(false)} aria-pressed={!resta}>
             + Suma
@@ -491,5 +519,6 @@ function FilaNueva({
       </div>
       {error && <p className="cc-form-error">{error}</p>}
     </form>
+    </>
   );
 }
