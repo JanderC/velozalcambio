@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Download, MessageCircle, Plus, Undo2, X } from "lucide-react";
+import { ArrowLeft, Download, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   descargarExcelEstadoCuenta,
@@ -10,6 +10,7 @@ import {
   type EstadoCuenta,
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
+import { compartirImagen, generarImagenReporte } from "./imagenReporte";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
@@ -116,6 +117,16 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     }
   }
 
+  // Imagen con solo los movimientos del período (sin nombre ni nada del sistema), para compartirla
+  async function compartir() {
+    if (!estado) return;
+    try {
+      await compartirImagen(await generarImagenReporte(estado, simbolo), "movimientos.png");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   async function descargar() {
     setDescargando(true);
     try {
@@ -196,6 +207,9 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             <MessageCircle size={14} /> Enviar saldo
           </a>
         )}
+        <button className="cc-descargar cc-compartir" onClick={compartir} disabled={!estado} title="Compartir una imagen con los movimientos">
+          <Share2 size={14} /> Compartir reporte
+        </button>
         <button className="cc-descargar" onClick={descargar} disabled={descargando} title="Descargar esta hoja en Excel">
           <Download size={14} /> {descargando ? "Descargando…" : "Descargar Excel"}
         </button>

@@ -99,7 +99,8 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-descargar:disabled { opacity: 0.6; cursor: default; }
 .cc-whatsapp { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: #25d366; color: white; font-weight: 600; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; text-decoration: none; }
 .cc-whatsapp:hover { background: #1eb858; }
-.cc-whatsapp + .cc-descargar { margin-left: 0; }
+.cc-whatsapp + .cc-descargar, .cc-descargar + .cc-descargar { margin-left: 0; }
+.cc-compartir { border-color: var(--color-navy) !important; color: var(--color-navy) !important; }
 .cc-operador { align-self: flex-start; margin-top: 27px; color: #9ca3af; font-weight: 700; }
 .cc-resultado { display: block; padding: 9px 10px; border: 1px dashed #b8c4d4; border-radius: 6px; background: #eef3f9; text-align: right; font-size: 0.95rem; font-weight: 700; color: var(--color-navy-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cc-resultado.cc-neg { color: #c0392b; }
