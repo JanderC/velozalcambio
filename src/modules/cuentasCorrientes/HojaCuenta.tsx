@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ArrowLeft, Download, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
+  cambiarModuloCuentaCorriente,
   descargarExcelEstadoCuenta,
   getCanales,
   getEstadoCuenta,
@@ -26,7 +27,7 @@ const SEPARADOR_PERSONA = " · ";
 
 /** Teléfono como lo pide wa.me: solo dígitos y con código de país (celular colombiano o venezolano sin él -> se le agrega). */
 function telefonoWhatsApp(telefono: string | null) {
-  const d = (telefono ?? "").replace(/D/g, "").replace(/^00/, "");
+  const d = (telefono ?? "").replace(/\D/g, "").replace(/^00/, "");
   if (d.length < 8) return null;
   if (d.length === 10 && d.startsWith("3")) return `57${d}`;
   if (d.length === 11 && d.startsWith("04")) return `58${d.slice(1)}`;
@@ -84,7 +85,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         setVentasPorBanco(
           canales
             .filter((c) => c.nombre !== "SIN_BANCO")
-            .map((c) => `Venta de ${c.nombre.replace(/_/g, " ").toLowerCase().replace(/(^|s)S/g, (l) => l.toUpperCase())}`)
+            .map((c) => `Venta de ${c.nombre.replace(/_/g, " ").toLowerCase().replace(/(^|\s)\S/g, (l) => l.toUpperCase())}`)
         )
       )
       .catch(() => setVentasPorBanco([]));
@@ -111,6 +112,22 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     try {
       await anularMovimientoCC(id);
       await cargar();
+      onActualizar();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  // Pasarla a Cuentas por Cobrar (sale de Cuentas Corrientes y se sigue llevando igual allá), o devolverla
+  async function mover() {
+    const destino = cuenta.modulo === "POR_COBRAR" ? "CORRIENTE" : "POR_COBRAR";
+    const pregunta =
+      destino === "POR_COBRAR"
+        ? `¿Pasar a ${cuenta.tercero_nombre} a Cuentas por Cobrar? Sale de Cuentas Corrientes y se sigue llevando igual desde allá.`
+        : `¿Devolver a ${cuenta.tercero_nombre} a Cuentas Corrientes?`;
+    if (!window.confirm(pregunta)) return;
+    try {
+      await cambiarModuloCuentaCorriente(cuenta.id, destino);
       onActualizar();
     } catch (e) {
       setError((e as Error).message);
@@ -171,6 +188,11 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             {cuenta.canal_nombre === "SIN_BANCO" ? "" : `${cuenta.canal_nombre.replace(/_/g, " ")} · `}
             {cuenta.moneda_codigo}
           </span>
+          {puedeAnular && (
+            <button type="button" className="cc-mover" onClick={mover}>
+              {cuenta.modulo === "POR_COBRAR" ? "Devolver a Cuentas Corrientes" : "Pasar a Cuentas por Cobrar"}
+            </button>
+          )}
         </div>
         <div className={`cc-hoja-saldo ${lecturaSaldo === "Yo le debo" ? "debo" : ""}`}>
           <span>{lecturaSaldo}</span>
@@ -379,7 +401,7 @@ function FilaNueva({
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
   // Ventas y abonos: se puede anotar quién hizo la transferencia; si entró por Zelle es obligatorio
-  const pidePersona = (/^s*(venta|abono|pago)/i.test(referencia) || /zelle/i.test(referencia)) && !referencia.includes(SEPARADOR_PERSONA);
+  const pidePersona = (/^\s*(venta|abono|pago)/i.test(referencia) || /zelle/i.test(referencia)) && !referencia.includes(SEPARADOR_PERSONA);
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   const sinSigno = (v: string) => v.replace(/^-/, "");
 

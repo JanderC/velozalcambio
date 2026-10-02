@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
 import { getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
-import { formatearMonto } from "../../utils/montos";
+import { formatearMonto, sumarDecimales } from "../../utils/montos";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
@@ -16,19 +16,37 @@ const TIPOS: { valor: string; etiqueta: string }[] = [
   { valor: "CLIENTE", etiqueta: "Clientes" },
 ];
 
-function saldoTexto(c: CuentaCorrienteResumen) {
-  const negativo = c.saldo_actual.startsWith("-");
-  const valor = formatearMonto(negativo ? c.saldo_actual.slice(1) : c.saldo_actual);
-  const conMoneda = c.moneda_codigo === "COP" ? `$${valor}` : `${valor} ${c.moneda_codigo}`;
+// En Cuentas por Cobrar se filtra por quién le debe a quién
+const SENTIDOS: { valor: string; etiqueta: string }[] = [
+  { valor: "", etiqueta: "Todos" },
+  { valor: "me-deben", etiqueta: "Me deben" },
+  { valor: "yo-debo", etiqueta: "Yo debo" },
+];
+
+const conSaldo = (c: CuentaCorrienteResumen) => /[1-9]/.test(c.saldo_actual);
+const yoDebo = (c: CuentaCorrienteResumen) => conSaldo(c) && c.saldo_actual.startsWith("-");
+
+function montoTexto(valor: string, moneda: string) {
+  const negativo = valor.startsWith("-");
+  const numero = formatearMonto(negativo ? valor.slice(1) : valor);
+  const conMoneda = moneda === "COP" ? `$${numero}` : `${numero} ${moneda}`;
   return negativo ? `- ${conMoneda}` : conMoneda;
 }
 
-export function CuentasCorrientesPage() {
+/**
+ * La misma pantalla sirve a dos módulos:
+ * - corrientes: las cuentas de movimiento diario.
+ * - cobrar: Cuentas por Cobrar / Pagar. Se alimenta de las mismas cuentas: toda la que tenga saldo
+ *   (me deben o yo debo) más las que se pasaron para allá por ser de poco movimiento.
+ */
+export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrientes" | "cobrar" }) {
   const { usuario } = useAuth();
   const puedeCrear = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
+  const enCobrar = modo === "cobrar";
   const [canales, setCanales] = useState<Canal[]>([]);
   const [canalId, setCanalId] = useState<number | "">("");
   const [tipo, setTipo] = useState("");
+  const [sentido, setSentido] = useState("");
   const [buscar, setBuscar] = useState("");
   const [cuentas, setCuentas] = useState<CuentaCorrienteResumen[]>([]);
   const [seleccionadaId, setSeleccionadaId] = useState<number | null>(null);
@@ -43,32 +61,59 @@ export function CuentasCorrientesPage() {
 
   const cargar = useCallback(async () => {
     try {
-      setCuentas(await getCuentasCorrientes({ canalId: canalId || undefined, tipoTercero: tipo || undefined, buscar }));
+      setCuentas(await getCuentasCorrientes({ canalId: canalId || undefined, tipoTercero: tipo || undefined, buscar, vista: modo }));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setCargando(false);
     }
-  }, [canalId, tipo, buscar]);
+  }, [canalId, tipo, buscar, modo]);
 
   useEffect(() => {
     const t = setTimeout(cargar, buscar ? 300 : 0);
     return () => clearTimeout(t);
   }, [cargar, buscar]);
 
+  // Totales por moneda: lo que me deben y lo que debo
+  const resumen = useMemo(() => {
+    const porMoneda = new Map<string, { meDeben: string; debo: string }>();
+    for (const c of cuentas) {
+      if (!conSaldo(c)) continue;
+      const t = porMoneda.get(c.moneda_codigo) ?? { meDeben: "0", debo: "0" };
+      if (yoDebo(c)) t.debo = sumarDecimales(t.debo, c.saldo_actual.slice(1));
+      else t.meDeben = sumarDecimales(t.meDeben, c.saldo_actual);
+      porMoneda.set(c.moneda_codigo, t);
+    }
+    return [...porMoneda.entries()];
+  }, [cuentas]);
+
+  // En Cuentas por Cobrar: primero las deudas más grandes
+  const visibles = useMemo(() => {
+    if (!enCobrar) return cuentas;
+    const filtradas = cuentas.filter((c) => (sentido === "me-deben" ? conSaldo(c) && !yoDebo(c) : sentido === "yo-debo" ? yoDebo(c) : true));
+    return [...filtradas].sort((a, b) => Math.abs(Number(b.saldo_actual)) - Math.abs(Number(a.saldo_actual)));
+  }, [cuentas, enCobrar, sentido]);
+
   const seleccionada = cuentas.find((c) => c.id === seleccionadaId) ?? null;
+  const chips = enCobrar ? SENTIDOS : TIPOS;
+  const chipActivo = enCobrar ? sentido : tipo;
+  const elegirChip = enCobrar ? setSentido : setTipo;
 
   return (
     <div className="cc-page">
       <Header />
       <div className="cc-header">
         <div>
-          <h1>Cuentas Corrientes</h1>
-          <p>La hoja de cada proveedor o cliente: cantidad × tasa = monto, y el total corrido.</p>
+          <h1>{enCobrar ? "Cuentas por Cobrar / Pagar" : "Cuentas Corrientes"}</h1>
+          <p>
+            {enCobrar
+              ? "Quién me debe y a quién le debo, con las mismas cuentas de Cuentas Corrientes."
+              : "La hoja de cada proveedor o cliente: cantidad × tasa = monto, y el total corrido."}
+          </p>
         </div>
         <div className="cc-header-acciones">
-          {usuario?.rol === "ADMIN" && <ImportarSaldosForm onImportado={cargar} />}
+          {!enCobrar && usuario?.rol === "ADMIN" && <ImportarSaldosForm onImportado={cargar} />}
           {puedeCrear && (
             <button className="cc-nueva-cuenta" onClick={() => setCreando(true)}>
               <Plus size={16} /> Nueva cuenta
@@ -76,6 +121,21 @@ export function CuentasCorrientesPage() {
           )}
         </div>
       </div>
+
+      {enCobrar && resumen.length > 0 && (
+        <div className="cc-resumen">
+          {resumen.flatMap(([moneda, t]) => [
+            <div key={`${moneda}-me-deben`}>
+              <span>Me deben · {moneda}</span>
+              <strong>{montoTexto(t.meDeben, moneda)}</strong>
+            </div>,
+            <div key={`${moneda}-debo`} className="debo">
+              <span>Yo debo · {moneda}</span>
+              <strong>{montoTexto(t.debo, moneda)}</strong>
+            </div>,
+          ])}
+        </div>
+      )}
 
       <div className={`cc-layout ${seleccionada ? "con-hoja" : ""}`}>
         <aside className="cc-lista" aria-label="Cuentas">
@@ -85,8 +145,8 @@ export function CuentasCorrientesPage() {
           </div>
           <div className="cc-filtros">
             <div className="cc-chips" role="tablist">
-              {TIPOS.map((t) => (
-                <button key={t.valor} role="tab" aria-selected={tipo === t.valor} className={tipo === t.valor ? "activo" : ""} onClick={() => setTipo(t.valor)}>
+              {chips.map((t) => (
+                <button key={t.valor} role="tab" aria-selected={chipActivo === t.valor} className={chipActivo === t.valor ? "activo" : ""} onClick={() => elegirChip(t.valor)}>
                   {t.etiqueta}
                 </button>
               ))}
@@ -104,24 +164,29 @@ export function CuentasCorrientesPage() {
 
           {error && <p className="cc-form-error cc-pad">{error}</p>}
           {cargando && <p className="cc-lista-aviso">Cargando…</p>}
-          {!cargando && cuentas.length === 0 && !error && (
+          {!cargando && visibles.length === 0 && !error && (
             <p className="cc-lista-aviso">
-              {buscar || tipo || canalId ? "Ninguna cuenta coincide." : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
+              {buscar || tipo || sentido || canalId
+                ? "Ninguna cuenta coincide."
+                : enCobrar
+                  ? "Nadie debe ni se le debe por ahora. Las cuentas con saldo aparecen acá solas."
+                  : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
             </p>
           )}
           <ul className="cc-cuentas">
-            {cuentas.map((c) => (
+            {visibles.map((c) => (
               <li key={c.id}>
                 <button className={seleccionadaId === c.id ? "activa" : ""} onClick={() => setSeleccionadaId(c.id)}>
                   <span className="cc-cuenta-nombre">
                     {c.tercero_nombre}
                     {c.estado !== "DISPONIBLE" && <span className={`cc-estado-badge cc-estado-${c.estado.toLowerCase()}`}>{c.estado.toLowerCase()}</span>}
+                    {enCobrar && c.modulo === "POR_COBRAR" && <span className="cc-estado-badge cc-estado-cobrar">solo por cobrar</span>}
                   </span>
-                  <span className={`cc-cuenta-saldo ${c.saldo_actual.startsWith("-") ? "cc-neg" : ""}`}>{saldoTexto(c)}</span>
+                  <span className={`cc-cuenta-saldo ${c.saldo_actual.startsWith("-") ? "cc-neg" : ""}`}>{montoTexto(c.saldo_actual, c.moneda_codigo)}</span>
                   <span className="cc-cuenta-detalle">
                     {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : "Mixto"}
                     {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
-                    {/[1-9]/.test(c.saldo_actual) ? (c.saldo_actual.startsWith("-") ? " · yo le debo" : " · me debe") : ""}
+                    {conSaldo(c) ? (yoDebo(c) ? " · yo le debo" : " · me debe") : ""}
                   </span>
                   <span className="cc-cuenta-detalle derecha">
                     {c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : "sin movimientos"}
@@ -144,12 +209,14 @@ export function CuentasCorrientesPage() {
       {creando && (
         <NuevaCuentaModal
           canales={canales}
+          modulo={enCobrar ? "POR_COBRAR" : "CORRIENTE"}
           onPersonalizar={() => setPersonalizando(true)}
           onCerrar={() => setCreando(false)}
           onCreada={async (c) => {
             setCreando(false);
             setBuscar("");
             setTipo("");
+            setSentido("");
             setCanalId("");
             await cargar();
             setSeleccionadaId(c.id);

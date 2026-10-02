@@ -1,21 +1,9 @@
-import { useState } from "react";
-import { CuentasPorCobrarPage } from "./CuentasPorCobrarPage";
-import { CuentasPorPagarPage } from "./CuentasPorPagarPage";
+import { CuentasCorrientesPage } from "../cuentasCorrientes/CuentasCorrientesPage";
 
+/**
+ * Cuentas por Cobrar / Pagar se alimenta de las cuentas corrientes: muestra a quién le debo y
+ * quién me debe, y las cuentas de poco movimiento que se pasaron para acá. Se llevan con la misma hoja.
+ */
 export function CuentasPorCobrarPagarPage() {
-  const [tab, setTab] = useState<"cobrar" | "pagar">("cobrar");
-
-  return (
-    <div>
-      <div className="cuentas-tabs">
-        <button className={tab === "cobrar" ? "activo" : ""} onClick={() => setTab("cobrar")}>
-          Por Cobrar
-        </button>
-        <button className={tab === "pagar" ? "activo" : ""} onClick={() => setTab("pagar")}>
-          Por Pagar
-        </button>
-      </div>
-      {tab === "cobrar" ? <CuentasPorCobrarPage /> : <CuentasPorPagarPage />}
-    </div>
-  );
+  return <CuentasCorrientesPage modo="cobrar" />;
 }

@@ -42,6 +42,15 @@
 .cc-hoja-titulo { flex: 1; min-width: 0; }
 .cc-hoja-titulo h2 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 2px; font-size: 1.25rem; }
 .cc-hoja-titulo span { font-size: 0.82rem; color: #6b7280; }
+.cc-mover { display: block; margin-top: 4px; padding: 0; border: none; background: none; color: var(--color-navy); font-family: inherit; font-size: 0.8rem; font-weight: 600; text-decoration: underline; cursor: pointer; }
+/* Cuentas por Cobrar: cuánto me deben y cuánto debo, por moneda */
+.cc-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 0 40px 16px; }
+.cc-resumen div { background: white; border-radius: 10px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-left: 4px solid #1a7f37; }
+.cc-resumen div.debo { border-left-color: #c0392b; }
+.cc-resumen span { display: block; font-size: 0.72rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+.cc-resumen strong { font-size: 1.15rem; color: #1a7f37; font-variant-numeric: tabular-nums; }
+.cc-resumen div.debo strong { color: #c0392b; }
+.cc-estado-cobrar { background: #e6f0fb; color: #14406f; }
 .cc-hoja-saldo { text-align: right; }
 .cc-hoja-saldo > span { display: block; font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
 .cc-hoja-saldo strong { font-size: 1.35rem; color: #1a7f37; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -208,6 +217,9 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-header-acciones { width: 100%; }
   .cc-nueva-cuenta { flex: 1; padding: 13px 16px; font-size: 0.95rem; }
 
+  .cc-resumen { padding: 0 12px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc-page:has(.cc-layout.con-hoja) .cc-resumen { display: none; }
+  .cc-mover { padding: 6px 0; font-size: 0.86rem; }
   /* Lista de cuentas */
   .cc-buscar input { font-size: 16px; padding: 12px 0; }
   .cc-filtros select { padding: 10px; font-size: 16px; }

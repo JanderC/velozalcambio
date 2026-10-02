@@ -9,11 +9,13 @@ import { formatearMonto, leerNumero } from "../../utils/montos";
 /** Abrir una cuenta: proveedor o cliente (existente o nuevo) + canal de pago + moneda + saldo pendiente inicial. */
 export function NuevaCuentaModal({
   canales,
+  modulo = "CORRIENTE",
   onPersonalizar,
   onCreada,
   onCerrar,
 }: {
   canales: Canal[];
+  modulo?: "CORRIENTE" | "POR_COBRAR";
   onPersonalizar: () => void;
   onCreada: (c: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
@@ -65,6 +67,7 @@ export function NuevaCuentaModal({
       const cuenta = await crearCuentaCorriente({
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined } }),
         canalId: canalId === "" ? undefined : canalId,
+        modulo,
         monedaId,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
       });
@@ -77,7 +80,7 @@ export function NuevaCuentaModal({
   }
 
   return (
-    <Modal titulo="Nueva cuenta corriente" onCerrar={onCerrar}>
+    <Modal titulo={modulo === "POR_COBRAR" ? "Nueva cuenta por cobrar" : "Nueva cuenta corriente"} onCerrar={onCerrar}>
       <form className="cc-modal" onSubmit={guardar}>
         <div className="cc-segmento" role="tablist">
           <button type="button" role="tab" aria-selected={modo === "nuevo"} className={modo === "nuevo" ? "activo" : ""} onClick={() => setModo("nuevo")}>

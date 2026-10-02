@@ -10,11 +10,15 @@ export interface Categoria {
   nombre: string;
 }
 
+export type ModuloCuenta = "CORRIENTE" | "POR_COBRAR";
+
 export interface CuentaCorrienteResumen {
   id: number;
   tercero_id: number;
   tercero_nombre: string;
   tercero_telefono: string | null;
+  // Dónde se lleva: en Cuentas Corrientes, o pasada a Cuentas por Cobrar (poco movimiento)
+  modulo: ModuloCuenta;
   canal_id: number;
   canal_nombre: string;
   moneda_id: number;
@@ -84,6 +88,7 @@ export function crearCuentaCorriente(data: {
   terceroId?: number;
   nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO"; telefono?: string };
   canalId?: number; // sin banco: no es obligatorio
+  modulo?: ModuloCuenta;
   monedaId: number;
   saldoInicial?: string;
 }) {
@@ -115,8 +120,9 @@ export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }
 
-export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string }) {
+export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string; vista?: "corrientes" | "cobrar" }) {
   const params = new URLSearchParams();
+  if (filtros.vista) params.set("vista", filtros.vista);
   if (filtros.terceroId) params.set("terceroId", String(filtros.terceroId));
   if (filtros.canalId) params.set("canalId", String(filtros.canalId));
   if (filtros.buscar?.trim()) params.set("buscar", filtros.buscar.trim());
@@ -149,6 +155,10 @@ interface RegistrarMovimientoInput {
 
 export function registrarMovimientoCC(data: RegistrarMovimientoInput) {
   return api.post("/cuentas-corrientes/movimientos", data);
+}
+
+export function cambiarModuloCuentaCorriente(id: number, modulo: ModuloCuenta) {
+  return api.put<CuentaCorrienteResumen>(`/cuentas-corrientes/${id}/modulo`, { modulo });
 }
 
 export function cambiarEstadoCuentaCorriente(id: number, estado: "DISPONIBLE" | "BLOQUEADA" | "CERRADA") {
