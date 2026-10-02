@@ -19,6 +19,11 @@ export interface CuentaCorrienteResumen {
   tercero_telefono: string | null;
   // Dónde se lleva: en Cuentas Corrientes, o pasada a Cuentas por Cobrar (poco movimiento)
   modulo: ModuloCuenta;
+  // Si se le cobra en otra moneda que la de la contabilidad: cuál y a qué tasa manual (1 de la contabilidad = tasa_cobro de la de cobro)
+  moneda_cobro_id: number | null;
+  moneda_cobro_codigo: string | null;
+  moneda_cobro_decimales: number | null;
+  tasa_cobro: string | null;
   canal_id: number;
   canal_nombre: string;
   moneda_id: number;
@@ -89,6 +94,8 @@ export function crearCuentaCorriente(data: {
   nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO"; telefono?: string };
   canalId?: number; // sin banco: no es obligatorio
   modulo?: ModuloCuenta;
+  monedaCobroId?: number;
+  tasaCobro?: string;
   monedaId: number;
   saldoInicial?: string;
 }) {
@@ -155,6 +162,10 @@ interface RegistrarMovimientoInput {
 
 export function registrarMovimientoCC(data: RegistrarMovimientoInput) {
   return api.post("/cuentas-corrientes/movimientos", data);
+}
+
+export function configurarCobroCuenta(id: number, datos: { monedaCobroId: number | null; tasaCobro?: string }) {
+  return api.put<CuentaCorrienteResumen>(`/cuentas-corrientes/${id}/cobro`, datos);
 }
 
 export function cambiarModuloCuentaCorriente(id: number, modulo: ModuloCuenta) {

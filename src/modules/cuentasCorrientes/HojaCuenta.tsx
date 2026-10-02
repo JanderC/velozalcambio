@@ -14,7 +14,8 @@ import { getCajas, type Caja } from "../../api/cajas.api";
 import { compartirImagen, generarImagenReporte } from "./imagenReporte";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
-import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { CobroModal } from "./CobroModal";
 
 type Periodo = "hoy" | "semana" | "mes" | "todo" | "rango";
 
@@ -76,6 +77,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
+  const [configurandoCobro, setConfigurandoCobro] = useState(false);
   // "Venta de <banco>" para cada banco o canal: ZELLE -> "Venta de Zelle"
   const [ventasPorBanco, setVentasPorBanco] = useState<string[]>([]);
 
@@ -158,6 +160,17 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const simbolo = cuenta.moneda_codigo === "COP" ? "$" : "";
   const sufijo = cuenta.moneda_codigo === "COP" ? "" : ` ${cuenta.moneda_codigo}`;
   const saldoActual = estado?.cuenta.saldo_actual ?? cuenta.saldo_actual;
+  // Si se le cobra en otra moneda: el saldo convertido con la tasa manual de la cuenta
+  const actual = estado?.cuenta ?? cuenta;
+  const cobro =
+    actual.moneda_cobro_codigo && actual.tasa_cobro
+      ? {
+          codigo: actual.moneda_cobro_codigo,
+          tasa: actual.tasa_cobro,
+          equivalente: multiplicarDecimales(saldoActual.replace(/^-/, ""), actual.tasa_cobro, Number(actual.moneda_cobro_decimales ?? 0)),
+        }
+      : null;
+  const equivalenteTexto = cobro ? (cobro.codigo === "COP" ? `$${formatearMonto(cobro.equivalente)} COP` : `${formatearMonto(cobro.equivalente)} ${cobro.codigo}`) : "";
   // Igual que el Excel: en negativo es lo que yo le debo
   const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") ? "Yo le debo" : "Me debe";
   // Enlace a WhatsApp (sin API): abre el chat del cliente con el saldo ya escrito, listo para enviar
@@ -169,9 +182,10 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       ? `tienes un saldo a favor de ${saldoSinSigno} (es lo que te debemos).`
       : lecturaSaldo === "Me debe"
         ? `tienes un saldo pendiente por pagar de ${saldoSinSigno}.`
-        : "tu cuenta está al día, sin saldo pendiente.");
+        : "tu cuenta está al día, sin saldo pendiente.") +
+    (cobro && lecturaSaldo !== "Saldo" ? ` Equivale a ${equivalenteTexto} (tasa ${formatearMonto(cobro.tasa)}).` : "");
   const referencias = useMemo(() => {
-    const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!);
+    const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!.replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, ""));
     return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])];
   }, [estado, ventasPorBanco]);
 
@@ -200,8 +214,29 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             <Monto valor={saldoActual} simbolo={simbolo} />
             {sufijo}
           </strong>
+          {cobro && lecturaSaldo !== "Saldo" && (
+            <small className="cc-equivalente">
+              = {equivalenteTexto} · tasa {formatearMonto(cobro.tasa)}
+            </small>
+          )}
+          {puedeAnular && (
+            <button type="button" className="cc-mover" onClick={() => setConfigurandoCobro(true)}>
+              {cobro ? "Cambiar tasa o moneda de cobro" : "Cobrar en otra moneda"}
+            </button>
+          )}
         </div>
       </div>
+      {configurandoCobro && (
+        <CobroModal
+          cuenta={actual}
+          onCerrar={() => setConfigurandoCobro(false)}
+          onGuardado={() => {
+            setConfigurandoCobro(false);
+            void cargar();
+            onActualizar();
+          }}
+        />
+      )}
 
       <div className="cc-periodos" role="tablist" aria-label="Período">
         {(
@@ -332,7 +367,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
 
       {cuenta.estado === "DISPONIBLE" ? (
         <FilaNueva
-          cuenta={cuenta}
+          cuenta={actual}
           saldo={estado?.cuenta.saldo_actual ?? cuenta.saldo_actual}
           referencias={referencias}
           onGuardado={() => {
@@ -365,6 +400,8 @@ function FilaNueva({
   const [cantidad, setCantidad] = useState("");
   const [tasa, setTasa] = useState("");
   const [esPorcentaje, setEsPorcentaje] = useState(false); // comisión: cantidad x % en vez de cantidad x tasa
+  // Movimiento hecho en la moneda de cobro (ej. pagó en pesos una cuenta en dólares): cantidad ÷ tasa
+  const [enCobro, setEnCobro] = useState(false);
   const [montoDirecto, setMontoDirecto] = useState("");
   const [masOpciones, setMasOpciones] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -384,6 +421,12 @@ function FilaNueva({
     } catch {
       // sin almacenamiento disponible: se escribe a mano
     }
+  }
+  const cobroCodigo = cuenta.moneda_cobro_codigo && cuenta.tasa_cobro ? cuenta.moneda_cobro_codigo : null;
+  function activarCobro() {
+    setEnCobro(true);
+    setEsPorcentaje(false);
+    if (cuenta.tasa_cobro) setTasa(formatearMonto(cuenta.tasa_cobro));
   }
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
@@ -408,7 +451,7 @@ function FilaNueva({
   // MONTO: cantidad x tasa, o el monto escrito a mano si no hay tasa (ej. "Abono efectivo")
   let monto: string | null = null;
   if (conTasa) {
-    if (nCantidad && nTasa) monto = multiplicarDecimales(sinSigno(nCantidad), nTasa, decimales);
+    if (nCantidad && nTasa) monto = enCobro ? dividirDecimales(sinSigno(nCantidad), nTasa, decimales) : multiplicarDecimales(sinSigno(nCantidad), nTasa, decimales);
   } else if (nDirecto) {
     monto = sinSigno(nDirecto);
   }
@@ -443,7 +486,8 @@ function FilaNueva({
         // no es grave: solo no se recuerda
       }
     }
-    const escrito = { referencia, persona, cantidad, tasa, montoDirecto, resta, esPorcentaje };
+    const escrito = { referencia, persona, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
+    setEnCobro(false);
     setReferencia("");
     setPersona("");
     setCantidad("");
@@ -459,10 +503,13 @@ function FilaNueva({
       canalId: cuenta.canal_id,
       monedaId: cuenta.moneda_id,
       tipo: resta ? ("ABONO" as const) : ("CARGO" as const),
-      descripcion: pidePersona && persona.trim() ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim(),
+      descripcion:
+        (pidePersona && persona.trim() ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim()) +
+        // lo que se movió de verdad en la moneda de cobro queda anotado en la referencia
+        (enCobro && conTasa ? ` (${formatearMonto(sinSigno(nCantidad!))} ${cobroCodigo} a ${formatearMonto(nTasa!)})` : ""),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
-      ...(conTasa ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
+      ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
       cajaId: masOpciones && cajaId !== "" ? cajaId : undefined,
     };
     pendientes.current++;
@@ -484,6 +531,7 @@ function FilaNueva({
         setMontoDirecto(escrito.montoDirecto);
         setResta(escrito.resta);
         setEsPorcentaje(escrito.esPorcentaje);
+        setEnCobro(escrito.enCobro);
       }
     } finally {
       pendientes.current--;
@@ -540,21 +588,42 @@ function FilaNueva({
           </button>
         </div>
         <label className="cc-c-num">
-          Cantidad
+          {enCobro ? `Cantidad en ${cobroCodigo}` : "Cantidad"}
           <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} inputMode="decimal" placeholder="700.000" autoComplete="off" />
           <small>{nCantidad ? formatearMonto(sinSigno(nCantidad)) : " "}</small>
         </label>
         <span className="cc-operador" aria-hidden="true">
-          ×
+          {enCobro ? "÷" : "×"}
         </span>
         <div className="cc-c-num corto">
           <div className="cc-modo-tasa" role="group" aria-label="Tasa o comisión en porcentaje">
-            <button type="button" className={!esPorcentaje ? "activo" : ""} onClick={() => setEsPorcentaje(false)} aria-pressed={!esPorcentaje}>
+            <button
+              type="button"
+              className={!esPorcentaje && !enCobro ? "activo" : ""}
+              onClick={() => {
+                setEsPorcentaje(false);
+                setEnCobro(false);
+              }}
+              aria-pressed={!esPorcentaje && !enCobro}
+            >
               Tasa
             </button>
-            <button type="button" className={esPorcentaje ? "activo" : ""} onClick={activarPorcentaje} aria-pressed={esPorcentaje}>
+            <button
+              type="button"
+              className={esPorcentaje ? "activo" : ""}
+              onClick={() => {
+                setEnCobro(false);
+                activarPorcentaje();
+              }}
+              aria-pressed={esPorcentaje}
+            >
               Comisión %
             </button>
+            {cobroCodigo && (
+              <button type="button" className={enCobro ? "activo" : ""} onClick={activarCobro} aria-pressed={enCobro}>
+                En {cobroCodigo}
+              </button>
+            )}
           </div>
           <input
             value={tasa}
@@ -599,6 +668,16 @@ function FilaNueva({
           </select>
         )}
         {enviando && <span className="cc-guardando">Guardando…</span>}
+        {enCobro && monto && nCantidad && nEscrita && (
+          <span className="cc-explica-comision">
+            {formatearMonto(sinSigno(nCantidad))} {cobroCodigo} ÷ {formatearMonto(nEscrita)} ={" "}
+            <strong>
+              {simbolo}
+              {formatearMonto(monto)} {cuenta.moneda_codigo}
+            </strong>{" "}
+            en la contabilidad
+          </span>
+        )}
         {esPorcentaje && monto && nCantidad && nEscrita && (
           <span className="cc-explica-comision">
             Comisión: el {formatearMonto(nEscrita)}% de {simbolo}

@@ -4,7 +4,7 @@ import { crearCuentaCorriente, type Canal, type CuentaCorrienteResumen } from ".
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
-import { formatearMonto, leerNumero } from "../../utils/montos";
+import { formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
 
 /** Abrir una cuenta: proveedor o cliente (existente o nuevo) + canal de pago + moneda + saldo pendiente inicial. */
 export function NuevaCuentaModal({
@@ -30,6 +30,9 @@ export function NuevaCuentaModal({
   const [canalId, setCanalId] = useState<number | "">("");
   const [monedas, setMonedas] = useState<Moneda[]>([]);
   const [monedaId, setMonedaId] = useState<number | "">("");
+  // Moneda en la que se le cobra, si no es la de la contabilidad, y la tasa manual para convertir
+  const [monedaCobroId, setMonedaCobroId] = useState<number | "">("");
+  const [tasaCobro, setTasaCobro] = useState("");
   const [saldo, setSaldo] = useState("");
   const [saldoNegativo, setSaldoNegativo] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -53,6 +56,9 @@ export function NuevaCuentaModal({
   }, [busqueda, modo]);
 
   const nSaldo = saldo.trim() ? leerNumero(saldo) : null;
+  const moneda = monedas.find((m) => m.id === monedaId);
+  const monedaCobro = monedaCobroId !== monedaId ? monedas.find((m) => m.id === monedaCobroId) : undefined;
+  const nTasaCobro = tasaCobro.trim() ? leerNumero(tasaCobro) : null;
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -60,6 +66,7 @@ export function NuevaCuentaModal({
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre.");
     if (modo === "existente" && !tercero) return setError("Buscá y elegí a quién le abrís la cuenta.");
     if (monedaId === "") return setError("Elegí la moneda.");
+    if (monedaCobro && (!nTasaCobro || !/[1-9]/.test(nTasaCobro) || nTasaCobro.startsWith("-"))) return setError("Para cobrar en otra moneda escribí la tasa.");
     if (saldo.trim() && !nSaldo) return setError("El saldo inicial no es un número válido.");
 
     setEnviando(true);
@@ -68,6 +75,7 @@ export function NuevaCuentaModal({
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined } }),
         canalId: canalId === "" ? undefined : canalId,
         modulo,
+        ...(monedaCobro ? { monedaCobroId: monedaCobro.id, tasaCobro: nTasaCobro! } : {}),
         monedaId,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
       });
@@ -151,7 +159,7 @@ export function NuevaCuentaModal({
             </select>
           </label>
           <label>
-            Moneda del saldo
+            Moneda de la contabilidad
             <select value={monedaId} onChange={(e) => setMonedaId(e.target.value ? Number(e.target.value) : "")}>
               {monedas.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -161,6 +169,36 @@ export function NuevaCuentaModal({
             </select>
           </label>
         </div>
+
+        <div className="cc-modal-fila">
+          <label>
+            Le cobro en
+            <select value={monedaCobro ? monedaCobroId : ""} onChange={(e) => setMonedaCobroId(e.target.value ? Number(e.target.value) : "")}>
+              <option value="">{moneda ? `${moneda.codigo} (la misma)` : "La misma moneda"}</option>
+              {monedas
+                .filter((m) => m.id !== monedaId)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.codigo} · {m.nombre}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {monedaCobro && moneda && (
+            <label>
+              Tasa: 1 {moneda.codigo} = cuántos {monedaCobro.codigo}
+              <input value={tasaCobro} onChange={(e) => setTasaCobro(e.target.value)} inputMode="decimal" placeholder="ej. 4.000" />
+            </label>
+          )}
+        </div>
+        {monedaCobro && moneda && nSaldo && nTasaCobro && (
+          <p className="cc-modal-nota">
+            La contabilidad queda en {moneda.codigo}. Al cobrar: {formatearMonto(nSaldo.replace(/^-/, ""))} {moneda.codigo} × {formatearMonto(nTasaCobro)} ={" "}
+            <strong>
+              {formatearMonto(multiplicarDecimales(nSaldo.replace(/^-/, ""), nTasaCobro, 2))} {monedaCobro.codigo}
+            </strong>
+          </p>
+        )}
 
         <label>
           Saldo pendiente con el que arranca (opcional)

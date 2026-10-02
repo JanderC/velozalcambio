@@ -55,6 +55,9 @@
 .cc-hoja-saldo > span { display: block; font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
 .cc-hoja-saldo strong { font-size: 1.35rem; color: #1a7f37; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cc-hoja-saldo strong .cc-neg { color: #c0392b; }
+.cc-equivalente { display: block; font-size: 0.8rem; color: #4b5563; font-variant-numeric: tabular-nums; }
+.cc-hoja-saldo .cc-mover { margin-left: auto; }
+.cc-modal-nota { margin: 0; font-size: 0.86rem; color: #4b5563; background: #f2f4f7; border-radius: 6px; padding: 10px 12px; }
 .cc-periodos { margin-bottom: 12px; }
 .cc-rango { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #6b7280; }
 .cc-rango input { padding: 5px 8px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: inherit; }
@@ -237,6 +240,8 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-hoja-saldo strong { font-size: 1.45rem; }
   .cc-hoja-saldo.debo { background: #fdecea; }
   .cc-hoja-saldo.debo > span { color: #c0392b; }
+  .cc-hoja-saldo { flex-wrap: wrap; }
+  .cc-equivalente, .cc-hoja-saldo .cc-mover { flex-basis: 100%; text-align: right; }
   .cc-rango { flex-basis: 100%; }
   .cc-rango input { flex: 1; min-width: 0; font-size: 16px; padding: 9px; }
   .cc-descargar, .cc-whatsapp { margin-left: 0; }

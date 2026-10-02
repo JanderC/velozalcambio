@@ -82,6 +82,26 @@ export function multiplicarDecimales(a: string, b: string, decimales: number): s
   return (negativo && producto !== 0n ? "-" : "") + entero + (dec ? `.${dec}` : "");
 }
 
+// a / b con enteros grandes (sin float), redondeado a `decimales`. Ej. pesos recibidos / tasa = dólares.
+export function dividirDecimales(a: string, b: string, decimales: number): string | null {
+  const partes = (v: string) => {
+    const negativo = v.startsWith("-");
+    const [e = "0", d = ""] = (negativo ? v.slice(1) : v).split(".");
+    return { n: BigInt(e + d) * (negativo ? -1n : 1n), escala: d.length };
+  };
+  const x = partes(a);
+  const y = partes(b);
+  if (y.n === 0n) return null;
+  const negativo = x.n < 0n !== y.n < 0n;
+  const numerador = (x.n < 0n ? -x.n : x.n) * 10n ** BigInt(y.escala + decimales);
+  const divisor = (y.n < 0n ? -y.n : y.n) * 10n ** BigInt(x.escala);
+  const cociente = (numerador + divisor / 2n) / divisor;
+  const texto = cociente.toString().padStart(decimales + 1, "0");
+  const entero = decimales ? texto.slice(0, -decimales) : texto;
+  const dec = decimales ? texto.slice(-decimales).replace(/0+$/, "") : "";
+  return (negativo && cociente !== 0n ? "-" : "") + entero + (dec ? `.${dec}` : "");
+}
+
 export function sumarDecimales(a: string, b: string): string {
   const escala = Math.max(a.split(".")[1]?.length ?? 0, b.split(".")[1]?.length ?? 0);
   const aEntero = (v: string) => {
