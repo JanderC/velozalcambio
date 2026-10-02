@@ -123,6 +123,11 @@ export function getEstadoCuenta(cuentaId: number, rango: { desde?: string; hasta
   return api.get<EstadoCuenta>(`/cuentas-corrientes/${cuentaId}/estado-cuenta?${params}`);
 }
 
+/** Últimas tasas y porcentajes de comisión usados (la más reciente primero). */
+export function getTasasRecientes(cuentaId: number) {
+  return api.get<{ tasas: string[]; porcentajes: string[] }>(`/cuentas-corrientes/${cuentaId}/tasas-recientes`);
+}
+
 export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }

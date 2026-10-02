@@ -105,6 +105,12 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-modo-tasa { display: flex; gap: 2px; height: 0.95rem; }
 .cc-modo-tasa button { border: none; background: none; padding: 0 5px; font-family: inherit; font-size: 0.72rem; font-weight: 600; color: #9ca3af; cursor: pointer; border-radius: 4px; white-space: nowrap; }
 .cc-modo-tasa button.activo { background: var(--color-navy); color: white; }
+/* Últimas tasas o comisiones: un toque y quedan puestas */
+.cc-recientes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.cc-recientes span { font-size: 0.76rem; font-weight: 600; color: #6b7280; margin-right: 2px; }
+.cc-recientes button { border: 1px solid #cfd6e0; background: white; color: var(--color-navy-dark); border-radius: 16px; padding: 4px 12px; font-family: inherit; font-size: 0.84rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; }
+.cc-recientes button:first-of-type { border-color: var(--color-navy); }
+.cc-recientes button.activo { background: var(--color-navy); color: white; border-color: var(--color-navy); }
 .cc-explica-comision { font-size: 0.82rem; color: #4b5563; }
 .cc-explica-comision strong { color: var(--color-navy-dark); }
 .cc-descargar { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: white !important; border: 1px solid #1a7f37 !important; color: #1a7f37 !important; font-weight: 600; border-radius: 6px !important; }
@@ -276,6 +282,7 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-nueva .cc-guardar { order: 6; padding: 15px; font-size: 1rem; border-radius: 10px; }
   .cc-resultado { padding: 12px; font-size: 1.1rem; }
   .cc-modo-tasa { height: auto; }
+  .cc-recientes button { padding: 9px 16px; font-size: 0.95rem; }
   .cc-modo-tasa button { padding: 3px 8px; font-size: 0.78rem; }
   .cc-form-acciones button { flex: 1; padding: 13px; }
 }

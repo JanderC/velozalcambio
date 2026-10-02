@@ -3,9 +3,11 @@ import { ArrowLeft, Download, MessageCircle, Plus, Share2, Undo2, X } from "luci
 import {
   anularMovimientoCC,
   cambiarModuloCuentaCorriente,
+  configurarCobroCuenta,
   descargarExcelEstadoCuenta,
   getCanales,
   getEstadoCuenta,
+  getTasasRecientes,
   registrarMovimientoCC,
   type CuentaCorrienteResumen,
   type EstadoCuenta,
@@ -411,13 +413,21 @@ function FilaNueva({
   // En el teléfono el formulario es un panel que sube desde abajo; en escritorio está siempre a la vista
   const [abierta, setAbierta] = useState(false);
   const refInput = useRef<HTMLInputElement>(null);
+  // Últimas tasas y comisiones usadas: se aplican con un toque, sin escribirlas
+  const [recientes, setRecientes] = useState<{ tasas: string[]; porcentajes: string[] }>({ tasas: [], porcentajes: [] });
+  const cargarRecientes = useCallback(() => {
+    getTasasRecientes(cuenta.id)
+      .then(setRecientes)
+      .catch(() => {});
+  }, [cuenta.id]);
+  useEffect(cargarRecientes, [cargarRecientes]);
 
   // Al pasar a "Comisión %" se propone el último porcentaje usado (queda guardado en este equipo)
   function activarPorcentaje() {
     setEsPorcentaje(true);
     if (tasa.trim()) return;
     try {
-      setTasa(localStorage.getItem(CLAVE_ULTIMA_COMISION) ?? "");
+      setTasa(recientes.porcentajes[0] ? formatearMonto(recientes.porcentajes[0]) : (localStorage.getItem(CLAVE_ULTIMA_COMISION) ?? ""));
     } catch {
       // sin almacenamiento disponible: se escribe a mano
     }
@@ -486,6 +496,8 @@ function FilaNueva({
         // no es grave: solo no se recuerda
       }
     }
+    // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
+    const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
     const escrito = { referencia, persona, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
     setEnCobro(false);
     setReferencia("");
@@ -518,6 +530,9 @@ function FilaNueva({
     cola.current = turno.catch(() => {});
     try {
       await turno;
+      // si no tiene permiso para cambiarla, la tasa de la cuenta queda como estaba
+      if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
+      cargarRecientes();
       onGuardado();
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : "No se pudo guardar el movimiento.";
@@ -651,6 +666,25 @@ function FilaNueva({
           Agregar
         </button>
       </div>
+
+      {(() => {
+        // En modo cobro la última es la tasa de la cuenta; en comisión, los porcentajes; si no, las tasas
+        const lista = esPorcentaje ? recientes.porcentajes : enCobro && cuenta.tasa_cobro ? [...new Set([cuenta.tasa_cobro, ...recientes.tasas])].slice(0, 5) : recientes.tasas;
+        if (lista.length === 0) return null;
+        return (
+          <div className="cc-recientes">
+            <span>{esPorcentaje ? "Últimas comisiones" : "Últimas tasas"}</span>
+            {lista.map((v, i) => {
+              const escrita = formatearMonto(v);
+              return (
+                <button key={v} type="button" className={tasa.trim() === escrita ? "activo" : ""} onClick={() => setTasa(escrita)} title={i === 0 ? "La última usada" : undefined}>
+                  {escrita}{esPorcentaje ? "%" : ""}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <div className="cc-nueva-pie">
         <label className="cc-check">
