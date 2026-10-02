@@ -7,6 +7,7 @@ import { formatearMonto } from "../../utils/montos";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
+import { PersonalizarCanalesModal } from "./PersonalizarCanalesModal";
 import "./cuentasCorrientes.css";
 
 const TIPOS: { valor: string; etiqueta: string }[] = [
@@ -34,6 +35,7 @@ export function CuentasCorrientesPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
+  const [personalizando, setPersonalizando] = useState(false);
 
   useEffect(() => {
     getCanales().then(setCanales).catch(() => setCanales([]));
@@ -89,13 +91,14 @@ export function CuentasCorrientesPage() {
                 </button>
               ))}
             </div>
-            <select value={canalId} onChange={(e) => setCanalId(e.target.value ? Number(e.target.value) : "")} aria-label="Canal">
+            <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? setPersonalizando(true) : setCanalId(e.target.value ? Number(e.target.value) : ""))} aria-label="Canal">
               <option value="">Todos los canales</option>
               {canales.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre.replace(/_/g, " ")}
                 </option>
               ))}
+              {puedeCrear && <option value="personalizar">Personalizar…</option>}
             </select>
           </div>
 
@@ -141,7 +144,7 @@ export function CuentasCorrientesPage() {
       {creando && (
         <NuevaCuentaModal
           canales={canales}
-          onCanalCreado={(c) => setCanales((lista) => [...lista, c].sort((a, b) => a.nombre.localeCompare(b.nombre)))}
+          onPersonalizar={() => setPersonalizando(true)}
           onCerrar={() => setCreando(false)}
           onCreada={async (c) => {
             setCreando(false);
@@ -151,6 +154,16 @@ export function CuentasCorrientesPage() {
             await cargar();
             setSeleccionadaId(c.id);
           }}
+        />
+      )}
+      {personalizando && (
+        <PersonalizarCanalesModal
+          canales={canales}
+          onCambio={(lista) => {
+            setCanales(lista);
+            if (canalId !== "" && !lista.some((c) => c.id === canalId)) setCanalId("");
+          }}
+          onCerrar={() => setPersonalizando(false)}
         />
       )}
     </div>

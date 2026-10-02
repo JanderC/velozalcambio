@@ -76,6 +76,10 @@ export function crearCanal(nombre: string) {
   return api.post<Canal>("/cuentas-corrientes/canales", { nombre });
 }
 
+export function actualizarCanal(id: number, cambios: { nombre?: string; activo?: boolean }) {
+  return api.put<Canal>(`/cuentas-corrientes/canales/${id}`, cambios);
+}
+
 export function crearCuentaCorriente(data: {
   terceroId?: number;
   nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO"; telefono?: string };

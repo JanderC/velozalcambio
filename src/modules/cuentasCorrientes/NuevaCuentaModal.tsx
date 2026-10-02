@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
-import { crearCanal, crearCuentaCorriente, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { crearCuentaCorriente, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
@@ -9,12 +9,12 @@ import { formatearMonto, leerNumero } from "../../utils/montos";
 /** Abrir una cuenta: proveedor o cliente (existente o nuevo) + canal de pago + moneda + saldo pendiente inicial. */
 export function NuevaCuentaModal({
   canales,
-  onCanalCreado,
+  onPersonalizar,
   onCreada,
   onCerrar,
 }: {
   canales: Canal[];
-  onCanalCreado: (c: Canal) => void;
+  onPersonalizar: () => void;
   onCreada: (c: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
 }) {
@@ -25,8 +25,7 @@ export function NuevaCuentaModal({
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<Tercero[]>([]);
   const [tercero, setTercero] = useState<Tercero | null>(null);
-  const [canalId, setCanalId] = useState<number | "nuevo" | "">("");
-  const [canalNuevo, setCanalNuevo] = useState("");
+  const [canalId, setCanalId] = useState<number | "">("");
   const [monedas, setMonedas] = useState<Moneda[]>([]);
   const [monedaId, setMonedaId] = useState<number | "">("");
   const [saldo, setSaldo] = useState("");
@@ -58,21 +57,14 @@ export function NuevaCuentaModal({
     setError(null);
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre.");
     if (modo === "existente" && !tercero) return setError("Buscá y elegí a quién le abrís la cuenta.");
-    if (canalId === "nuevo" && canalNuevo.trim().length < 2) return setError("Escribí el nombre del banco o canal nuevo.");
     if (monedaId === "") return setError("Elegí la moneda.");
     if (saldo.trim() && !nSaldo) return setError("El saldo inicial no es un número válido.");
 
     setEnviando(true);
     try {
-      let canal = canalId;
-      if (canal === "nuevo") {
-        const creado = await crearCanal(canalNuevo);
-        onCanalCreado(creado);
-        canal = creado.id;
-      }
       const cuenta = await crearCuentaCorriente({
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined } }),
-        canalId: canal === "" ? undefined : canal,
+        canalId: canalId === "" ? undefined : canalId,
         monedaId,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
       });
@@ -145,14 +137,14 @@ export function NuevaCuentaModal({
         <div className="cc-modal-fila">
           <label>
             Banco o canal de pago (opcional)
-            <select value={canalId} onChange={(e) => setCanalId(e.target.value === "nuevo" ? "nuevo" : e.target.value ? Number(e.target.value) : "")}>
+            <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? onPersonalizar() : setCanalId(e.target.value ? Number(e.target.value) : ""))}>
               <option value="">Sin banco</option>
               {canales.filter((c) => c.nombre !== "SIN_BANCO").map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre.replace(/_/g, " ")}
                 </option>
               ))}
-              <option value="nuevo">+ Agregar canal…</option>
+              <option value="personalizar">Personalizar…</option>
             </select>
           </label>
           <label>
@@ -166,12 +158,6 @@ export function NuevaCuentaModal({
             </select>
           </label>
         </div>
-        {canalId === "nuevo" && (
-          <label>
-            Nombre del canal nuevo
-            <input value={canalNuevo} onChange={(e) => setCanalNuevo(e.target.value)} placeholder="ej. Binance, Efectivo, Bancolombia" />
-          </label>
-        )}
 
         <label>
           Saldo pendiente con el que arranca (opcional)

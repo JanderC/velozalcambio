@@ -131,6 +131,12 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-elegido strong { color: var(--color-navy-dark); }
 .cc-elegido button { margin-left: auto; border: none; background: none; color: var(--color-navy); cursor: pointer; text-decoration: underline; font-family: inherit; }
 .cc-form-acciones { display: flex; justify-content: flex-end; gap: 8px; }
+.cc-canales { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; }
+.cc-canales li, .cc-canal-nuevo { display: flex; gap: 8px; align-items: center; }
+.cc-canales input, .cc-canal-nuevo input { flex: 1; }
+.cc-canales button { border: none; background: #fdecea; color: #c0392b; border-radius: 6px; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.cc-canales button:disabled { opacity: 0.5; cursor: default; }
+.cc-canal-nuevo { padding-top: 10px; border-top: 1px solid #eef0f4; }
 
 /* Importar saldos iniciales */
 .cc-import-btn { background: transparent; border: 1px solid var(--color-gold-dark); color: var(--color-gold-dark); padding: 9px 16px; border-radius: 6px; cursor: pointer; font-family: inherit; }

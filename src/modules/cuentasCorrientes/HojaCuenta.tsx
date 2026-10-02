@@ -18,6 +18,8 @@ type Periodo = "hoy" | "semana" | "mes" | "todo" | "rango";
 
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
+const CLAVE_ULTIMA_COMISION = "cc-ultima-comision-pct";
+
 // La referencia lleva quién envió la transferencia: "Venta de Zelle · Juan Pérez"
 const SEPARADOR_PERSONA = " · ";
 
@@ -336,6 +338,17 @@ function FilaNueva({
   // En el teléfono el formulario es un panel que sube desde abajo; en escritorio está siempre a la vista
   const [abierta, setAbierta] = useState(false);
   const refInput = useRef<HTMLInputElement>(null);
+
+  // Al pasar a "Comisión %" se propone el último porcentaje usado (queda guardado en este equipo)
+  function activarPorcentaje() {
+    setEsPorcentaje(true);
+    if (tasa.trim()) return;
+    try {
+      setTasa(localStorage.getItem(CLAVE_ULTIMA_COMISION) ?? "");
+    } catch {
+      // sin almacenamiento disponible: se escribe a mano
+    }
+  }
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
   const pendientes = useRef(0);
@@ -371,7 +384,7 @@ function FilaNueva({
     setReferencia(valor);
     // "Abono ..." resta, igual que en el Excel donde va en negativo
     if (/^\s*(abono|pago)/i.test(valor)) setResta(true);
-    if (/comisi[oó]n/i.test(valor)) setEsPorcentaje(true);
+    if (/comisi[oó]n/i.test(valor) && !esPorcentaje) activarPorcentaje();
   }
 
   async function guardar(e: FormEvent) {
@@ -387,6 +400,13 @@ function FilaNueva({
 
     // La fila se limpia ya, para poder seguir cargando la siguiente sin esperar al servidor.
     // Si el guardado falla, se devuelve lo escrito (salvo que ya se esté escribiendo otra).
+    if (conTasa && esPorcentaje) {
+      try {
+        localStorage.setItem(CLAVE_ULTIMA_COMISION, tasa.replace(/%/g, "").trim());
+      } catch {
+        // no es grave: solo no se recuerda
+      }
+    }
     const escrito = { referencia, persona, cantidad, tasa, montoDirecto, resta, esPorcentaje };
     setReferencia("");
     setPersona("");
@@ -496,7 +516,7 @@ function FilaNueva({
             <button type="button" className={!esPorcentaje ? "activo" : ""} onClick={() => setEsPorcentaje(false)} aria-pressed={!esPorcentaje}>
               Tasa
             </button>
-            <button type="button" className={esPorcentaje ? "activo" : ""} onClick={() => setEsPorcentaje(true)} aria-pressed={esPorcentaje}>
+            <button type="button" className={esPorcentaje ? "activo" : ""} onClick={activarPorcentaje} aria-pressed={esPorcentaje}>
               Comisión %
             </button>
           </div>
