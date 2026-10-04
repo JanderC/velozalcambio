@@ -66,7 +66,7 @@ function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaC
   for (const m of estado.movimientos) {
     if (m.anulado) continue;
     const moneda = m.tasa && !m.tasa_es_porcentaje && m.cantidad_base ? monedaDeLaTasa(m.tasa, m.descripcion ?? "") : null;
-    if (!moneda) {
+    if (!moneda || !m.tasa || !m.cantidad_base) {
       // sin tasa de otra moneda: es un movimiento en pesos
       if (esAbono(m.descripcion, m.monto)) abonosPesos = sumarDecimales(abonosPesos, m.monto);
       else otrosPesos = sumarDecimales(otrosPesos, m.monto);
