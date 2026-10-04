@@ -54,6 +54,8 @@ export interface FilaEstadoCuenta {
 
 export interface EstadoCuenta {
   cuenta: CuentaCorrienteResumen;
+  // Cierre de ese día, si ya se cerró
+  cierre: { saldo_final: string; created_at: string; usuario_nombre: string } | null;
   saldoAnterior: string;
   movimientos: FilaEstadoCuenta[];
   sumas: string;
@@ -126,6 +128,11 @@ export function getEstadoCuenta(cuentaId: number, rango: { desde?: string; hasta
 /** Últimas tasas y porcentajes de comisión usados (la más reciente primero). */
 export function getTasasRecientes(cuentaId: number) {
   return api.get<{ tasas: string[]; porcentajes: string[] }>(`/cuentas-corrientes/${cuentaId}/tasas-recientes`);
+}
+
+/** Cierra el día de la cuenta (o lo vuelve a cerrar) y devuelve la hoja de ese día. */
+export function cerrarDiaCuenta(cuentaId: number, dia: string) {
+  return api.post<EstadoCuenta>(`/cuentas-corrientes/${cuentaId}/cierres`, { dia });
 }
 
 export function anularMovimientoCC(movimientoId: number) {

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Download, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
+  cerrarDiaCuenta,
   cambiarModuloCuentaCorriente,
   configurarCobroCuenta,
   descargarExcelEstadoCuenta,
@@ -18,8 +19,6 @@ import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { CobroModal } from "./CobroModal";
-
-type Periodo = "hoy" | "semana" | "mes" | "todo" | "rango";
 
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
@@ -48,12 +47,11 @@ function hoyBogota(desplazarDias = 0) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(d);
 }
 
-function rangoDe(periodo: Periodo, desde: string, hasta: string) {
-  if (periodo === "hoy") return { desde: hoyBogota(), hasta: hoyBogota() };
-  if (periodo === "semana") return { desde: hoyBogota(-6), hasta: hoyBogota() };
-  if (periodo === "mes") return { desde: `${hoyBogota().slice(0, 8)}01`, hasta: hoyBogota() };
-  if (periodo === "rango") return { desde: desde || undefined, hasta: hasta || undefined };
-  return {};
+/** El día anterior o siguiente a un AAAA-MM-DD. */
+function moverDia(dia: string, cuanto: number) {
+  const d = new Date(`${dia}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + cuanto);
+  return d.toISOString().slice(0, 10);
 }
 
 function fechaCorta(fecha: string) {
@@ -72,9 +70,9 @@ function Monto({ valor, simbolo = "$" }: { valor: string; simbolo?: string }) {
 export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaCorrienteResumen; onActualizar: () => void; onVolver: () => void }) {
   const { usuario } = useAuth();
   const puedeAnular = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
-  const [periodo, setPeriodo] = useState<Periodo>("hoy");
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
+  // La hoja es diaria: se ve y se cierra un día a la vez
+  const [dia, setDia] = useState(hoyBogota());
+  const [cerrando, setCerrando] = useState(false);
   const [estado, setEstado] = useState<EstadoCuenta | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,14 +95,14 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
 
   const cargar = useCallback(async () => {
     try {
-      setEstado(await getEstadoCuenta(cuenta.id, rangoDe(periodo, desde, hasta)));
+      setEstado(await getEstadoCuenta(cuenta.id, { desde: dia, hasta: dia }));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setCargando(false);
     }
-  }, [cuenta.id, periodo, desde, hasta]);
+  }, [cuenta.id, dia]);
 
   useEffect(() => {
     setCargando(true);
@@ -142,16 +140,31 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   async function compartir() {
     if (!estado) return;
     try {
-      await compartirImagen(await generarImagenReporte(estado, simbolo), "movimientos.png");
+      await compartirImagen(await generarImagenReporte(estado, simbolo), `cierre-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+
+  // Cierre diario: deja anotado el saldo con el que cerró el día y manda el reporte del día como imagen
+  async function cerrarDia() {
+    setCerrando(true);
+    try {
+      const cerrado = await cerrarDiaCuenta(cuenta.id, dia);
+      setEstado(cerrado);
+      setError(null);
+      await compartirImagen(await generarImagenReporte(cerrado, simbolo), `cierre-${dia}.png`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCerrando(false);
     }
   }
 
   async function descargar() {
     setDescargando(true);
     try {
-      await descargarExcelEstadoCuenta(cuenta.id, rangoDe(periodo, desde, hasta), `Cuenta ${cuenta.tercero_nombre} ${hoyBogota()}.xlsx`);
+      await descargarExcelEstadoCuenta(cuenta.id, { desde: dia, hasta: dia }, `Cuenta ${cuenta.tercero_nombre} ${dia}.xlsx`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -240,27 +253,24 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         />
       )}
 
-      <div className="cc-periodos" role="tablist" aria-label="Período">
-        {(
-          [
-            ["hoy", "Hoy"],
-            ["semana", "7 días"],
-            ["mes", "Este mes"],
-            ["todo", "Todo"],
-            ["rango", "Fechas"],
-          ] as [Periodo, string][]
-        ).map(([valor, etiqueta]) => (
-          <button key={valor} role="tab" aria-selected={periodo === valor} className={periodo === valor ? "activo" : ""} onClick={() => setPeriodo(valor)}>
-            {etiqueta}
+      <div className="cc-periodos" aria-label="Día">
+        <span className="cc-dia">
+          <button onClick={() => setDia(moverDia(dia, -1))} aria-label="Día anterior" title="Día anterior">
+            <ChevronLeft size={16} />
           </button>
-        ))}
-        {periodo === "rango" && (
-          <span className="cc-rango">
-            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} aria-label="Desde" />
-            a
-            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} aria-label="Hasta" />
-          </span>
-        )}
+          <input type="date" value={dia} max={hoyBogota()} onChange={(e) => e.target.value && setDia(e.target.value)} aria-label="Día" />
+          <button onClick={() => setDia(moverDia(dia, 1))} disabled={dia >= hoyBogota()} aria-label="Día siguiente" title="Día siguiente">
+            <ChevronRight size={16} />
+          </button>
+          {dia !== hoyBogota() && (
+            <button className="cc-dia-hoy" onClick={() => setDia(hoyBogota())}>
+              Hoy
+            </button>
+          )}
+        </span>
+        <button className="cc-cerrar-dia" onClick={cerrarDia} disabled={!estado || cerrando} title="Cierra el día y comparte el reporte como imagen">
+          <Lock size={14} /> {cerrando ? "Cerrando…" : estado?.cierre ? "Volver a cerrar y enviar" : "Cerrar día y enviar"}
+        </button>
         {telefono && (
           <a className="cc-whatsapp" href={`https://wa.me/${telefono}?text=${encodeURIComponent(mensajeSaldo)}`} target="_blank" rel="noreferrer" title="Abrir WhatsApp con el saldo listo para enviar">
             <MessageCircle size={14} /> Enviar saldo
@@ -275,6 +285,15 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       </div>
 
       {error && <p className="cc-form-error">{error}</p>}
+      {estado?.cierre &&
+        (estado.cierre.saldo_final === estado.saldoFinal ? (
+          <p className="cc-cierre-aviso">
+            Día cerrado a las {new Date(estado.cierre.created_at).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" })} por{" "}
+            {estado.cierre.usuario_nombre}.
+          </p>
+        ) : (
+          <p className="cc-cierre-aviso pendiente">Hubo movimientos después del cierre de este día: volvé a cerrarlo para enviar el reporte actualizado.</p>
+        ))}
 
       <div className="cc-tabla-scroll">
         <table className="cc-tabla">
@@ -290,7 +309,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             </tr>
           </thead>
           <tbody>
-            {estado && periodo !== "todo" && (
+            {estado && (
               <tr className="cc-fila-saldo">
                 <td colSpan={5}>Saldo pendiente anterior</td>
                 <td className="num">
@@ -309,7 +328,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             {!cargando && estado?.movimientos.length === 0 && (
               <tr>
                 <td colSpan={7} className="cc-tabla-aviso">
-                  Sin movimientos en este período. Cargá el primero en la fila de abajo.
+                  Sin movimientos este día.
                 </td>
               </tr>
             )}
@@ -342,14 +361,14 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           {estado && (
             <tfoot>
               <tr>
-                <td colSpan={4}>Sumas del período</td>
+                <td colSpan={4}>Sumas del día</td>
                 <td className="num">
                   <Monto valor={estado.sumas} simbolo={simbolo} />
                 </td>
                 <td colSpan={2} />
               </tr>
               <tr>
-                <td colSpan={4}>Abonos del período</td>
+                <td colSpan={4}>Abonos del día</td>
                 <td className="num">
                   <Monto valor={estado.abonos} simbolo={simbolo} />
                 </td>

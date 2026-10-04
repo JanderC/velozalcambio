@@ -95,10 +95,11 @@ export async function compartirImagen(blob: Blob, nombreArchivo: string) {
   if (navigator.canShare?.({ files: [archivo] })) {
     try {
       await navigator.share({ files: [archivo] });
+      return;
     } catch (e) {
-      if ((e as Error).name !== "AbortError") throw e; // cerrar el menú sin compartir no es un error
+      if ((e as Error).name === "AbortError") return; // cerrar el menú sin compartir no es un error
+      // si el navegador no deja abrir el menú (p. ej. pasó mucho desde el toque), se descarga
     }
-    return;
   }
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");

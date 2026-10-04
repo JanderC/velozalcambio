@@ -59,6 +59,15 @@
 .cc-hoja-saldo .cc-mover { margin-left: auto; }
 .cc-modal-nota { margin: 0; font-size: 0.86rem; color: #4b5563; background: #f2f4f7; border-radius: 6px; padding: 10px 12px; }
 .cc-periodos { margin-bottom: 12px; }
+/* Cierre diario: un día a la vez */
+.cc-dia { display: inline-flex; align-items: center; gap: 4px; }
+.cc-dia input { padding: 5px 8px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: inherit; font-size: 0.86rem; }
+.cc-dia button { display: inline-flex; align-items: center; padding: 6px 8px !important; }
+.cc-dia button:disabled { opacity: 0.4; cursor: default; }
+.cc-periodos button.cc-cerrar-dia { display: inline-flex; align-items: center; gap: 6px; background: var(--color-navy); color: white; font-weight: 700; border-radius: 6px; }
+.cc-periodos button.cc-cerrar-dia:disabled { opacity: 0.6; cursor: default; }
+.cc-cierre-aviso { margin: 0 0 10px; padding: 8px 12px; border-radius: 6px; font-size: 0.84rem; background: #e8f6ec; color: #1a7f37; font-weight: 600; }
+.cc-cierre-aviso.pendiente { background: #fff4e0; color: #a8531f; }
 .cc-rango { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #6b7280; }
 .cc-rango input { padding: 5px 8px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: inherit; }
 
@@ -251,6 +260,10 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-rango { flex-basis: 100%; }
   .cc-rango input { flex: 1; min-width: 0; font-size: 16px; padding: 9px; }
   .cc-descargar, .cc-whatsapp { margin-left: 0; }
+  .cc-dia { flex-basis: 100%; }
+  .cc-dia input { flex: 1; min-width: 0; font-size: 16px; padding: 9px; }
+  .cc-dia button { padding: 10px 12px !important; }
+  .cc-periodos button.cc-cerrar-dia { flex-basis: 100%; justify-content: center; padding: 13px; font-size: 0.95rem; }
   .cc-whatsapp { padding: 9px 14px; font-size: 0.86rem; }
 
   /* Tarjetas de movimientos más aireadas */
