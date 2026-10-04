@@ -215,7 +215,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         <div className="cc-hoja-titulo">
           <h2>{cuenta.tercero_nombre}</h2>
           <span>
-            {cuenta.tercero_tipo === "PROVEEDOR" ? "Proveedor" : cuenta.tercero_tipo === "CLIENTE" ? "Cliente" : "Cliente y proveedor"} ·{" "}
+            {cuenta.tercero_tipo === "PROVEEDOR" ? "Proveedor" : cuenta.tercero_tipo === "CLIENTE" ? "Cliente" : cuenta.tercero_tipo === "AMIGO" ? "Amigo" : "Cliente y proveedor"} ·{" "}
             {cuenta.canal_nombre === "SIN_BANCO" ? "" : `${cuenta.canal_nombre.replace(/_/g, " ")} · `}
             {cuenta.moneda_codigo}
           </span>

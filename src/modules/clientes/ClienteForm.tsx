@@ -14,7 +14,7 @@ export function ClienteForm({
   const [nombre, setNombre] = useState(nombreInicial);
   const [identificacion, setIdentificacion] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [tipo, setTipo] = useState<"CLIENTE" | "PROVEEDOR" | "MIXTO">("CLIENTE");
+  const [tipo, setTipo] = useState<"CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO">("CLIENTE");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,10 +54,11 @@ export function ClienteForm({
       </label>
       <label>
         Tipo
-        <select value={tipo} onChange={(e) => setTipo(e.target.value as "CLIENTE" | "PROVEEDOR" | "MIXTO")}>
+        <select value={tipo} onChange={(e) => setTipo(e.target.value as "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO")}>
           <option value="CLIENTE">Cliente</option>
           <option value="PROVEEDOR">Proveedor</option>
           <option value="MIXTO">Mixto</option>
+          <option value="AMIGO">Amigo</option>
         </select>
       </label>
 

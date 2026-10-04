@@ -22,7 +22,7 @@ export function NuevaCuentaModal({
 }) {
   const [modo, setModo] = useState<"nuevo" | "existente">("nuevo");
   const [nombre, setNombre] = useState("");
-  const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO">("PROVEEDOR");
+  const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO">("PROVEEDOR");
   const [telefono, setTelefono] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<Tercero[]>([]);
@@ -112,6 +112,7 @@ export function NuevaCuentaModal({
                   <option value="PROVEEDOR">Proveedor</option>
                   <option value="CLIENTE">Cliente</option>
                   <option value="MIXTO">Cliente y proveedor</option>
+                  <option value="AMIGO">Amigo</option>
                 </select>
               </label>
               <label>

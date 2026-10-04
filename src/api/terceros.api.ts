@@ -7,7 +7,7 @@ export interface Tercero {
   nombre: string;
   identificacion: string | null;
   telefono: string | null;
-  tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO";
+  tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO";
   created_at: string;
 }
 

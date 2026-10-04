@@ -14,6 +14,7 @@ const TIPOS: { valor: string; etiqueta: string }[] = [
   { valor: "", etiqueta: "Todos" },
   { valor: "PROVEEDOR", etiqueta: "Proveedores" },
   { valor: "CLIENTE", etiqueta: "Clientes" },
+  { valor: "AMIGO", etiqueta: "Amigos" },
 ];
 
 // En Cuentas por Cobrar se filtra por quién le debe a quién
@@ -184,7 +185,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   </span>
                   <span className={`cc-cuenta-saldo ${c.saldo_actual.startsWith("-") ? "cc-neg" : ""}`}>{montoTexto(c.saldo_actual, c.moneda_codigo)}</span>
                   <span className="cc-cuenta-detalle">
-                    {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : "Mixto"}
+                    {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : c.tercero_tipo === "AMIGO" ? "Amigo" : "Mixto"}
                     {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
                     {conSaldo(c) ? (yoDebo(c) ? " · yo le debo" : " · me debe") : ""}
                   </span>
