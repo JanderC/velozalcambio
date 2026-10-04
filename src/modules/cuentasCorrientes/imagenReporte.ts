@@ -83,7 +83,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, tasa
   const lienzo = document.createElement("canvas");
   lienzo.width = ANCHO;
   const altoCuadro = equivalentes.length ? SEPARACION_CUADRO + (equivalentes.length + 1) * ALTO_FILA : 0;
-  lienzo.height = ALTO_CABEZA + (filas.length + (conSaldoAnterior ? 1 : 0) + 1) * ALTO_FILA + altoCuadro + 12;
+  lienzo.height = ALTO_CABEZA + (filas.length + (conSaldoAnterior ? 1 : 0) + 2) * ALTO_FILA + altoCuadro + 12;
   const c = lienzo.getContext("2d")!;
   c.fillStyle = "#ffffff";
   c.fillRect(0, 0, lienzo.width, lienzo.height);
@@ -134,6 +134,12 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, tasa
     texto(dinero(corrido), "total", medio, colorMonto(corrido), true);
     y += ALTO_FILA;
   });
+  // Lo que abonó el cliente en el día, en la moneda de la cuenta
+  c.fillStyle = "#eef7f0";
+  c.fillRect(0, y, ANCHO, ALTO_FILA);
+  texto("Abonado en el día", "fecha", y + ALTO_FILA / 2, "#1a7f37", true);
+  texto(dinero(estado.abonos.replace(/^-/, "")), "total", y + ALTO_FILA / 2, "#1a7f37", true);
+  y += ALTO_FILA;
   franja("Saldo pendiente", estado.saldoFinal);
 
   // Cuadrito debajo de la tabla: el saldo pendiente en dólares y en bolívares, a las tasas de sus movimientos
