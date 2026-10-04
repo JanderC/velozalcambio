@@ -12,9 +12,9 @@ const FUENTE = '"Inter", "Segoe UI", Arial, sans-serif';
 const COL = {
   fecha: [MARGEN, "left"],
   referencia: [150, "left"],
-  cantidad: [640, "right"],
-  tasa: [740, "right"],
-  monto: [900, "right"],
+  cantidad: [590, "right"],
+  tasa: [670, "right"],
+  monto: [850, "right"],
   total: [ANCHO - MARGEN, "right"],
 } as const;
 
@@ -61,10 +61,17 @@ function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaC
     };
   }
   const grupos = new Map<string, { moneda: MonedaTasa; tasa: string; abono: boolean; cantidad: string; pesos: string }>();
+  let abonosPesos = "0";
+  let otrosPesos = "0";
   for (const m of estado.movimientos) {
-    if (m.anulado || !m.tasa || m.tasa_es_porcentaje || !m.cantidad_base) continue;
-    const moneda = monedaDeLaTasa(m.tasa, m.descripcion ?? "");
-    if (!moneda) continue;
+    if (m.anulado) continue;
+    const moneda = m.tasa && !m.tasa_es_porcentaje && m.cantidad_base ? monedaDeLaTasa(m.tasa, m.descripcion ?? "") : null;
+    if (!moneda) {
+      // sin tasa de otra moneda: es un movimiento en pesos
+      if (esAbono(m.descripcion, m.monto)) abonosPesos = sumarDecimales(abonosPesos, m.monto);
+      else otrosPesos = sumarDecimales(otrosPesos, m.monto);
+      continue;
+    }
     const abono = m.monto.startsWith("-");
     const clave = `${moneda}|${Number(m.tasa)}|${abono}`;
     const g = grupos.get(clave) ?? { moneda, tasa: m.tasa, abono, cantidad: "0", pesos: "0" };
@@ -81,17 +88,32 @@ function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaC
     for (const g of deLaMoneda) {
       cantidad = sumarDecimales(cantidad, g.cantidad);
       pesos = sumarDecimales(pesos, g.pesos);
-      lineas.push({ texto: `${g.abono ? "Abono " : ""}${cantidadTexto(g.cantidad.replace(/^-/, ""), moneda)} × ${formatearMonto(g.tasa)}`, monto: g.pesos, prefijo: "$" });
+      lineas.push({ texto: `${g.cantidad.startsWith("-") ? "- " : ""}${cantidadTexto(g.cantidad.replace(/^-/, ""), moneda)} × ${formatearMonto(g.tasa)}`, monto: g.pesos, prefijo: "$" });
     }
     lineas.push({ texto: `Total ${NOMBRE_MONEDA[moneda]}: ${cantidad.startsWith("-") ? "- " : ""}${cantidadTexto(cantidad.replace(/^-/, ""), moneda)}`, monto: pesos, prefijo: "$", total: true });
   }
+  // Pesos: los abonos (transferencia, efectivo...) y lo demás que se movió directo en pesos
+  const hayAbonos = /[1-9]/.test(abonosPesos);
+  const hayOtros = /[1-9]/.test(otrosPesos);
+  if (hayAbonos || hayOtros) {
+    if (hayAbonos) lineas.push({ texto: "Abonos en pesos", monto: abonosPesos, prefijo: "$" });
+    if (hayOtros) lineas.push({ texto: "Otros movimientos en pesos", monto: otrosPesos, prefijo: "$" });
+    lineas.push({ texto: "Total pesos", monto: sumarDecimales(abonosPesos, otrosPesos), prefijo: "$", total: true });
+  }
   return { titulo: "Por moneda y tasa", lineas };
+}
+
+/** Es un abono si la referencia lo dice; si no dice nada (ni abono ni venta), cuando resta. */
+function esAbono(descripcion: string | null, monto: string) {
+  if (/^\s*(abono|pago)/i.test(descripcion ?? "")) return true;
+  if (/^\s*venta/i.test(descripcion ?? "")) return false;
+  return monto.startsWith("-");
 }
 
 /** Todo lo abonado en el día: lo que resta y también los abonos cargados como suma (ej. un abono por transferencia). */
 function abonadoEnElDia(estado: EstadoCuenta) {
   return estado.movimientos
-    .filter((m) => !m.anulado && (m.monto.startsWith("-") || /^\s*(abono|pago)/i.test(m.descripcion ?? "")))
+    .filter((m) => !m.anulado && esAbono(m.descripcion, m.monto))
     .reduce((suma, m) => sumarDecimales(suma, m.monto.replace(/^-/, "")), "0");
 }
 
@@ -156,7 +178,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Pro
     const medio = y + ALTO_FILA / 2;
     const fecha = new Date(m.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "2-digit" });
     texto(fecha, "fecha", medio, "#4b5563");
-    texto(`${m.descripcion ?? m.tipo}${m.cuenta_destino ? ` → ${m.cuenta_destino}` : ""}`, "referencia", medio, "#111827", false, m.cantidad_base ? 330 : 560);
+    texto(`${m.descripcion ?? m.tipo}${m.cuenta_destino ? ` → ${m.cuenta_destino}` : ""}`, "referencia", medio, "#111827", false, m.cantidad_base ? 290 : 500);
     if (m.cantidad_base) texto(formatearMonto(m.cantidad_base), "cantidad", medio, colorMonto(m.cantidad_base));
     if (m.tasa) texto(m.tasa_es_porcentaje ? `${formatearMonto(multiplicarDecimales(m.tasa, "100", 6))}%` : formatearMonto(m.tasa), "tasa", medio, "#4b5563");
     texto(dinero(m.monto), "monto", medio, colorMonto(m.monto));
