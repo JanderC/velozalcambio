@@ -23,12 +23,15 @@ import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { CobroModal } from "./CobroModal";
 
-const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
+const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia (suma)", "Abono transferencia (resta)"];
 
 // Referencias que no se sugieren, aunque exista el banco o se hayan usado antes
 const REFERENCIAS_OCULTAS = /^(venta de (bancolombia|proveedor(es)?|western union)|abono nequi)$/i;
 
-const CLAVE_ULTIMA_COMISION ="cc-ultima-comision-pct";
+// Un abono resta, salvo el que dice "(suma)" (ej. "Abono transferencia (suma)")
+const restaPorReferencia = (referencia: string) => /^\s*(abono|pago)/i.test(referencia) && !/\(suma\)/i.test(referencia);
+
+const CLAVE_ULTIMA_COMISION = "cc-ultima-comision-pct";
 
 // La referencia lleva quién envió la transferencia: "Venta de Zelle · Juan Pérez"
 const SEPARADOR_PERSONA = " · ";
@@ -399,6 +402,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                 <td className={Number(m.monto) < 0 && !m.anulado ? "cc-ref-abono" : ""}>
                   {m.descripcion ?? m.tipo}
                   {m.anulado && !m.reverso_de_id && <em> (anulado)</em>}
+                  {m.cuenta_destino && <span className="cc-cuenta-destino-chip">→ {m.cuenta_destino}</span>}
                   {m.movimiento_caja_id && <span className="cc-chip-caja">caja</span>}
                 </td>
                 <td className="num">{m.cantidad_base ? <Monto valor={m.cantidad_base} simbolo="" /> : ""}</td>
@@ -478,6 +482,7 @@ function FilaNueva({
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
   const [persona, setPersona] = useState("");
+  const [cuentaDestino, setCuentaDestino] = useState(""); // a qué cuenta del cliente se le pagó (opcional)
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
   const [tasa, setTasa] = useState("");
@@ -511,7 +516,7 @@ function FilaNueva({
     setTasa((t) => (t.trim() || esPorcentaje || enCobro ? t : tasaPuesta));
     setReferencia((r) => {
       if (r.trim() || !referenciaPuesta) return r;
-      setResta(/^\s*(abono|pago)/i.test(referenciaPuesta));
+      setResta(restaPorReferencia(referenciaPuesta));
       return referenciaPuesta;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -569,7 +574,8 @@ function FilaNueva({
   function alCambiarReferencia(valor: string) {
     setReferencia(valor);
     // "Abono ..." resta, igual que en el Excel donde va en negativo
-    if (/^\s*(abono|pago)/i.test(valor)) setResta(true);
+    if (restaPorReferencia(valor)) setResta(true);
+    else if (/\((suma)\)/i.test(valor)) setResta(false);
     if (/comisi[oó]n/i.test(valor) && !esPorcentaje) activarPorcentaje();
   }
 
@@ -595,7 +601,7 @@ function FilaNueva({
     }
     // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
     const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
-    const escrito = { referencia, persona, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
+    const escrito = { referencia, persona, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
     setEnCobro(false);
     // La tasa que queda para el próximo: la nueva si se marcó mantenerla; si no, la que venía puesta
     const tasaQueQueda = tasaModificada ? (mantenerTasa ? nEscrita! : recientes.tasaHabitual) : null;
@@ -604,10 +610,11 @@ function FilaNueva({
     setMantenerTasa(false);
     setReferencia(referenciaPuesta);
     setPersona("");
+    setCuentaDestino("");
     setCantidad("");
     setTasa(tasaSiguiente);
     setMontoDirecto("");
-    setResta(/^\s*(abono|pago)/i.test(referenciaPuesta));
+    setResta(restaPorReferencia(referenciaPuesta));
     setEsPorcentaje(false);
     if (window.matchMedia("(max-width: 860px)").matches) setAbierta(false);
     else refInput.current?.focus();
@@ -624,6 +631,7 @@ function FilaNueva({
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
+      cuentaDestino: cuentaDestino.trim() || undefined,
       cajaId: masOpciones && cajaId !== "" ? cajaId : undefined,
     };
     pendientes.current++;
@@ -644,6 +652,7 @@ function FilaNueva({
       if ((refInput.current?.value ?? "") === referenciaPuesta) {
         setReferencia(escrito.referencia);
         setPersona(escrito.persona);
+        setCuentaDestino(escrito.cuentaDestino);
         setCantidad(escrito.cantidad);
         setTasa(escrito.tasa);
         setMontoDirecto(escrito.montoDirecto);
@@ -697,6 +706,10 @@ function FilaNueva({
             <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Nombre de quien hizo el envío" autoComplete="off" />
           </label>
         )}
+        <label className="cc-c-destino">
+          Cuenta a la que se pagó (opcional)
+          <input value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)} placeholder="ej. Bancolombia ahorros 1234, Nequi 300…" autoComplete="off" maxLength={120} />
+        </label>
         <div className="cc-c-signo" role="group" aria-label="Suma o abono">
           <button type="button" className={!resta ? "activo suma" : ""} onClick={() => setResta(false)} aria-pressed={!resta}>
             + Suma

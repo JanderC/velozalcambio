@@ -149,7 +149,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Pro
     const medio = y + ALTO_FILA / 2;
     const fecha = new Date(m.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "2-digit" });
     texto(fecha, "fecha", medio, "#4b5563");
-    texto(m.descripcion ?? m.tipo, "referencia", medio, "#111827", false, m.cantidad_base ? 330 : 560);
+    texto(`${m.descripcion ?? m.tipo}${m.cuenta_destino ? ` → ${m.cuenta_destino}` : ""}`, "referencia", medio, "#111827", false, m.cantidad_base ? 330 : 560);
     if (m.cantidad_base) texto(formatearMonto(m.cantidad_base), "cantidad", medio, colorMonto(m.cantidad_base));
     if (m.tasa) texto(m.tasa_es_porcentaje ? `${formatearMonto(multiplicarDecimales(m.tasa, "100", 6))}%` : formatearMonto(m.tasa), "tasa", medio, "#4b5563");
     texto(dinero(m.monto), "monto", medio, colorMonto(m.monto));

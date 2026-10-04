@@ -49,6 +49,7 @@ export interface FilaEstadoCuenta {
   cantidad_base: string | null;
   tasa: string | null;
   tasa_es_porcentaje: boolean; // comisión en %: la tasa viene como fracción (3% = "0.03")
+  cuenta_destino: string | null; // a qué cuenta del cliente se le pagó
   monto: string;
   total: string;
   anulado: boolean;
@@ -185,6 +186,7 @@ interface RegistrarMovimientoInput {
   monedaBaseId?: number;
   tasa?: string;
   tasaEsPorcentaje?: boolean;
+  cuentaDestino?: string;
   categoriaId?: number;
   cajaId?: number;
   montoCaja?: string;
