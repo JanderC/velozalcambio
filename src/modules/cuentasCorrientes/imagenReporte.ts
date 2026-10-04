@@ -1,5 +1,5 @@
 import type { EstadoCuenta } from "../../api/cuentasCorrientes.api";
-import { dividirDecimales, formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
 const ANCHO = 1080;
 const MARGEN = 28;
@@ -20,19 +20,24 @@ const COL = {
 
 const SEPARACION_CUADRO = 18;
 
-interface Equivalente {
-  nombre: string;
-  tasa: string;
-  monto: string;
+// Una línea del cuadrito de abajo: texto a la izquierda, monto a la derecha
+interface LineaCuadro {
+  texto: string;
+  monto: string; // con signo, ya en la moneda que se muestra
   prefijo: string;
-  sufijo: string;
+  total?: boolean;
 }
+
+type MonedaTasa = "USD" | "USDT" | "EUR" | "VES";
+const NOMBRE_MONEDA: Record<MonedaTasa, string> = { USD: "dólares", USDT: "USDT", EUR: "euros", VES: "bolívares" };
+const cantidadTexto = (cantidad: string, moneda: MonedaTasa) => (moneda === "VES" ? `Bs. ${formatearMonto(cantidad)}` : `${formatearMonto(cantidad)} ${moneda}`);
 
 // A qué moneda corresponde una tasa en pesos: primero por la referencia del movimiento, si no por su tamaño
 // (un dólar vale miles de pesos; un bolívar, unos pocos).
-function monedaDeLaTasa(tasa: string, referencia = ""): "USD" | "VES" | null {
-  if (/euro/i.test(referencia)) return null;
-  if (/zelle|usdt|d[oó]lar/i.test(referencia)) return "USD";
+function monedaDeLaTasa(tasa: string, referencia = ""): MonedaTasa | null {
+  if (/euro/i.test(referencia)) return "EUR";
+  if (/usdt/i.test(referencia)) return "USDT";
+  if (/zelle|d[oó]lar/i.test(referencia)) return "USD";
   if (/bss|bol[ií]var|pago m[oó]vil/i.test(referencia)) return "VES";
   const n = Number(tasa);
   if (n >= 1000) return "USD";
@@ -41,35 +46,46 @@ function monedaDeLaTasa(tasa: string, referencia = ""): "USD" | "VES" | null {
 }
 
 /**
- * El saldo pendiente (en pesos) pasado a dólares y a bolívares con las últimas tasas usadas en sus movimientos:
- * primero las del reporte, y si ese día no se usó alguna, las últimas de la cuenta.
+ * El cuadrito de abajo. Las tasas cambian de un movimiento a otro, así que no se convierte todo con una sola:
+ * por cada moneda va una línea por tasa (3 USD × 3.100 = $9.300) y al final el total de esa moneda, en cantidad y en pesos.
+ * Las ventas y los abonos van en líneas aparte.
  */
-function equivalentesDelSaldo(estado: EstadoCuenta, tasasRespaldo: string[]): Equivalente[] {
-  if (!/[1-9]/.test(estado.saldoFinal)) return [];
+function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaCuadro[] } {
   // Cuenta en otra moneda: su saldo en pesos, al valor de esa moneda
   if (estado.cuenta.moneda_codigo !== "COP") {
     const valor = estado.cuenta.valor_moneda;
-    if (!valor) return [];
-    return [{ nombre: `En pesos, 1 ${estado.cuenta.moneda_codigo}`, tasa: valor, monto: multiplicarDecimales(estado.saldoFinal, valor, 0), prefijo: "$", sufijo: "" }];
+    if (!valor || !/[1-9]/.test(estado.saldoFinal)) return { titulo: "", lineas: [] };
+    return {
+      titulo: "El saldo pendiente equivale a",
+      lineas: [{ texto: `En pesos, 1 ${estado.cuenta.moneda_codigo} = $${formatearMonto(valor)}`, monto: multiplicarDecimales(estado.saldoFinal, valor, 0), prefijo: "$", total: true }],
+    };
   }
-  const tasas: Partial<Record<"USD" | "VES", string>> = {};
-  const candidatas = [
-    ...estado.movimientos
-      .filter((m) => !m.anulado && m.tasa && !m.tasa_es_porcentaje)
-      .reverse()
-      .map((m) => ({ tasa: m.tasa!, referencia: m.descripcion ?? "" })),
-    ...tasasRespaldo.map((tasa) => ({ tasa, referencia: "" })),
-  ];
-  for (const { tasa, referencia } of candidatas) {
-    const moneda = monedaDeLaTasa(tasa, referencia);
-    if (moneda && !tasas[moneda]) tasas[moneda] = tasa;
+  const grupos = new Map<string, { moneda: MonedaTasa; tasa: string; abono: boolean; cantidad: string; pesos: string }>();
+  for (const m of estado.movimientos) {
+    if (m.anulado || !m.tasa || m.tasa_es_porcentaje || !m.cantidad_base) continue;
+    const moneda = monedaDeLaTasa(m.tasa, m.descripcion ?? "");
+    if (!moneda) continue;
+    const abono = m.monto.startsWith("-");
+    const clave = `${moneda}|${Number(m.tasa)}|${abono}`;
+    const g = grupos.get(clave) ?? { moneda, tasa: m.tasa, abono, cantidad: "0", pesos: "0" };
+    g.cantidad = sumarDecimales(g.cantidad, m.cantidad_base);
+    g.pesos = sumarDecimales(g.pesos, m.monto);
+    grupos.set(clave, g);
   }
-  const lista: Equivalente[] = [];
-  const usd = tasas.USD && dividirDecimales(estado.saldoFinal, tasas.USD, 2);
-  if (usd) lista.push({ nombre: "En dólares", tasa: tasas.USD!, monto: usd, prefijo: "", sufijo: " USD" });
-  const ves = tasas.VES && dividirDecimales(estado.saldoFinal, tasas.VES, 2);
-  if (ves) lista.push({ nombre: "En bolívares", tasa: tasas.VES!, monto: ves, prefijo: "Bs. ", sufijo: "" });
-  return lista;
+  const lineas: LineaCuadro[] = [];
+  for (const moneda of ["USD", "USDT", "EUR", "VES"] as const) {
+    const deLaMoneda = [...grupos.values()].filter((g) => g.moneda === moneda).sort((a, b) => Number(a.abono) - Number(b.abono) || Number(a.tasa) - Number(b.tasa));
+    if (deLaMoneda.length === 0) continue;
+    let cantidad = "0";
+    let pesos = "0";
+    for (const g of deLaMoneda) {
+      cantidad = sumarDecimales(cantidad, g.cantidad);
+      pesos = sumarDecimales(pesos, g.pesos);
+      lineas.push({ texto: `${g.abono ? "Abono " : ""}${cantidadTexto(g.cantidad.replace(/^-/, ""), moneda)} × ${formatearMonto(g.tasa)}`, monto: g.pesos, prefijo: "$" });
+    }
+    lineas.push({ texto: `Total ${NOMBRE_MONEDA[moneda]}: ${cantidad.startsWith("-") ? "- " : ""}${cantidadTexto(cantidad.replace(/^-/, ""), moneda)}`, monto: pesos, prefijo: "$", total: true });
+  }
+  return { titulo: "Por moneda y tasa", lineas };
 }
 
 const negar = (v: string) => (v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ? `-${v}` : v);
@@ -78,9 +94,9 @@ const negar = (v: string) => (v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ?
  * La hoja como imagen para mandarle al cliente: solo los movimientos y el saldo.
  * Sin nombre del cliente ni nada del sistema, y sin los movimientos anulados.
  */
-export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, tasasRespaldo: string[] = []): Promise<Blob> {
+export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Promise<Blob> {
   const vigentes = estado.movimientos.filter((m) => !m.anulado);
-  const equivalentes = equivalentesDelSaldo(estado, tasasRespaldo);
+  const cuadro = lineasDelCuadro(estado);
   const filas = vigentes.slice(-MAX_FILAS);
   // El saldo de arranque sale de restarle al saldo final lo que se muestra: así el total corrido siempre cierra
   let corrido = filas.reduce((saldo, m) => sumarDecimales(saldo, negar(m.monto)), estado.saldoFinal);
@@ -88,7 +104,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, tasa
 
   const lienzo = document.createElement("canvas");
   lienzo.width = ANCHO;
-  const altoCuadro = equivalentes.length ? SEPARACION_CUADRO + (equivalentes.length + 1) * ALTO_FILA : 0;
+  const altoCuadro = cuadro.lineas.length ? SEPARACION_CUADRO + (cuadro.lineas.length + 1) * ALTO_FILA : 0;
   lienzo.height = ALTO_CABEZA + (filas.length + (conSaldoAnterior ? 1 : 0) + 2) * ALTO_FILA + altoCuadro + 12;
   const c = lienzo.getContext("2d")!;
   c.fillStyle = "#ffffff";
@@ -148,29 +164,34 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, tasa
   y += ALTO_FILA;
   franja("Saldo pendiente", estado.saldoFinal);
 
-  // Cuadrito debajo de la tabla: el saldo pendiente en dólares y en bolívares, a las tasas de sus movimientos
-  if (equivalentes.length) {
+  // Cuadrito debajo de la tabla: por moneda, cada tasa en su línea y el total
+  if (cuadro.lineas.length) {
     y += SEPARACION_CUADRO;
-    const alto = (equivalentes.length + 1) * ALTO_FILA;
+    const alto = (cuadro.lineas.length + 1) * ALTO_FILA;
     c.fillStyle = "#f7f9fc";
     c.fillRect(MARGEN, y, ANCHO - MARGEN * 2, alto);
+    cuadro.lineas.forEach((l, i) => {
+      if (!l.total) return;
+      c.fillStyle = "#e6f7fb";
+      c.fillRect(MARGEN, y + (i + 1) * ALTO_FILA, ANCHO - MARGEN * 2, ALTO_FILA);
+    });
     c.strokeStyle = "#12305a";
     c.lineWidth = 2;
     c.strokeRect(MARGEN, y, ANCHO - MARGEN * 2, alto);
     c.font = `700 22px ${FUENTE}`;
     c.fillStyle = "#12305a";
     c.textAlign = "left";
-    c.fillText("El saldo pendiente equivale a", MARGEN + 18, y + ALTO_FILA / 2);
-    equivalentes.forEach((e, i) => {
+    c.fillText(cuadro.titulo, MARGEN + 18, y + ALTO_FILA / 2);
+    cuadro.lineas.forEach((l, i) => {
       const medio = y + (i + 1) * ALTO_FILA + ALTO_FILA / 2;
-      c.font = `400 22px ${FUENTE}`;
-      c.fillStyle = "#4b5563";
+      c.font = `${l.total ? "700" : "400"} 22px ${FUENTE}`;
+      c.fillStyle = l.total ? "#12305a" : "#374151";
       c.textAlign = "left";
-      c.fillText(e.nombre.includes(", 1 ") ? `${e.nombre} = $${formatearMonto(e.tasa)}` : `${e.nombre} (tasa ${formatearMonto(e.tasa)})`, MARGEN + 18, medio);
-      c.font = `700 24px ${FUENTE}`;
-      c.fillStyle = colorMonto(e.monto);
+      c.fillText(l.texto, MARGEN + 18, medio);
+      c.font = `${l.total ? "700" : "400"} 24px ${FUENTE}`;
+      c.fillStyle = colorMonto(l.monto);
       c.textAlign = "right";
-      c.fillText(e.monto.startsWith("-") ? `- ${e.prefijo}${formatearMonto(e.monto.slice(1))}${e.sufijo}` : `${e.prefijo}${formatearMonto(e.monto)}${e.sufijo}`, ANCHO - MARGEN - 18, medio);
+      c.fillText(l.monto.startsWith("-") ? `= - ${l.prefijo}${formatearMonto(l.monto.slice(1))}` : `= ${l.prefijo}${formatearMonto(l.monto)}`, ANCHO - MARGEN - 18, medio);
     });
   }
 
