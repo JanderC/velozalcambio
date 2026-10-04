@@ -24,7 +24,10 @@ import { CobroModal } from "./CobroModal";
 
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
-const CLAVE_ULTIMA_COMISION = "cc-ultima-comision-pct";
+// Referencias que no se sugieren, aunque exista el banco o se hayan usado antes
+const REFERENCIAS_OCULTAS = /^(venta de (bancolombia|proveedor(es)?|western union)|abono nequi)$/i;
+
+const CLAVE_ULTIMA_COMISION ="cc-ultima-comision-pct";
 
 // La referencia lleva quién envió la transferencia: "Venta de Zelle · Juan Pérez"
 const SEPARADOR_PERSONA = " · ";
@@ -203,7 +206,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     (cobro && lecturaSaldo !== "Saldo" ? ` Equivale a ${equivalenteTexto} (tasa ${formatearMonto(cobro.tasa)}).` : "");
   const referencias = useMemo(() => {
     const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!.replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, ""));
-    return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])];
+    return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])].filter((r) => !REFERENCIAS_OCULTAS.test(r.trim()));
   }, [estado, ventasPorBanco]);
 
   return (
