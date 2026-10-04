@@ -16,7 +16,8 @@ import {
   type EstadoCuenta,
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
-import { compartirImagen, generarImagenReporte } from "./imagenReporte";
+import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte } from "./imagenReporte";
+import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
@@ -78,6 +79,21 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   // La hoja es diaria: se ve y se cierra un día a la vez
   const [dia, setDia] = useState(hoyBogota());
   const [cerrando, setCerrando] = useState(false);
+  // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
+  const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
+  const [copiado, setCopiado] = useState(false);
+
+  // Teléfono: menú de compartir. Computador: la imagen a la vista con copiar y descargar.
+  async function entregarReporte(blob: Blob, nombre: string) {
+    if (await compartirImagen(blob, nombre)) return;
+    setCopiado(false);
+    setReporte({ blob, url: URL.createObjectURL(blob), nombre });
+  }
+
+  function cerrarReporte() {
+    if (reporte) URL.revokeObjectURL(reporte.url);
+    setReporte(null);
+  }
   const [estado, setEstado] = useState<EstadoCuenta | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +161,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   async function compartir() {
     if (!estado) return;
     try {
-      await compartirImagen(await generarImagenReporte(estado, simbolo), `cierre-${dia}.png`);
+      await entregarReporte(await generarImagenReporte(estado, simbolo), `cierre-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -158,7 +174,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       const cerrado = await cerrarDiaCuenta(cuenta.id, dia);
       setEstado(cerrado);
       setError(null);
-      await compartirImagen(await generarImagenReporte(cerrado, simbolo), `cierre-${dia}.png`);
+      await entregarReporte(await generarImagenReporte(cerrado, simbolo), `cierre-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -303,6 +319,29 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         </button>
       </div>
 
+      {reporte && (
+        <Modal titulo="Reporte del día" ancho="ancho" onCerrar={cerrarReporte}>
+          <div className="cc-reporte">
+            <div className="cc-reporte-acciones">
+              <button
+                type="button"
+                className="cc-guardar"
+                onClick={() =>
+                  copiarImagen(reporte.blob)
+                    .then(() => setCopiado(true))
+                    .catch(() => setError("Este navegador no deja copiar la imagen: usá Descargar."))
+                }
+              >
+                {copiado ? "Copiada: pegala en WhatsApp (Ctrl+V)" : "Copiar imagen"}
+              </button>
+              <button type="button" className="cc-btn-secundario" onClick={() => descargarBlob(reporte.blob, reporte.nombre)}>
+                Descargar
+              </button>
+            </div>
+            <img src={reporte.url} alt="Reporte de movimientos del día" />
+          </div>
+        </Modal>
+      )}
       {error && <p className="cc-form-error">{error}</p>}
       {estado?.cierre &&
         (estado.cierre.saldo_final === estado.saldoFinal ? (

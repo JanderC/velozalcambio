@@ -117,8 +117,11 @@ export async function descargarExcelEstadoCuenta(cuentaId: number, rango: { desd
   const enlace = document.createElement("a");
   enlace.href = url;
   enlace.download = nombreArchivo;
+  enlace.style.display = "none";
+  document.body.appendChild(enlace);
   enlace.click();
-  URL.revokeObjectURL(url);
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export function getEstadoCuenta(cuentaId: number, rango: { desde?: string; hasta?: string }) {

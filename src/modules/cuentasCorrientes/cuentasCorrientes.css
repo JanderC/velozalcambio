@@ -72,6 +72,10 @@
 .cc-dia button:disabled { opacity: 0.4; cursor: default; }
 .cc-periodos button.cc-cerrar-dia { display: inline-flex; align-items: center; gap: 6px; background: var(--color-navy); color: white; font-weight: 700; border-radius: 6px; }
 .cc-periodos button.cc-cerrar-dia:disabled { opacity: 0.6; cursor: default; }
+/* El reporte en pantalla (computador): copiar o descargar */
+.cc-reporte { display: flex; flex-direction: column; gap: 12px; }
+.cc-reporte-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.cc-reporte img { width: 100%; height: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
 .cc-cierre-aviso { margin: 0 0 10px; padding: 8px 12px; border-radius: 6px; font-size: 0.84rem; background: #e8f6ec; color: #1a7f37; font-weight: 600; }
 .cc-cierre-aviso.pendiente { background: #fff4e0; color: #a8531f; }
 .cc-rango { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #6b7280; }

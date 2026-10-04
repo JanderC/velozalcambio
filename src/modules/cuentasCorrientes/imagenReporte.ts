@@ -89,22 +89,36 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Pro
   return new Promise((resolver, rechazar) => lienzo.toBlob((b) => (b ? resolver(b) : rechazar(new Error("No se pudo generar la imagen"))), "image/png"));
 }
 
-/** En el teléfono abre el menú de compartir (WhatsApp, etc.) con la imagen; en el computador la descarga. */
-export async function compartirImagen(blob: Blob, nombreArchivo: string) {
-  const archivo = new File([blob], nombreArchivo, { type: "image/png" });
-  if (navigator.canShare?.({ files: [archivo] })) {
-    try {
-      await navigator.share({ files: [archivo] });
-      return;
-    } catch (e) {
-      if ((e as Error).name === "AbortError") return; // cerrar el menú sin compartir no es un error
-      // si el navegador no deja abrir el menú (p. ej. pasó mucho desde el toque), se descarga
-    }
-  }
+/** Guarda un archivo generado en el navegador. El enlace va en el documento y la URL se libera después: si no, algunos navegadores navegan en vez de descargar. */
+export function descargarBlob(blob: Blob, nombreArchivo: string) {
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
   enlace.href = url;
   enlace.download = nombreArchivo;
+  enlace.style.display = "none";
+  document.body.appendChild(enlace);
   enlace.click();
-  URL.revokeObjectURL(url);
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Copia la imagen al portapapeles, para pegarla en WhatsApp Web o donde haga falta. */
+export async function copiarImagen(blob: Blob) {
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
+/**
+ * En el teléfono abre el menú de compartir (WhatsApp, etc.) con la imagen y devuelve true.
+ * En el computador no hay un menú así que sirva: devuelve false para que se muestre la imagen con copiar y descargar.
+ */
+export async function compartirImagen(blob: Blob, nombreArchivo: string): Promise<boolean> {
+  const archivo = new File([blob], nombreArchivo, { type: "image/png" });
+  const esTactil = window.matchMedia("(pointer: coarse)").matches;
+  if (!esTactil || !navigator.canShare?.({ files: [archivo] })) return false;
+  try {
+    await navigator.share({ files: [archivo] });
+    return true;
+  } catch (e) {
+    return (e as Error).name === "AbortError"; // cerrar el menú sin compartir no es un error
+  }
 }
