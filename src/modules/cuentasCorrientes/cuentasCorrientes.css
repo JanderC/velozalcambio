@@ -51,6 +51,12 @@
 .cc-resumen strong { font-size: 1.15rem; color: #1a7f37; font-variant-numeric: tabular-nums; }
 .cc-resumen div.debo strong { color: #c0392b; }
 .cc-estado-cobrar { background: #e6f0fb; color: #14406f; }
+.cc-hoy { display: block; margin-top: 3px; font-size: 0.84rem !important; color: #374151 !important; font-variant-numeric: tabular-nums; }
+.cc-hoy b { color: var(--color-navy-dark); }
+.cc-cuenta-hoy { grid-column: 1 / -1; font-size: 0.74rem; color: #4b5563; font-variant-numeric: tabular-nums; }
+.cc-cuenta-hoy b { color: var(--color-navy-dark); }
+.cc-nueva label.cc-mantener-tasa { margin-top: 8px; flex-wrap: wrap; font-size: 0.86rem; font-weight: 600; color: var(--color-navy-dark); background: #fff4e0; border-radius: 6px; padding: 8px 10px; }
+.cc-mantener-tasa small { flex-basis: 100%; padding-left: 22px; }
 .cc-hoja-saldo { text-align: right; }
 .cc-hoja-saldo > span { display: block; font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
 .cc-hoja-saldo strong { font-size: 1.35rem; color: #1a7f37; font-variant-numeric: tabular-nums; white-space: nowrap; }

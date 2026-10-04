@@ -191,6 +191,11 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   <span className="cc-cuenta-detalle derecha">
                     {c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : "sin movimientos"}
                   </span>
+                  {(/[1-9]/.test(c.vendido_hoy) || /[1-9]/.test(c.abonado_hoy)) && (
+                    <span className="cc-cuenta-hoy">
+                      Hoy: le vendí <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · me vendió o abonó <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

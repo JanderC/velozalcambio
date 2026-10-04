@@ -33,6 +33,9 @@ export interface CuentaCorrienteResumen {
   tercero_tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO";
   moneda_decimales: number;
   ultimo_movimiento: string | null;
+  // Lo de hoy: lo que le vendí (positivo) y lo que me vendió o abonó (negativo)
+  vendido_hoy: string;
+  abonado_hoy: string;
 }
 
 /** Una fila de la hoja: como en el Excel (fecha, referencia, cantidad, tasa, monto, total). */
@@ -125,9 +128,20 @@ export function getEstadoCuenta(cuentaId: number, rango: { desde?: string; hasta
   return api.get<EstadoCuenta>(`/cuentas-corrientes/${cuentaId}/estado-cuenta?${params}`);
 }
 
+export interface TasasRecientes {
+  tasas: string[];
+  porcentajes: string[];
+  tasaHabitual: string | null; // la que queda puesta en el formulario de la cuenta
+  referenciaFrecuente: string | null; // la referencia que más se usa con esa persona
+}
+
+export function guardarTasaHabitual(cuentaId: number, tasa: string) {
+  return api.put<{ tasaHabitual: string }>(`/cuentas-corrientes/${cuentaId}/tasa-habitual`, { tasa });
+}
+
 /** Últimas tasas y porcentajes de comisión usados (la más reciente primero). */
 export function getTasasRecientes(cuentaId: number) {
-  return api.get<{ tasas: string[]; porcentajes: string[] }>(`/cuentas-corrientes/${cuentaId}/tasas-recientes`);
+  return api.get<TasasRecientes>(`/cuentas-corrientes/${cuentaId}/tasas-recientes`);
 }
 
 /** Cierra el día de la cuenta (o lo vuelve a cerrar) y devuelve la hoja de ese día. */

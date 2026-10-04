@@ -9,6 +9,8 @@ import {
   getCanales,
   getEstadoCuenta,
   getTasasRecientes,
+  guardarTasaHabitual,
+  type TasasRecientes,
   registrarMovimientoCC,
   type CuentaCorrienteResumen,
   type EstadoCuenta,
@@ -217,6 +219,20 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             {cuenta.canal_nombre === "SIN_BANCO" ? "" : `${cuenta.canal_nombre.replace(/_/g, " ")} · `}
             {cuenta.moneda_codigo}
           </span>
+          {estado && (
+            <span className="cc-hoy">
+              {dia === hoyBogota() ? "Hoy" : fechaCorta(`${dia}T12:00:00-05:00`)}: le vendí{" "}
+              <b>
+                <Monto valor={estado.sumas} simbolo={simbolo} />
+                {sufijo}
+              </b>{" "}
+              · me vendió o abonó{" "}
+              <b>
+                <Monto valor={estado.abonos.replace(/^-/, "")} simbolo={simbolo} />
+                {sufijo}
+              </b>
+            </span>
+          )}
           {puedeAnular && (
             <button type="button" className="cc-mover" onClick={mover}>
               {cuenta.modulo === "POR_COBRAR" ? "Devolver a Cuentas Corrientes" : "Pasar a Cuentas por Cobrar"}
@@ -433,13 +449,28 @@ function FilaNueva({
   const [abierta, setAbierta] = useState(false);
   const refInput = useRef<HTMLInputElement>(null);
   // Últimas tasas y comisiones usadas: se aplican con un toque, sin escribirlas
-  const [recientes, setRecientes] = useState<{ tasas: string[]; porcentajes: string[] }>({ tasas: [], porcentajes: [] });
+  const [recientes, setRecientes] = useState<TasasRecientes>({ tasas: [], porcentajes: [], tasaHabitual: null, referenciaFrecuente: null });
+  // Si se cambia la tasa que venía puesta: ¿queda esta para los próximos movimientos?
+  const [mantenerTasa, setMantenerTasa] = useState(false);
   const cargarRecientes = useCallback(() => {
     getTasasRecientes(cuenta.id)
       .then(setRecientes)
       .catch(() => {});
   }, [cuenta.id]);
   useEffect(cargarRecientes, [cargarRecientes]);
+
+  // La referencia más usada con esta persona y la tasa de la cuenta vienen puestas: solo se llenan casilleros vacíos
+  const tasaPuesta = recientes.tasaHabitual ? formatearMonto(recientes.tasaHabitual) : "";
+  const referenciaPuesta = recientes.referenciaFrecuente ?? "";
+  useEffect(() => {
+    setTasa((t) => (t.trim() || esPorcentaje || enCobro ? t : tasaPuesta));
+    setReferencia((r) => {
+      if (r.trim() || !referenciaPuesta) return r;
+      setResta(/^\s*(abono|pago)/i.test(referenciaPuesta));
+      return referenciaPuesta;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasaPuesta, referenciaPuesta]);
 
   // Al pasar a "Comisión %" se propone el último porcentaje usado (queda guardado en este equipo)
   function activarPorcentaje() {
@@ -476,6 +507,8 @@ function FilaNueva({
   const pidePersona = (/^\s*(venta|abono|pago)/i.test(referencia) || /zelle/i.test(referencia)) && !referencia.includes(SEPARADOR_PERSONA);
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   const sinSigno = (v: string) => v.replace(/^-/, "");
+  // Se escribió una tasa distinta a la que venía puesta
+  const tasaModificada = !esPorcentaje && !enCobro && !!nEscrita && /[1-9]/.test(nEscrita) && nEscrita !== (recientes.tasaHabitual ?? "");
 
   // MONTO: cantidad x tasa, o el monto escrito a mano si no hay tasa (ej. "Abono efectivo")
   let monto: string | null = null;
@@ -519,12 +552,17 @@ function FilaNueva({
     const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
     const escrito = { referencia, persona, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
     setEnCobro(false);
-    setReferencia("");
+    // La tasa que queda para el próximo: la nueva si se marcó mantenerla; si no, la que venía puesta
+    const tasaQueQueda = tasaModificada ? (mantenerTasa ? nEscrita! : recientes.tasaHabitual) : null;
+    const tasaSiguiente = tasaModificada && mantenerTasa ? formatearMonto(nEscrita!) : tasaPuesta;
+    setRecientes((r) => (tasaModificada && mantenerTasa ? { ...r, tasaHabitual: nEscrita! } : r));
+    setMantenerTasa(false);
+    setReferencia(referenciaPuesta);
     setPersona("");
     setCantidad("");
-    setTasa("");
+    setTasa(tasaSiguiente);
     setMontoDirecto("");
-    setResta(false);
+    setResta(/^\s*(abono|pago)/i.test(referenciaPuesta));
     setEsPorcentaje(false);
     if (window.matchMedia("(max-width: 860px)").matches) setAbierta(false);
     else refInput.current?.focus();
@@ -551,13 +589,14 @@ function FilaNueva({
       await turno;
       // si no tiene permiso para cambiarla, la tasa de la cuenta queda como estaba
       if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
+      if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       cargarRecientes();
       onGuardado();
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : "No se pudo guardar el movimiento.";
       setError(`"${escrito.referencia.trim()}" no se guardó: ${mensaje}`);
       setAbierta(true);
-      if (!refInput.current?.value) {
+      if ((refInput.current?.value ?? "") === referenciaPuesta) {
         setReferencia(escrito.referencia);
         setPersona(escrito.persona);
         setCantidad(escrito.cantidad);
@@ -637,6 +676,7 @@ function FilaNueva({
               onClick={() => {
                 setEsPorcentaje(false);
                 setEnCobro(false);
+                if (esPorcentaje || enCobro) setTasa(tasaPuesta);
               }}
               aria-pressed={!esPorcentaje && !enCobro}
             >
@@ -686,6 +726,13 @@ function FilaNueva({
         </button>
       </div>
 
+      {tasaModificada && (
+        <label className="cc-check cc-mantener-tasa">
+          <input type="checkbox" checked={mantenerTasa} onChange={(e) => setMantenerTasa(e.target.checked)} />
+          Mantener {formatearMonto(nEscrita!)} como la tasa de esta cuenta
+          {tasaPuesta && !mantenerTasa && <small>Si no, después de este movimiento vuelve a {tasaPuesta}.</small>}
+        </label>
+      )}
       {(() => {
         // En modo cobro la última es la tasa de la cuenta; en comisión, los porcentajes; si no, las tasas
         const lista = esPorcentaje ? recientes.porcentajes : enCobro && cuenta.tasa_cobro ? [...new Set([cuenta.tasa_cobro, ...recientes.tasas])].slice(0, 5) : recientes.tasas;
