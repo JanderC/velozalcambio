@@ -90,6 +90,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     setReporte({ blob, url: URL.createObjectURL(blob), nombre });
   }
 
+  // Últimas tasas de la cuenta, por si el día del reporte no tiene movimientos en dólares o en bolívares
+  const tasasDeLaCuenta = () =>
+    getTasasRecientes(cuenta.id)
+      .then((r) => r.tasas)
+      .catch(() => [] as string[]);
+
   function cerrarReporte() {
     if (reporte) URL.revokeObjectURL(reporte.url);
     setReporte(null);
@@ -161,7 +167,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   async function compartir() {
     if (!estado) return;
     try {
-      await entregarReporte(await generarImagenReporte(estado, simbolo), `cierre-${dia}.png`);
+      await entregarReporte(await generarImagenReporte(estado, simbolo, await tasasDeLaCuenta()), `cierre-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -174,7 +180,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       const cerrado = await cerrarDiaCuenta(cuenta.id, dia);
       setEstado(cerrado);
       setError(null);
-      await entregarReporte(await generarImagenReporte(cerrado, simbolo), `cierre-${dia}.png`);
+      await entregarReporte(await generarImagenReporte(cerrado, simbolo, await tasasDeLaCuenta()), `cierre-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
