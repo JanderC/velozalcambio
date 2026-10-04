@@ -211,7 +211,10 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           tasa: actual.tasa_cobro,
           equivalente: multiplicarDecimales(saldoActual.replace(/^-/, ""), actual.tasa_cobro, Number(actual.moneda_cobro_decimales ?? 0)),
         }
-      : null;
+      : actual.valor_moneda
+        ? // sin moneda de cobro configurada: el valor de su moneda en pesos, a la última tasa usada
+          { codigo: "COP", tasa: actual.valor_moneda, equivalente: multiplicarDecimales(saldoActual.replace(/^-/, ""), actual.valor_moneda, 0) }
+        : null;
   const equivalenteTexto = cobro ? (cobro.codigo === "COP" ? `$${formatearMonto(cobro.equivalente)} COP` : `${formatearMonto(cobro.equivalente)} ${cobro.codigo}`) : "";
   // Igual que el Excel: en negativo es lo que yo le debo
   const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") ? "Yo le debo" : "Me debe";
@@ -272,12 +275,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           </strong>
           {cobro && lecturaSaldo !== "Saldo" && (
             <small className="cc-equivalente">
-              = {equivalenteTexto} · tasa {formatearMonto(cobro.tasa)}
+              = {equivalenteTexto} · 1 {cuenta.moneda_codigo} = {formatearMonto(cobro.tasa)} {cobro.codigo}
             </small>
           )}
           {puedeAnular && (
             <button type="button" className="cc-mover" onClick={() => setConfigurandoCobro(true)}>
-              {cobro ? "Cambiar tasa o moneda de cobro" : "Cobrar en otra moneda"}
+              {actual.moneda_cobro_codigo ? "Cambiar tasa o moneda de cobro" : "Cobrar en otra moneda"}
             </button>
           )}
         </div>

@@ -34,6 +34,8 @@ export interface CuentaCorrienteResumen {
   moneda_decimales: number;
   ultimo_movimiento: string | null;
   // Lo de hoy: lo que le vendí (positivo) y lo que me vendió o abonó (negativo)
+  // Cuentas que no son en pesos: cuántos pesos vale 1 de su moneda (tasa de cobro o la última usada en los movimientos)
+  valor_moneda: string | null;
   vendido_hoy: string;
   abonado_hoy: string;
 }

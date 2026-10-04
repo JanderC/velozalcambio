@@ -3,7 +3,7 @@ import { Plus, Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
 import { getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
-import { formatearMonto, sumarDecimales } from "../../utils/montos";
+import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
@@ -123,7 +123,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
         </div>
       </div>
 
-      {enCobrar && resumen.length > 0 && (
+      {resumen.length > 0 && (
         <div className="cc-resumen">
           {resumen.flatMap(([moneda, t]) => [
             <div key={`${moneda}-me-deben`}>
@@ -192,6 +192,17 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   <span className="cc-cuenta-detalle derecha">
                     {c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : "sin movimientos"}
                   </span>
+                  {c.valor_moneda && (
+                    <span className="cc-cuenta-hoy">
+                      1 {c.moneda_codigo} = ${formatearMonto(c.valor_moneda)}
+                      {conSaldo(c) && (
+                        <>
+                          {" "}
+                          · en pesos <b>{montoTexto(multiplicarDecimales(c.saldo_actual, c.valor_moneda, 0), "COP")}</b>
+                        </>
+                      )}
+                    </span>
+                  )}
                   {(/[1-9]/.test(c.vendido_hoy) || /[1-9]/.test(c.abonado_hoy)) && (
                     <span className="cc-cuenta-hoy">
                       Hoy: le vendí <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · me vendió o abonó <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>

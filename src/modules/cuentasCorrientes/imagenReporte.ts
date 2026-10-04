@@ -45,7 +45,13 @@ function monedaDeLaTasa(tasa: string, referencia = ""): "USD" | "VES" | null {
  * primero las del reporte, y si ese día no se usó alguna, las últimas de la cuenta.
  */
 function equivalentesDelSaldo(estado: EstadoCuenta, tasasRespaldo: string[]): Equivalente[] {
-  if (estado.cuenta.moneda_codigo !== "COP" || !/[1-9]/.test(estado.saldoFinal)) return [];
+  if (!/[1-9]/.test(estado.saldoFinal)) return [];
+  // Cuenta en otra moneda: su saldo en pesos, al valor de esa moneda
+  if (estado.cuenta.moneda_codigo !== "COP") {
+    const valor = estado.cuenta.valor_moneda;
+    if (!valor) return [];
+    return [{ nombre: `En pesos, 1 ${estado.cuenta.moneda_codigo}`, tasa: valor, monto: multiplicarDecimales(estado.saldoFinal, valor, 0), prefijo: "$", sufijo: "" }];
+  }
   const tasas: Partial<Record<"USD" | "VES", string>> = {};
   const candidatas = [
     ...estado.movimientos
@@ -160,7 +166,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, tasa
       c.font = `400 22px ${FUENTE}`;
       c.fillStyle = "#4b5563";
       c.textAlign = "left";
-      c.fillText(`${e.nombre} (tasa ${formatearMonto(e.tasa)})`, MARGEN + 18, medio);
+      c.fillText(e.nombre.includes(", 1 ") ? `${e.nombre} = $${formatearMonto(e.tasa)}` : `${e.nombre} (tasa ${formatearMonto(e.tasa)})`, MARGEN + 18, medio);
       c.font = `700 24px ${FUENTE}`;
       c.fillStyle = colorMonto(e.monto);
       c.textAlign = "right";
