@@ -88,6 +88,13 @@ function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaC
   return { titulo: "Por moneda y tasa", lineas };
 }
 
+/** Todo lo abonado en el día: lo que resta y también los abonos cargados como suma (ej. un abono por transferencia). */
+function abonadoEnElDia(estado: EstadoCuenta) {
+  return estado.movimientos
+    .filter((m) => !m.anulado && (m.monto.startsWith("-") || /^\s*(abono|pago)/i.test(m.descripcion ?? "")))
+    .reduce((suma, m) => sumarDecimales(suma, m.monto.replace(/^-/, "")), "0");
+}
+
 const negar = (v: string) => (v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ? `-${v}` : v);
 
 /**
@@ -160,7 +167,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Pro
   c.fillStyle = "#eef7f0";
   c.fillRect(0, y, ANCHO, ALTO_FILA);
   texto("Abonado en el día", "fecha", y + ALTO_FILA / 2, "#1a7f37", true);
-  texto(dinero(estado.abonos.replace(/^-/, "")), "total", y + ALTO_FILA / 2, "#1a7f37", true);
+  texto(dinero(abonadoEnElDia(estado)), "total", y + ALTO_FILA / 2, "#1a7f37", true);
   y += ALTO_FILA;
   franja("Saldo pendiente", estado.saldoFinal);
 

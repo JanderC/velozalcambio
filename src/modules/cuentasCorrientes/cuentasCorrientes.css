@@ -43,6 +43,9 @@
 .cc-hoja-titulo h2 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 2px; font-size: 1.25rem; }
 .cc-hoja-titulo span { font-size: 0.82rem; color: #6b7280; }
 .cc-mover { display: block; margin-top: 4px; padding: 0; border: none; background: none; color: var(--color-navy); font-family: inherit; font-size: 0.8rem; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.cc-acciones-cuenta { display: flex; gap: 14px; }
+.cc-mover.cc-eliminar { color: #c0392b; }
+.cc-nueva small.cc-repetido { color: #c0392b; font-weight: 600; font-size: 0.78rem; }
 /* Cuentas por Cobrar: cuánto me deben y cuánto debo, por moneda */
 .cc-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 0 40px 16px; }
 .cc-resumen div { background: white; border-radius: 10px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-left: 4px solid #1a7f37; }

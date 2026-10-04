@@ -155,6 +155,23 @@ export function cerrarDiaCuenta(cuentaId: number, dia: string) {
   return api.post<EstadoCuenta>(`/cuentas-corrientes/${cuentaId}/cierres`, { dia });
 }
 
+export interface MovimientoConNumero {
+  id: number;
+  fecha: string;
+  descripcion: string;
+  monto: string;
+  tercero_nombre: string;
+}
+
+/** El movimiento ya registrado con ese número de transferencia, si lo hay. */
+export async function buscarMovimientoPorNumero(numero: string) {
+  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${numero}`)).movimiento;
+}
+
+export function eliminarCuentaCorriente(id: number) {
+  return api.delete<void>(`/cuentas-corrientes/${id}`);
+}
+
 export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }

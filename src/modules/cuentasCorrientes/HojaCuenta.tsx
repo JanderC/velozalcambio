@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
+  buscarMovimientoPorNumero,
+  eliminarCuentaCorriente,
+  type MovimientoConNumero,
   cerrarDiaCuenta,
   cambiarModuloCuentaCorriente,
   configurarCobroCuenta,
@@ -16,6 +19,7 @@ import {
   type EstadoCuenta,
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
+import { actualizarTercero } from "../../api/terceros.api";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte } from "./imagenReporte";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
@@ -23,13 +27,13 @@ import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { CobroModal } from "./CobroModal";
 
-const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia (suma)", "Abono transferencia (resta)"];
+const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
 // Referencias que no se sugieren, aunque exista el banco o se hayan usado antes
 const REFERENCIAS_OCULTAS = /^(venta de (bancolombia|proveedor(es)?|western union)|abono nequi)$/i;
 
-// Un abono resta, salvo el que dice "(suma)" (ej. "Abono transferencia (suma)")
-const restaPorReferencia = (referencia: string) => /^\s*(abono|pago)/i.test(referencia) && !/\(suma\)/i.test(referencia);
+// Un abono resta solo. El abono por transferencia no: a veces suma y a veces resta, se elige a mano
+const restaPorReferencia = (referencia: string) => /^\s*(abono|pago)/i.test(referencia) && !/transferencia/i.test(referencia);
 
 const CLAVE_ULTIMA_COMISION = "cc-ultima-comision-pct";
 
@@ -160,6 +164,30 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     }
   }
 
+  async function cambiarNombre() {
+    const nombre = window.prompt("Nombre", cuenta.tercero_nombre)?.trim();
+    if (!nombre || nombre === cuenta.tercero_nombre) return;
+    try {
+      await actualizarTercero(cuenta.tercero_id, { nombre });
+      onActualizar();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  // Eliminar: la cuenta deja de aparecer en las listas. Los movimientos no se borran.
+  async function eliminar() {
+    const conSaldo = /[1-9]/.test(saldoActual);
+    const pregunta = `¿Eliminar la cuenta de ${cuenta.tercero_nombre}?${conSaldo ? " Ojo: todavía tiene saldo pendiente." : ""} Deja de aparecer en las listas.`;
+    if (!window.confirm(pregunta)) return;
+    try {
+      await eliminarCuentaCorriente(cuenta.id);
+      onActualizar();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   // Imagen con solo los movimientos del período (sin nombre ni nada del sistema), para compartirla
   async function compartir() {
     if (!estado) return;
@@ -262,6 +290,16 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             <button type="button" className="cc-mover" onClick={mover}>
               {cuenta.modulo === "POR_COBRAR" ? "Devolver a Cuentas Corrientes" : "Pasar a Cuentas por Cobrar"}
             </button>
+          )}
+          {puedeAnular && (
+            <span className="cc-acciones-cuenta">
+              <button type="button" className="cc-mover" onClick={cambiarNombre}>
+                Cambiar nombre
+              </button>
+              <button type="button" className="cc-mover cc-eliminar" onClick={eliminar}>
+                Eliminar
+              </button>
+            </span>
           )}
         </div>
         <div className={`cc-hoja-saldo ${lecturaSaldo === "Yo le debo" ? "debo" : ""}`}>
@@ -554,7 +592,23 @@ function FilaNueva({
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
   // Ventas y abonos: se puede anotar quién hizo la transferencia; si entró por Zelle es obligatorio
-  const pidePersona = (/^\s*(venta|abono|pago)/i.test(referencia) || /zelle/i.test(referencia)) && !referencia.includes(SEPARADOR_PERSONA);
+  // Quién envió o el número de la transferencia: siempre se puede anotar; si entró por Zelle es obligatorio
+  const pidePersona = !referencia.includes(SEPARADOR_PERSONA);
+  // Si se anota un número de transferencia, no puede haber ya un movimiento con ese número
+  const numeroMovimiento = pidePersona ? (persona.match(/\d{4,30}/)?.[0] ?? null) : null;
+  const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
+  useEffect(() => {
+    setRepetido(null);
+    if (!numeroMovimiento) return;
+    const t = setTimeout(() => {
+      buscarMovimientoPorNumero(numeroMovimiento)
+        .then(setRepetido)
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+  }, [numeroMovimiento]);
+  const avisoRepetido = (m: MovimientoConNumero) =>
+    `Ya hay un movimiento con el número ${numeroMovimiento}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   const sinSigno = (v: string) => v.replace(/^-/, "");
   // Se escribió una tasa distinta a la que venía puesta
@@ -575,7 +629,6 @@ function FilaNueva({
     setReferencia(valor);
     // "Abono ..." resta, igual que en el Excel donde va en negativo
     if (restaPorReferencia(valor)) setResta(true);
-    else if (/\((suma)\)/i.test(valor)) setResta(false);
     if (/comisi[oó]n/i.test(valor) && !esPorcentaje) activarPorcentaje();
   }
 
@@ -589,6 +642,14 @@ function FilaNueva({
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
     if (masOpciones && cajaId === "") return setError("Elegí la caja o banco que también se mueve.");
+    if (numeroMovimiento) {
+      // se vuelve a consultar al guardar: el aviso de arriba puede no haber llegado todavía
+      const ya = repetido ?? (await buscarMovimientoPorNumero(numeroMovimiento).catch(() => null));
+      if (ya) {
+        setRepetido(ya);
+        return setError(`${avisoRepetido(ya)} No se puede registrar dos veces.`);
+      }
+    }
 
     // La fila se limpia ya, para poder seguir cargando la siguiente sin esperar al servidor.
     // Si el guardado falla, se devuelve lo escrito (salvo que ya se esté escribiendo otra).
@@ -702,8 +763,9 @@ function FilaNueva({
         </label>
         {pidePersona && (
           <label className="cc-c-persona">
-            Quién envió la transferencia{personaObligatoria ? "" : " (opcional)"}
-            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Nombre de quien hizo el envío" autoComplete="off" />
+            Quién envió o número de la transferencia{personaObligatoria ? "" : " (opcional)"}
+            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Nombre de quien envió, y el número si lo hay" autoComplete="off" />
+            {repetido && <small className="cc-repetido">{avisoRepetido(repetido)}</small>}
           </label>
         )}
         <label className="cc-c-destino">
