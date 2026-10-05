@@ -265,7 +265,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         : null;
   const equivalenteTexto = cobro ? (cobro.codigo === "COP" ? `$${formatearMonto(cobro.equivalente)} COP` : `${formatearMonto(cobro.equivalente)} ${cobro.codigo}`) : "";
   // Igual que el Excel: en negativo es lo que yo le debo
-  // En Confirmaciones el saldo se lee al revés: lo que el cliente pasó a cobrar (en positivo) es plata que nosotros le debemos
+  // En Confirmaciones el saldo se lee al revés: lo que le compramos al cliente (en positivo) es plata que nosotros le debemos
   const esConfirmaciones = cuenta.modulo === "CAJA";
   const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") !== esConfirmaciones ? "Yo le debo" : "Me debe";
   // Enlace a WhatsApp (sin API): abre el chat del cliente con el saldo ya escrito, listo para enviar
@@ -302,10 +302,11 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     : abonoParaAvisar.sentido === "proceso"
       ? aviso("la operación está en proceso de confirmación.", lineaRef, `Monto: ${montoAviso}`, "Le avisaremos apenas sea confirmada")
       : abonoParaAvisar.sentido === "confirmada" || abonoParaAvisar.sentido === "retiro"
-        ? // en Confirmaciones un Retiro que no quedó pendiente entra ya confirmado
+        ? // en Confirmaciones una Compra que no quedó pendiente entra ya confirmada
           aviso("la operación ha sido confirmada.", lineaRef, `Recibe: ${montoAviso}`, "Disponible para recoger")
         : abonoParaAvisar.sentido === "recibe"
-          ? aviso("la operación ha sido entregada.", lineaRef, `Entregado: ${montoAviso}`, saldoParaCliente)
+          ? // Venta: le vendimos al cliente
+            aviso("su compra ha sido registrada.", lineaRef, `Monto: ${montoAviso}`, saldoParaCliente)
           : // abono en Cuentas Corrientes o Cuentas por Cobrar
             aviso("hemos recibido su abono.", lineaRef, `Monto: ${montoAviso}`, saldoParaCliente);
 
@@ -341,12 +342,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           </span>
           {estado && (
             <span className="cc-hoy">
-              {dia === hoyBogota() ? "Hoy" : fechaCorta(`${dia}T12:00:00-05:00`)}: {esConfirmaciones ? "pasó a cobrar" : "le vendí"}{" "}
+              {dia === hoyBogota() ? "Hoy" : fechaCorta(`${dia}T12:00:00-05:00`)}: {esConfirmaciones ? "le compramos" : "le vendí"}{" "}
               <b>
                 <Monto valor={estado.sumas} simbolo={simbolo} />
                 {sufijo}
               </b>{" "}
-              · {esConfirmaciones ? "recibió" : "me vendió o abonó"}{" "}
+              · {esConfirmaciones ? "le vendimos" : "me vendió o abonó"}{" "}
               <b>
                 <Monto valor={estado.abonos.replace(/^-/, "")} simbolo={simbolo} />
                 {sufijo}
@@ -656,9 +657,11 @@ function FilaNueva({
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
   // Cliente que se trabaja con comisión descontada: 1.000 - 4% = 960. El % de su primer movimiento ya viene puesto.
-  // Confirmaciones: en vez de suma/abono se habla de "Retiro" (el cliente nos paga o pasa un monto a cobrar: entra a nuestra caja
-  // y queda a su favor) y "Recibe" (el cliente recibe efectivo: sale de nuestra caja y se le descuenta)
+  // Confirmaciones: en vez de suma/abono se habla de "Compra" (le compramos al cliente lo que nos pasa: nos resta pesos o dólares
+  // y queda a su favor hasta que se le paga) y "Venta" (le vendemos bolívares o dólares: nos aumenta el saldo en pesos)
   const enConfirmaciones = cuenta.modulo === "CAJA";
+  // qué referencias restan: en Confirmaciones, las ventas; en los demás módulos, los abonos
+  const restaSegunReferencia = (r: string) => (enConfirmaciones ? /^\s*(venta|recibe)/i.test(r) : restaPorReferencia(r));
   const comisionDescuenta = cuenta.formula === "COMISION";
   const pctCuenta = comisionDescuenta && cuenta.comision_pct ? formatearMonto(cuenta.comision_pct) : "";
   // Cliente que se trabaja dividiendo (cuenta en USD o USDT, llega en pesos): el formulario abre en ese modo con su tasa
@@ -740,7 +743,7 @@ function FilaNueva({
     setTasa((t) => (t.trim() || esPorcentaje || enCobro ? t : tasaPuesta));
     setReferencia((r) => {
       if (r.trim() || !referenciaPuesta) return r;
-      setResta(restaPorReferencia(referenciaPuesta));
+      setResta(restaSegunReferencia(referenciaPuesta));
       return referenciaPuesta;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -801,7 +804,7 @@ function FilaNueva({
   const esWestern = /western/i.test(referencia) || cuenta.canal_nombre === "WESTERN_UNION";
   const nMtcn = esWestern ? mtcn.replace(/\D/g, "") : "";
   // quién envió + el MTCN: así queda en la referencia del movimiento y entra en la revisión de números repetidos
-  // Lleva confirmación lo que llega por transferencia: en Confirmaciones, lo que el cliente pasa a cobrar (Retiro); y todo Western Union
+  // Lleva confirmación lo que llega por transferencia: en Confirmaciones, lo que le compramos al cliente (Compra); y todo Western Union
   const llevaConfirmacion = esWestern || (enConfirmaciones && !resta);
   const personaCompleta = [persona.trim(), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
   const numeroMovimiento = nMtcn.length >= 4 ? nMtcn : pidePersona ? codigoDeReferencia(persona) : null;
@@ -843,15 +846,16 @@ function FilaNueva({
       : monedaExtranjera && nCantidad
         ? { codigo: monedaExtranjera as string, cantidad: sinSigno(nCantidad) }
         : { codigo: cuenta.moneda_codigo, cantidad: monto };
-  // un abono entra a la caja; en Confirmaciones entra lo que el cliente pasa a cobrar (Retiro) y sale lo que recibe
-  const entraACaja = sentidoCaja === "auto" ? resta !== enConfirmaciones : sentidoCaja === "entra";
+  // lo que resta entra a la caja: un abono, o en Confirmaciones una Venta (nos pagan); una Compra o una suma sale
+  const entraACaja = sentidoCaja === "auto" ? resta : sentidoCaja === "entra";
   const monedaCaja = movimientoCaja ? monedas.find((m) => m.codigo === movimientoCaja.codigo) : undefined;
   const simbolo = cuenta.moneda_codigo === "COP" ? "$" : "";
 
   function alCambiarReferencia(valor: string) {
     setReferencia(valor);
     // "Abono ..." resta, igual que en el Excel donde va en negativo
-    if (restaPorReferencia(valor)) setResta(true);
+    if (restaSegunReferencia(valor)) setResta(true);
+    else if (enConfirmaciones && /^\s*compra/i.test(valor)) setResta(false);
     if (/comisi[oó]n/i.test(valor) && !esPorcentaje) activarPorcentaje();
   }
 
@@ -924,7 +928,7 @@ function FilaNueva({
     // el que se trabaja dividiendo sigue con la tasa que se acaba de usar
     setTasa(comisionDescuenta ? pctCuenta || tasa : iniciaEnCobro && enCobro ? tasa : tasaSiguiente);
     setMontoDirecto("");
-    setResta(restaPorReferencia(referenciaPuesta));
+    setResta(restaSegunReferencia(referenciaPuesta));
     setEsPorcentaje(comisionDescuenta);
     if (window.matchMedia("(max-width: 860px)").matches) setAbierta(false);
     else refInput.current?.focus();
@@ -1053,24 +1057,24 @@ function FilaNueva({
           Cuenta a la que se pagó (opcional)
           <input value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)} placeholder="ej. Bancolombia ahorros 1234, Nequi 300…" autoComplete="off" maxLength={120} />
         </label>
-        <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Retiro o recibe" : "Suma o abono"}>
+        <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Compra o venta" : "Suma o abono"}>
           <button
             type="button"
             className={!resta ? "activo suma" : ""}
             onClick={() => setResta(false)}
             aria-pressed={!resta}
-            title={enConfirmaciones ? "El cliente nos paga o pasa un monto a cobrar: entra a nuestra caja" : undefined}
+            title={enConfirmaciones ? "Le compramos al cliente: nos resta pesos o dólares" : undefined}
           >
-            {enConfirmaciones ? "Retiro" : "+ Suma"}
+            {enConfirmaciones ? "Compra" : "+ Suma"}
           </button>
           <button
             type="button"
             className={resta ? "activo resta" : ""}
             onClick={() => setResta(true)}
             aria-pressed={resta}
-            title={enConfirmaciones ? "El cliente recibe efectivo: sale de nuestra caja" : undefined}
+            title={enConfirmaciones ? "Le vendemos al cliente: nos aumenta el saldo en pesos" : undefined}
           >
-            {enConfirmaciones ? "Recibe" : "− Abono"}
+            {enConfirmaciones ? "Venta" : "− Abono"}
           </button>
         </div>
         <label className="cc-c-num">

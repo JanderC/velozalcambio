@@ -36,7 +36,7 @@ const SENTIDOS: { valor: string; etiqueta: string }[] = [
 ];
 
 const conSaldo = (c: CuentaCorrienteResumen) => /[1-9]/.test(c.saldo_actual);
-// En Confirmaciones el saldo se lee al revés: lo que el cliente pasó a cobrar (positivo) es lo que le debemos
+// En Confirmaciones el saldo se lee al revés: lo que le compramos al cliente (positivo) es lo que le debemos
 const yoDebo = (c: CuentaCorrienteResumen) => conSaldo(c) && c.saldo_actual.startsWith("-") !== (c.modulo === "CAJA");
 
 function montoTexto(valor: string, moneda: string) {
@@ -270,7 +270,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   )}
                   {(/[1-9]/.test(c.vendido_hoy) || /[1-9]/.test(c.abonado_hoy)) && (
                     <span className="cc-cuenta-hoy">
-                      Hoy: {c.modulo === "CAJA" ? "pasó a cobrar" : "le vendí"} <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · {c.modulo === "CAJA" ? "recibió" : "me vendió o abonó"} <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>
+                      Hoy: {c.modulo === "CAJA" ? "le compramos" : "le vendí"} <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · {c.modulo === "CAJA" ? "le vendimos" : "me vendió o abonó"} <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>
                     </span>
                   )}
                 </button>

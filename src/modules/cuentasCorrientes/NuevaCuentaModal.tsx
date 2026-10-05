@@ -220,12 +220,12 @@ export function NuevaCuentaModal({
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
             tipo: movResta ? "ABONO" : "CARGO",
-            // la referencia sale del medio: "Retiro Zelle" (lo que pasó a cobrar) o "Recibe Zelle"
+            // la referencia sale del medio: "Compra Zelle" o "Venta Zelle"
             descripcion:
-              `${movResta ? "Recibe" : "Retiro"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
+              `${movResta ? "Venta" : "Compra"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
               // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
               (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
-            // lleva confirmación lo que llega por transferencia: lo que el cliente pasa a cobrar (Retiro) y todo Western Union
+            // lleva confirmación lo que llega por transferencia: lo que le compramos al cliente (Compra) y todo Western Union
             ...(esWestern || !movResta ? { estadoConfirmacion: movConfirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) } : {}),
             ...(movFactor
               ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true } : {}) }
@@ -417,13 +417,13 @@ export function NuevaCuentaModal({
             <small className="cc-primer-mov-nota">O pegá la captura con Ctrl+V en cualquier parte de este formulario.</small>
             {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
             <div className="cc-primer-mov-opciones">
-              {/* Retiro: el cliente nos paga o pasa un monto a cobrar (entra a nuestra caja, queda a su favor). Recibe: el cliente recibe efectivo (sale de nuestra caja). */}
-              <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Retiro o recibe">
-                <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta} title="El cliente nos paga o pasa un monto a cobrar: entra a nuestra caja">
-                  Retiro
+              {/* Compra: le compramos al cliente lo que nos pasa (nos resta pesos o dólares). Venta: le vendemos bolívares o dólares (nos aumenta el saldo en pesos). */}
+              <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Compra o venta">
+                <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta} title="Le compramos al cliente: nos resta pesos o dólares">
+                  Compra
                 </button>
-                <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta} title="El cliente recibe efectivo: sale de nuestra caja">
-                  Recibe
+                <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta} title="Le vendemos al cliente: nos aumenta el saldo en pesos">
+                  Venta
                 </button>
               </div>
               <div className="cc-segmento cc-primer-mov-formula" role="group" aria-label="Tasa o comisión">
@@ -448,7 +448,7 @@ export function NuevaCuentaModal({
               )}
             </div>
             <small className="cc-primer-mov-nota">
-              {movResta ? "Recibe: el cliente recibe efectivo, sale de nuestra caja." : "Retiro: el cliente pasa un monto a cobrar, entra a nuestra caja y queda a su favor."}
+              {movResta ? "Venta: le vendemos bolívares o dólares; nos aumenta el saldo en pesos." : "Compra: le compramos lo que nos pasa; nos resta pesos o dólares y queda a su favor hasta pagarle."}
             </small>
             <div className="cc-primer-mov-cuenta">
               <label>
