@@ -169,10 +169,17 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-leer-comprobante input { display: none; }
 .cc-aviso-lectura { margin: 8px 0 0; padding: 8px 10px; border-radius: 6px; background: #e6f0fb; color: #14406f; font-size: 0.84rem; font-weight: 600; }
 /* Confirmaciones: crear el cliente en la misma página, debajo de la búsqueda */
-.cc-crear-en-linea { padding: 14px; border-top: 1px solid #eef0f4; background: #f7f9fc; }
-.cc-crear-en-linea h3 { margin: 0 0 10px; font-family: "Space Grotesk", sans-serif; font-size: 0.95rem; color: var(--color-navy-dark); }
+.cc-crear-en-linea { padding: 0; }
+.cc-crear-ayuda { margin: -4px 0 14px; font-size: 0.86rem; color: #5b6472; }
+/* En el panel ancho los datos del cliente van en dos columnas; el movimiento y las acciones, a todo el ancho */
+.cc-crear-en-linea .cc-modal { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; align-items: start; }
+.cc-crear-en-linea .cc-modal > .cc-primer-mov, .cc-crear-en-linea .cc-modal > .cc-mas-opciones, .cc-crear-en-linea .cc-modal > .cc-form-error, .cc-crear-en-linea .cc-modal > .cc-form-acciones { grid-column: 1 / -1; }
+.cc-crear-en-linea .cc-modal-fila { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cc-crear-en-linea .cc-form-acciones .cc-guardar { padding: 12px 26px; font-size: 0.95rem; }
+.cc-primer-mov-nota { color: #6b7280; font-size: 0.78rem; }
+.cc-crear-en-linea h3 { margin: 0 0 10px; font-family: "Space Grotesk", sans-serif; font-size: 1.2rem; color: var(--color-navy-dark); }
 /* El movimiento dentro del formulario de crear cliente */
-.cc-primer-mov { margin: 0; padding: 12px; border: 1px solid #cfd6e0; border-radius: 8px; background: white; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cc-primer-mov { margin: 0; padding: 14px 16px; background: #f7f9fc !important; border: 1px solid #cfd6e0; border-radius: 8px; background: white; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .cc-primer-mov legend { padding: 0 6px; font-size: 0.82rem; font-weight: 700; color: var(--color-navy-dark); }
 .cc-primer-mov-signo { margin-top: 0; align-self: flex-start; }
 .cc-primer-mov-cuenta { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.7fr) auto minmax(0, 1fr); gap: 6px; align-items: end; }
@@ -248,7 +255,9 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-layout { grid-template-columns: minmax(0, 1fr); padding: 0 12px 24px; }
   .cc-lista { position: static; max-height: none; }
   .cc-layout.con-hoja .cc-lista { display: none; }
-  .cc-layout:not(.con-hoja) .cc-hoja { display: none; }
+  .cc-layout:not(.con-hoja):not(.con-crear) .cc-hoja { display: none; }
+  .cc-crear-en-linea .cc-modal, .cc-crear-en-linea .cc-modal-fila { grid-template-columns: minmax(0, 1fr); }
+  .cc-hoja.cc-crear-panel { padding-bottom: 16px; }
   .cc-volver { display: inline-flex; }
   .cc-hoja { padding: 14px 12px 16px; }
   .cc-hoja-titulo h2 { font-size: 1.05rem; }

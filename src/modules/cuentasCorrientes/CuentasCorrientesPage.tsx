@@ -28,15 +28,6 @@ const ETIQUETA_BANCO: Record<string, string> = {
   ZELLE: "Zelle",
 };
 
-/** Lo que se escribió en el buscador, puesto donde corresponde al crear el cliente: un celular, una cédula o un nombre. */
-function datosDeLaBusqueda(texto: string) {
-  const limpio = texto.trim();
-  const digitos = limpio.replace(/[\s+().-]/g, "");
-  if (!/^\d{5,}$/.test(digitos)) return { nombre: limpio };
-  const esCelular = digitos.length > 10 || (digitos.length === 10 && digitos.startsWith("3")) || (digitos.length === 11 && digitos.startsWith("04"));
-  return esCelular ? { telefono: limpio } : { cedula: limpio };
-}
-
 // En Cuentas por Cobrar se filtra por quién le debe a quién
 const SENTIDOS: { valor: string; etiqueta: string }[] = [
   { valor: "", etiqueta: "Todos" },
@@ -179,7 +170,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
         </div>
       )}
 
-      <div className={`cc-layout ${seleccionada ? "con-hoja" : ""}`}>
+      <div className={`cc-layout ${seleccionada ? "con-hoja" : ""} ${enConfirmaciones ? "con-crear" : ""}`}>
         <aside className="cc-lista" aria-label="Cuentas">
           {!enConfirmaciones && (
             <div className="cc-buscar">
@@ -232,7 +223,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                 : enCobrar
                   ? "Nadie debe ni se le debe por ahora. Las cuentas con saldo aparecen acá solas."
                   : modo === "cajas"
-                    ? "Buscá al cliente arriba por nombre, teléfono o cédula. Si no está, se crea acá mismo."
+                    ? "Buscá al cliente arriba por nombre, teléfono o cédula."
                     : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
             </p>
           )}
@@ -277,27 +268,25 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
               </li>
             ))}
           </ul>
-          {/* Confirmaciones: el cliente nuevo se crea acá abajo, con lo que se estaba buscando ya puesto */}
-          {enConfirmaciones && puedeCrear && buscar.trim().length >= 2 && (
-            <NuevaCuentaModal
-              enLinea
-              canales={canales}
-              modulo="CAJA"
-              inicial={datosDeLaBusqueda(buscar)}
-              onPersonalizar={() => setPersonalizando(true)}
-              onCerrar={() => {}}
-              onCreada={async (c) => {
-                setCanalId("");
-                setBuscar(c.tercero_nombre);
-                await cargar();
-                setSeleccionadaId(c.id);
-              }}
-            />
-          )}
         </aside>
 
         {seleccionada ? (
           <HojaCuenta key={seleccionada.id} cuenta={seleccionada} onActualizar={cargar} onVolver={() => setSeleccionadaId(null)} />
+        ) : enConfirmaciones && puedeCrear ? (
+          // Confirmaciones: sin cliente abierto, el formulario para registrar uno nuevo está siempre a la vista
+          <div className="cc-hoja cc-crear-panel">
+            <NuevaCuentaModal
+              enLinea
+              canales={canales}
+              modulo="CAJA"
+              onPersonalizar={() => setPersonalizando(true)}
+              onCerrar={() => {}}
+              onCreada={async (c) => {
+                await cargar();
+                setSeleccionadaId(c.id);
+              }}
+            />
+          </div>
         ) : (
           <div className="cc-hoja cc-hoja-vacia">
             <p>Elegí una cuenta para ver su hoja y cargar movimientos.</p>

@@ -336,10 +336,11 @@ export function NuevaCuentaModal({
                 {movConTasa ? (
                   <output className={`cc-resultado ${movResta ? "cc-neg" : ""}`}>{movMonto ? `${movResta ? "- " : ""}${formatearMonto(movMonto)}` : "—"}</output>
                 ) : (
-                  <input value={movMontoDirecto} onChange={(e) => setMovMontoDirecto(e.target.value)} inputMode="decimal" placeholder="sin tasa: monto directo" autoComplete="off" />
+                  <input value={movMontoDirecto} onChange={(e) => setMovMontoDirecto(e.target.value)} inputMode="decimal" placeholder="monto" autoComplete="off" />
                 )}
               </label>
             </div>
+            <small className="cc-primer-mov-nota">Sin tasa, se escribe el monto directo.</small>
             <label>
               Quién envió o número de la transferencia (opcional)
               <input value={movPersona} onChange={(e) => setMovPersona(e.target.value)} placeholder="Nombre de quien envió, y el número si lo hay" autoComplete="off" />
@@ -414,7 +415,8 @@ export function NuevaCuentaModal({
   if (enLinea) {
     return (
       <section className="cc-crear-en-linea" aria-label="Crear cliente">
-        <h3>¿No está? Crealo acá</h3>
+        <h3>Cliente nuevo</h3>
+        <p className="cc-crear-ayuda">Si el cliente no existe, se registra acá. El movimiento es opcional y se guarda junto con el cliente.</p>
         {formulario}
       </section>
     );
