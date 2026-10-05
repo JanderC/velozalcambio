@@ -36,7 +36,7 @@ const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", 
 const REFERENCIAS_OCULTAS = /^(venta de (bancolombia|proveedor(es)?|western union)|abono nequi)$/i;
 
 // Un abono resta solo. El abono por transferencia no: a veces suma y a veces resta, se elige a mano
-const restaPorReferencia = (referencia: string) => /^\s*(abono|pago)/i.test(referencia) && !/transferencia/i.test(referencia);
+const restaPorReferencia = (referencia: string) => /^\s*(abono|pago|retiro)/i.test(referencia) && !/transferencia/i.test(referencia);
 
 const CLAVE_ULTIMA_COMISION = "cc-ultima-comision-pct";
 const CLAVE_ULTIMA_CAJA = "cc-ultima-caja";
@@ -95,7 +95,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
   const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
   // Abono recién cargado (o elegido en la tabla): se le puede confirmar al cliente por WhatsApp
-  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string } | null>(null);
+  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" } | null>(null);
   const [estadoAviso, setEstadoAviso] = useState<"" | "enviando" | "enviado">("");
   const [copiado, setCopiado] = useState(false);
 
@@ -264,14 +264,23 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         : "tu cuenta está al día, sin saldo pendiente.") +
     (cobro && lecturaSaldo !== "Saldo" ? ` Equivale a ${equivalenteTexto} (tasa ${formatearMonto(cobro.tasa)}).` : "");
   // Confirmación de un abono: "he recibido tanto" y cómo queda el saldo
-  const mensajeAbono = abonoParaAvisar
-    ? `Hola ${cuenta.tercero_nombre}, he recibido ${simbolo}${formatearMonto(abonoParaAvisar.monto)}${sufijo} (${abonoParaAvisar.descripcion}). ` +
-      (lecturaSaldo === "Yo le debo"
-        ? `Tu saldo a favor queda en ${saldoSinSigno}.`
-        : lecturaSaldo === "Me debe"
-          ? `Tu saldo pendiente queda en ${saldoSinSigno}.`
-          : "Quedas al día, sin saldo pendiente.")
-    : "";
+  // En Confirmaciones el mensaje depende de qué pasó: "recibe" = se le entregó plata al cliente (sale de nuestra caja);
+  // "retiro" = el cliente nos pagó (entra a nuestra caja). El saldo se dice desde el lado del cliente.
+  const montoAviso = abonoParaAvisar ? `${simbolo}${formatearMonto(abonoParaAvisar.monto)}${sufijo}` : "";
+  const saldoParaCliente =
+    lecturaSaldo === "Yo le debo" ? `Tienes ${saldoSinSigno} a tu favor.` : lecturaSaldo === "Me debe" ? `Tu saldo por pagar es de ${saldoSinSigno}.` : "Quedas al día, sin saldo pendiente.";
+  const mensajeAbono = !abonoParaAvisar
+    ? ""
+    : abonoParaAvisar.sentido === "recibe"
+      ? `Hola ${cuenta.tercero_nombre}, te entregamos ${montoAviso}. ${saldoParaCliente}`
+      : abonoParaAvisar.sentido === "retiro"
+        ? `Hola ${cuenta.tercero_nombre}, recibimos tu pago de ${montoAviso}. ${saldoParaCliente}`
+        : `Hola ${cuenta.tercero_nombre}, he recibido ${montoAviso} (${abonoParaAvisar.descripcion}). ` +
+          (lecturaSaldo === "Yo le debo"
+            ? `Tu saldo a favor queda en ${saldoSinSigno}.`
+            : lecturaSaldo === "Me debe"
+              ? `Tu saldo pendiente queda en ${saldoSinSigno}.`
+              : "Quedas al día, sin saldo pendiente.");
 
   async function avisarConElSistema() {
     setEstadoAviso("enviando");
@@ -505,15 +514,19 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   <Monto valor={m.total} simbolo={simbolo} />
                 </td>
                 <td className="cc-acciones">
-                  {!m.anulado && (m.monto.startsWith("-") || /^\s*(abono|pago)/i.test(m.descripcion ?? "")) && (
+                  {!m.anulado && (cuenta.modulo === "CAJA" || m.monto.startsWith("-") || /^\s*(abono|pago)/i.test(m.descripcion ?? "")) && (
                     <button
                       className="cc-avisar"
                       onClick={() => {
                         setEstadoAviso("");
-                        setAbonoParaAvisar({ monto: m.monto.replace(/^-/, ""), descripcion: m.descripcion ?? m.tipo });
+                        setAbonoParaAvisar({
+                          monto: m.monto.replace(/^-/, ""),
+                          descripcion: m.descripcion ?? m.tipo,
+                          ...(cuenta.modulo === "CAJA" ? { sentido: m.monto.startsWith("-") ? ("retiro" as const) : ("recibe" as const) } : {}),
+                        });
                       }}
-                      aria-label="Avisar al cliente que se recibió"
-                      title="Avisar al cliente que se recibió"
+                      aria-label="Enviarle la confirmación al cliente"
+                      title="Enviarle la confirmación al cliente"
                     >
                       <MessageCircle size={14} />
                     </button>
@@ -586,7 +599,7 @@ function FilaNueva({
   saldo: string;
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
-  onGuardado: (abono?: { monto: string; descripcion: string }) => void;
+  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" }) => void;
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
@@ -595,6 +608,9 @@ function FilaNueva({
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
   // Cliente que se trabaja con comisión descontada: 1.000 - 4% = 960. El % de su primer movimiento ya viene puesto.
+  // Confirmaciones: en vez de suma/abono se habla de "Recibe" (el cliente recibe efectivo: sale de nuestra caja)
+  // y "Retiro" (el cliente nos paga: entra a nuestra caja)
+  const enConfirmaciones = cuenta.modulo === "CAJA";
   const comisionDescuenta = cuenta.formula === "COMISION";
   const pctCuenta = comisionDescuenta && cuenta.comision_pct ? formatearMonto(cuenta.comision_pct) : "";
   // Cliente que se trabaja dividiendo (cuenta en USD o USDT, llega en pesos): el formulario abre en ese modo con su tasa
@@ -879,7 +895,13 @@ function FilaNueva({
       if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       cargarRecientes();
-      onGuardado(datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion) ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion } : undefined);
+      onGuardado(
+        enConfirmaciones
+          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: datos.tipo === "ABONO" ? "retiro" : "recibe" }
+          : datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion)
+            ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion }
+            : undefined
+      );
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : "No se pudo guardar el movimiento.";
       setError(`"${escrito.referencia.trim()}" no se guardó: ${mensaje}`);
@@ -959,12 +981,24 @@ function FilaNueva({
           Cuenta a la que se pagó (opcional)
           <input value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)} placeholder="ej. Bancolombia ahorros 1234, Nequi 300…" autoComplete="off" maxLength={120} />
         </label>
-        <div className="cc-c-signo" role="group" aria-label="Suma o abono">
-          <button type="button" className={!resta ? "activo suma" : ""} onClick={() => setResta(false)} aria-pressed={!resta}>
-            + Suma
+        <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Recibe o retiro" : "Suma o abono"}>
+          <button
+            type="button"
+            className={!resta ? "activo suma" : ""}
+            onClick={() => setResta(false)}
+            aria-pressed={!resta}
+            title={enConfirmaciones ? "El cliente recibe efectivo: sale de nuestra caja" : undefined}
+          >
+            {enConfirmaciones ? "Recibe" : "+ Suma"}
           </button>
-          <button type="button" className={resta ? "activo resta" : ""} onClick={() => setResta(true)} aria-pressed={resta}>
-            − Abono
+          <button
+            type="button"
+            className={resta ? "activo resta" : ""}
+            onClick={() => setResta(true)}
+            aria-pressed={resta}
+            title={enConfirmaciones ? "El cliente nos paga: entra a nuestra caja" : undefined}
+          >
+            {enConfirmaciones ? "Retiro" : "− Abono"}
           </button>
         </div>
         <label className="cc-c-num">
