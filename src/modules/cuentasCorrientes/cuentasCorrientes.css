@@ -104,7 +104,7 @@ a.cc-caja:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.14); }
 .cc-periodos button.cc-cerrar-dia:disabled { opacity: 0.6; cursor: default; }
 /* Confirmación de un abono al cliente */
 .cc-aviso-abono { margin: 0 0 12px; padding: 12px 14px; border-radius: 8px; background: #eafaf0; border: 1px solid #b7e4c7; }
-.cc-aviso-abono p { margin: 0 0 10px; font-size: 0.9rem; color: #14532d; }
+.cc-aviso-abono p { margin: 0 0 10px; font-size: 0.9rem; color: #14532d; white-space: pre-line; }
 .cc-aviso-abono-acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.84rem; color: #4b5563; }
 .cc-aviso-abono-acciones .cc-whatsapp { margin-left: 0; padding: 10px 14px; font-size: 0.88rem; }
 .cc-acciones button.cc-avisar:hover { color: #1a7f37; background: #e8f6ec; }

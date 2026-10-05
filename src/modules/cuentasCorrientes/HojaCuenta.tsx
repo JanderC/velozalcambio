@@ -295,16 +295,19 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     return codigoDeReferencia(anotado);
   })();
   const conMtcn = refAviso ? ` (referencia ${refAviso})` : "";
+  // Operación confirmada: el texto que se le manda al cliente, tal cual lo usa el negocio
+  const mensajeConfirmada = `Estimado(a), le informamos que la operación ha sido confirmada.\n\nRef: ${refAviso ?? "—"}\nRecibe: ${montoAviso}\nDisponible para recoger`;
   const mensajeAbono = !abonoParaAvisar
     ? ""
     : abonoParaAvisar.sentido === "proceso"
       ? `Hola ${cuenta.tercero_nombre}, su transferencia recibida por ${montoAviso}${conMtcn} está en proceso de confirmación. Le avisamos apenas quede confirmada.`
       : abonoParaAvisar.sentido === "confirmada"
-        ? `Hola ${cuenta.tercero_nombre}, su transferencia por ${montoAviso}${conMtcn} ya fue confirmada. ${saldoParaCliente}`
+        ? mensajeConfirmada
     : abonoParaAvisar.sentido === "recibe"
       ? `Hola ${cuenta.tercero_nombre}, te entregamos ${montoAviso}. ${saldoParaCliente}`
       : abonoParaAvisar.sentido === "retiro"
-        ? `Hola ${cuenta.tercero_nombre}, recibimos ${montoAviso}${conMtcn} que pasaste a cobrar. ${saldoParaCliente}`
+        ? // en Confirmaciones un Retiro que no quedó pendiente entra ya confirmado
+          mensajeConfirmada
         : `Hola ${cuenta.tercero_nombre}, he recibido ${montoAviso} (${abonoParaAvisar.descripcion}). ` +
           (lecturaSaldo === "Yo le debo"
             ? `Tu saldo a favor queda en ${saldoSinSigno}.`
