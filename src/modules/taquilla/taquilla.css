@@ -1,0 +1,37 @@
+/* Taquilla: la caja en efectivo arriba y las solicitudes confirmadas por pagar */
+.tq-caja, .tq-lista { padding: 0 40px 16px; }
+.tq-caja h2, .tq-lista h2 { margin: 0 0 10px; font-family: "Space Grotesk", sans-serif; font-size: 1.05rem; color: var(--color-navy-dark); display: flex; align-items: center; gap: 8px; }
+.tq-lista h2 span { background: var(--color-navy); color: white; font-size: 0.78rem; border-radius: 12px; padding: 1px 9px; }
+.tq-caja-monedas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.tq-moneda { background: white; border-radius: 10px; padding: 14px 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-top: 3px solid var(--color-navy); display: flex; flex-direction: column; gap: 6px; }
+.tq-moneda span { font-size: 0.74rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+.tq-moneda strong { font-size: 1.45rem; color: var(--color-navy-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tq-moneda button { align-self: flex-start; padding: 7px 12px; font-size: 0.82rem; }
+.tq-error { margin: 0 40px 12px; padding: 10px 12px; background: #fdecea; border-radius: 8px; font-weight: 600; }
+.tq-buscador { margin: 0 40px 16px; }
+
+.tq-lista ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tq-solicitud { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; align-items: center; background: white; border-radius: 10px; padding: 14px 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-left: 4px solid #1a7f37; }
+.tq-solicitud-datos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tq-solicitud-datos strong { font-size: 1rem; color: var(--color-navy-dark); }
+.tq-solicitud-datos span { font-size: 0.84rem; color: #4b5563; overflow-wrap: anywhere; }
+.tq-solicitud-datos b { color: var(--color-navy-dark); }
+.tq-solicitud-monto { text-align: right; }
+.tq-solicitud-monto span { display: block; font-size: 0.72rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+.tq-solicitud-monto strong { font-size: 1.3rem; color: #1a7f37; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tq-pagar { display: inline-flex; align-items: center; gap: 8px; background: #1a7f37; color: white; border: none; border-radius: 8px; padding: 13px 20px; font-family: inherit; font-size: 0.98rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.tq-pagar:hover:not(:disabled) { background: #14632b; }
+.tq-pagar:disabled { opacity: 0.55; cursor: default; }
+.tq-pagadas .tq-solicitud { border-left-color: #9ca3af; grid-template-columns: minmax(0, 1fr) auto; opacity: 0.85; }
+.tq-pagadas .tq-solicitud-monto strong { color: #4b5563; font-size: 1.05rem; }
+
+@media (max-width: 860px) {
+  .tq-caja, .tq-lista { padding: 0 12px 14px; }
+  .tq-error { margin: 0 12px 12px; }
+  .tq-buscador { margin: 0 12px 14px; }
+  .tq-caja-monedas { grid-template-columns: minmax(0, 1fr); }
+  .tq-moneda { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .tq-moneda strong { font-size: 1.25rem; }
+  .tq-solicitud { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; }
+  .tq-pagar { grid-column: 1 / -1; justify-content: center; padding: 15px; font-size: 1.02rem; }
+}

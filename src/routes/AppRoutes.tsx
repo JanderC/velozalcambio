@@ -10,6 +10,7 @@ import { SolicitudesPage } from "../modules/solicitudes/SolicitudesPage";
 import { TransaccionesPage } from "../modules/transacciones/TransaccionesPage";
 import { CuentasPorCobrarPagarPage } from "../modules/cuentasPorCobrarPagar/CuentasPorCobrarPagarPage";
 import { CuentasCorrientesPage } from "../modules/cuentasCorrientes/CuentasCorrientesPage";
+import { TaquillaPage } from "../modules/taquilla/TaquillaPage";
 import { TasasPage } from "../modules/tasas/TasasPage";
 import { RegistroTasasPage } from "../modules/tasas/RegistroTasasPage";
 import { ROLES_REGISTRO_TASAS } from "../modules/tasas/tasas.roles";
@@ -38,6 +39,7 @@ export function AppRoutes() {
         <Route path="/clientes/:id" element={<ClienteFichaPage />} />
         <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
         <Route path="/cajas-confirmaciones" element={<CuentasCorrientesPage key="cajas" modo="cajas" />} />
+        <Route path="/taquilla" element={<TaquillaPage />} />
         <Route path="/reportes" element={<ReportesPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />
