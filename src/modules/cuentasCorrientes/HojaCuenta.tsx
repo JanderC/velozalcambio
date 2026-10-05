@@ -20,6 +20,7 @@ import {
   registrarMovimientoCC,
   type CuentaCorrienteResumen,
   type EstadoCuenta,
+  type FilaEstadoCuenta,
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
@@ -97,7 +98,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
   const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
   // Abono recién cargado (o elegido en la tabla): se le puede confirmar al cliente por WhatsApp
-  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada" } | null>(null);
+  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string } | null>(null);
   const [estadoAviso, setEstadoAviso] = useState<"" | "enviando" | "enviado">("");
   const [copiado, setCopiado] = useState(false);
 
@@ -150,12 +151,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   }, [cargar]);
 
   // Western ya verificó: el movimiento pasa a confirmado y queda listo el mensaje para el cliente
-  async function confirmar(m: { id: number; monto: string; descripcion: string | null; tipo: string }) {
+  async function confirmar(m: FilaEstadoCuenta) {
     try {
       await confirmarMovimientoCC(m.id);
       await cargar();
       setEstadoAviso("");
-      setAbonoParaAvisar({ monto: m.monto.replace(/^-/, ""), descripcion: m.descripcion ?? m.tipo, sentido: "confirmada" });
+      setAbonoParaAvisar({ ...avisoDeMovimiento(m), sentido: "confirmada" });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -273,7 +274,11 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     const mtcn = /MTCN\s*(\d+)/i.exec(a.descripcion)?.[1];
     const anotado = (a.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
     const lineaRef = `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigoDeReferencia(anotado) ?? "—")}`;
-    const aviso = (frase: string, ...lineas: string[]) => `Estimado(a), le informamos que ${frase}\n\n${lineas.join("\n")}`;
+    // Debajo de todo, como referencia: el total que mandó el cliente y la comisión con la que queda lo que recibe
+    const pie = a.enviado
+      ? `\n\nReferencia: envió ${simbolo}${formatearMonto(a.enviado)}${sufijo}${a.comision ? ` · comisión ${formatearMonto(a.comision)}%` : ""}`
+      : "";
+    const aviso = (frase: string, ...lineas: string[]) => `Estimado(a), le informamos que ${frase}\n\n${lineas.join("\n")}${pie}`;
     if (a.sentido === "proceso") return aviso("la operación está en proceso de confirmación.", lineaRef, `Monto: ${monto}`, "En breves minutos estará disponible");
     // en Confirmaciones una Compra que no quedó pendiente entra ya confirmada
     if (a.sentido === "confirmada" || a.sentido === "retiro") return aviso("la operación ha sido confirmada.", lineaRef, `Recibe: ${monto}`, "Disponible para recoger");
@@ -283,9 +288,13 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     return aviso("hemos recibido su abono.", lineaRef, `Monto: ${monto}`, saldoParaCliente);
   }
   // Qué se le dice al cliente de un movimiento: según su estado de confirmación y, en Confirmaciones, si fue compra o venta
-  const avisoDeMovimiento = (m: { monto: string; descripcion: string | null; tipo: string; estado_confirmacion: string | null }): Aviso => ({
+  const avisoDeMovimiento = (m: FilaEstadoCuenta): Aviso => ({
     monto: m.monto.replace(/^-/, ""),
     descripcion: m.descripcion ?? m.tipo,
+    // operación con comisión descontada: el total enviado y el % (la tasa guardada es lo que queda: 0.9435 -> 5,65%)
+    ...(m.comision_descontada && m.cantidad_base && m.tasa
+      ? { enviado: m.cantidad_base.replace(/^-/, ""), comision: sumarDecimales("100", `-${multiplicarDecimales(m.tasa, "100", 6)}`) }
+      : {}),
     ...(m.estado_confirmacion === "EN_PROCESO"
       ? { sentido: "proceso" as const }
       : m.estado_confirmacion === "CONFIRMADA"
@@ -295,6 +304,10 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           : {}),
   });
   const mensajeAbono = abonoParaAvisar ? construirAviso(abonoParaAvisar) : "";
+
+  // La última operación con comisión del día: cuánto mandó el cliente en total, como referencia de lo que recibe
+  const ultimaConComision = [...(estado?.movimientos ?? [])].reverse().find((m) => !m.anulado && m.comision_descontada && m.cantidad_base && m.tasa);
+  const referenciaEnvio = ultimaConComision ? (avisoDeMovimiento(ultimaConComision) as Aviso & { enviado: string; comision: string }) : null;
 
   // Botón de arriba. En Confirmaciones se envía la última operación hecha (con su referencia), no el saldo global.
   const ultimaOperacion = esConfirmaciones ? [...(estado?.movimientos ?? [])].reverse().find((m) => !m.anulado) : undefined;
@@ -372,6 +385,15 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           {cobro && lecturaSaldo !== "Saldo" && (
             <small className="cc-equivalente">
               = {equivalenteTexto} · 1 {cuenta.moneda_codigo} = {formatearMonto(cobro.tasa)} {cobro.codigo}
+            </small>
+          )}
+          {referenciaEnvio && (
+            <small className="cc-equivalente">
+              Referencia: envió {simbolo}
+              {formatearMonto(referenciaEnvio.enviado)}
+              {sufijo} · comisión {formatearMonto(referenciaEnvio.comision)}% · recibe {simbolo}
+              {formatearMonto(referenciaEnvio.monto)}
+              {sufijo}
             </small>
           )}
           {puedeAnular && (
@@ -636,7 +658,7 @@ function FilaNueva({
   saldo: string;
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
-  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada" }) => void;
+  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string }) => void;
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
@@ -953,13 +975,15 @@ function FilaNueva({
       if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       cargarRecientes();
+      // operación con comisión descontada: el aviso lleva lo que el cliente envió en total y el %
+      const envio = esPorcentaje && comisionDescuenta && nCantidad && nEscrita ? { enviado: sinSigno(nCantidad), comision: nEscrita } : {};
       onGuardado(
         datos.estadoConfirmacion === "EN_PROCESO"
-          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso" }
+          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso", ...envio }
           : enConfirmaciones
-          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: datos.tipo === "ABONO" ? "recibe" : "retiro" }
+          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: datos.tipo === "ABONO" ? "recibe" : "retiro", ...envio }
           : datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion)
-            ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion }
+            ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, ...envio }
             : undefined
       );
     } catch (err) {
