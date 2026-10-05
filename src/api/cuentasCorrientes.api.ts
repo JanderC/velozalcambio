@@ -10,7 +10,7 @@ export interface Categoria {
   nombre: string;
 }
 
-export type ModuloCuenta = "CORRIENTE" | "POR_COBRAR";
+export type ModuloCuenta = "CORRIENTE" | "POR_COBRAR" | "CAJA";
 
 export interface CuentaCorrienteResumen {
   id: number;
@@ -19,6 +19,7 @@ export interface CuentaCorrienteResumen {
   tercero_telefono: string | null;
   // Dónde se lleva: en Cuentas Corrientes, o pasada a Cuentas por Cobrar (poco movimiento)
   modulo: ModuloCuenta;
+  referencia: string | null; // dato libre del cliente (Cajas y Confirmaciones)
   // Si se le cobra en otra moneda que la de la contabilidad: cuál y a qué tasa manual (1 de la contabilidad = tasa_cobro de la de cobro)
   moneda_cobro_id: number | null;
   moneda_cobro_codigo: string | null;
@@ -102,6 +103,7 @@ export function crearCuentaCorriente(data: {
   nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO"; telefono?: string };
   canalId?: number; // sin banco: no es obligatorio
   modulo?: ModuloCuenta;
+  referencia?: string;
   monedaCobroId?: number;
   tasaCobro?: string;
   monedaId: number;
@@ -168,6 +170,11 @@ export async function buscarMovimientoPorNumero(numero: string) {
   return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${numero}`)).movimiento;
 }
 
+/** Manda un mensaje al cliente por el WhatsApp conectado al sistema. */
+export function avisarClienteCuenta(id: number, texto: string) {
+  return api.post<{ ok: true }>(`/cuentas-corrientes/${id}/avisar`, { texto });
+}
+
 export function eliminarCuentaCorriente(id: number) {
   return api.delete<void>(`/cuentas-corrientes/${id}`);
 }
@@ -176,7 +183,7 @@ export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }
 
-export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string; vista?: "corrientes" | "cobrar" }) {
+export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string; vista?: "corrientes" | "cobrar" | "cajas" }) {
   const params = new URLSearchParams();
   if (filtros.vista) params.set("vista", filtros.vista);
   if (filtros.terceroId) params.set("terceroId", String(filtros.terceroId));

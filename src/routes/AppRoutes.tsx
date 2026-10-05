@@ -37,6 +37,7 @@ export function AppRoutes() {
         <Route path="/clientes" element={<ClientesPage />} />
         <Route path="/clientes/:id" element={<ClienteFichaPage />} />
         <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
+        <Route path="/cajas-confirmaciones" element={<CuentasCorrientesPage key="cajas" modo="cajas" />} />
         <Route path="/reportes" element={<ReportesPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />

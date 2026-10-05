@@ -128,6 +128,15 @@ export const MODULOS: ModuloConfig[] = [
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
   },
   {
+    id: "cajas-confirmaciones",
+    titulo: "Cajas y Confirmaciones",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: Inbox,
+    ruta: "/cajas-confirmaciones",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
     id: "reportes",
     titulo: "Reportes",
     categoria: "Administración general",

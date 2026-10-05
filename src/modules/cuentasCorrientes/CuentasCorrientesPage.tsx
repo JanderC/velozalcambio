@@ -39,8 +39,9 @@ function montoTexto(valor: string, moneda: string) {
  * - corrientes: las cuentas de movimiento diario.
  * - cobrar: Cuentas por Cobrar / Pagar. Se alimenta de las mismas cuentas: toda la que tenga saldo
  *   (me deben o yo debo) más las que se pasaron para allá por ser de poco movimiento.
+ * - cajas: Cajas y Confirmaciones. Los clientes que llegan se crean ahí mismo y se llevan con la misma hoja.
  */
-export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrientes" | "cobrar" }) {
+export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrientes" | "cobrar" | "cajas" }) {
   const { usuario } = useAuth();
   const puedeCrear = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
   const enCobrar = modo === "cobrar";
@@ -106,18 +107,20 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
       <Header />
       <div className="cc-header">
         <div>
-          <h1>{enCobrar ? "Cuentas por Cobrar / Pagar" : "Cuentas Corrientes"}</h1>
+          <h1>{enCobrar ? "Cuentas por Cobrar / Pagar" : modo === "cajas" ? "Cajas y Confirmaciones" : "Cuentas Corrientes"}</h1>
           <p>
             {enCobrar
               ? "Quién me debe y a quién le debo, con las mismas cuentas de Cuentas Corrientes."
-              : "La hoja de cada proveedor o cliente: cantidad × tasa = monto, y el total corrido."}
+              : modo === "cajas"
+                ? "Los clientes que llegan: se crean acá, se les lleva la cuenta y se les confirma lo recibido."
+                : "La hoja de cada proveedor o cliente: cantidad × tasa = monto, y el total corrido."}
           </p>
         </div>
         <div className="cc-header-acciones">
-          {!enCobrar && usuario?.rol === "ADMIN" && <ImportarSaldosForm onImportado={cargar} />}
+          {modo === "corrientes" && usuario?.rol === "ADMIN" && <ImportarSaldosForm onImportado={cargar} />}
           {puedeCrear && (
             <button className="cc-nueva-cuenta" onClick={() => setCreando(true)}>
-              <Plus size={16} /> Nueva cuenta
+              <Plus size={16} /> {modo === "cajas" ? "Nuevo cliente" : "Nueva cuenta"}
             </button>
           )}
         </div>
@@ -171,7 +174,9 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                 ? "Ninguna cuenta coincide."
                 : enCobrar
                   ? "Nadie debe ni se le debe por ahora. Las cuentas con saldo aparecen acá solas."
-                  : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
+                  : modo === "cajas"
+                    ? "Todavía no hay clientes. Creá el primero con «Nuevo cliente»."
+                    : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
             </p>
           )}
           <ul className="cc-cuentas">
@@ -187,6 +192,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   <span className="cc-cuenta-detalle">
                     {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : c.tercero_tipo === "AMIGO" ? "Amigo" : "Mixto"}
                     {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
+                    {c.referencia ? ` · ${c.referencia}` : ""}
                     {conSaldo(c) ? (yoDebo(c) ? " · yo le debo" : " · me debe") : ""}
                   </span>
                   <span className="cc-cuenta-detalle derecha">
@@ -226,7 +232,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
       {creando && (
         <NuevaCuentaModal
           canales={canales}
-          modulo={enCobrar ? "POR_COBRAR" : "CORRIENTE"}
+          modulo={enCobrar ? "POR_COBRAR" : modo === "cajas" ? "CAJA" : "CORRIENTE"}
           onPersonalizar={() => setPersonalizando(true)}
           onCerrar={() => setCreando(false)}
           onCreada={async (c) => {

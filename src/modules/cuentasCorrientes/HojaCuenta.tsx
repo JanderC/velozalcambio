@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
+  avisarClienteCuenta,
   buscarMovimientoPorNumero,
   eliminarCuentaCorriente,
   type MovimientoConNumero,
@@ -88,6 +89,9 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const [cerrando, setCerrando] = useState(false);
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
   const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
+  // Abono recién cargado (o elegido en la tabla): se le puede confirmar al cliente por WhatsApp
+  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string } | null>(null);
+  const [estadoAviso, setEstadoAviso] = useState<"" | "enviando" | "enviado">("");
   const [copiado, setCopiado] = useState(false);
 
   // Teléfono: menú de compartir. Computador: la imagen a la vista con copiar y descargar.
@@ -254,6 +258,28 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         ? `tienes un saldo pendiente por pagar de ${saldoSinSigno}.`
         : "tu cuenta está al día, sin saldo pendiente.") +
     (cobro && lecturaSaldo !== "Saldo" ? ` Equivale a ${equivalenteTexto} (tasa ${formatearMonto(cobro.tasa)}).` : "");
+  // Confirmación de un abono: "he recibido tanto" y cómo queda el saldo
+  const mensajeAbono = abonoParaAvisar
+    ? `Hola ${cuenta.tercero_nombre}, he recibido ${simbolo}${formatearMonto(abonoParaAvisar.monto)}${sufijo} (${abonoParaAvisar.descripcion}). ` +
+      (lecturaSaldo === "Yo le debo"
+        ? `Tu saldo a favor queda en ${saldoSinSigno}.`
+        : lecturaSaldo === "Me debe"
+          ? `Tu saldo pendiente queda en ${saldoSinSigno}.`
+          : "Quedas al día, sin saldo pendiente.")
+    : "";
+
+  async function avisarConElSistema() {
+    setEstadoAviso("enviando");
+    try {
+      await avisarClienteCuenta(cuenta.id, mensajeAbono);
+      setEstadoAviso("enviado");
+      setError(null);
+    } catch (e) {
+      setEstadoAviso("");
+      setError((e as Error).message);
+    }
+  }
+
   const referencias = useMemo(() => {
     const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!.replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, ""));
     return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])].filter((r) => !REFERENCIAS_OCULTAS.test(r.trim()));
@@ -286,7 +312,8 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
               </b>
             </span>
           )}
-          {puedeAnular && (
+          {cuenta.referencia && <span className="cc-hoy">Referencia: {cuenta.referencia}</span>}
+          {puedeAnular && cuenta.modulo !== "CAJA" && (
             <button type="button" className="cc-mover" onClick={mover}>
               {cuenta.modulo === "POR_COBRAR" ? "Devolver a Cuentas Corrientes" : "Pasar a Cuentas por Cobrar"}
             </button>
@@ -363,6 +390,28 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         </button>
       </div>
 
+      {abonoParaAvisar && (
+        <div className="cc-aviso-abono">
+          <p>{mensajeAbono}</p>
+          <div className="cc-aviso-abono-acciones">
+            {telefono ? (
+              <>
+                <a className="cc-whatsapp" href={`https://wa.me/${telefono}?text=${encodeURIComponent(mensajeAbono)}`} target="_blank" rel="noreferrer">
+                  <MessageCircle size={14} /> Enviar por mi WhatsApp
+                </a>
+                <button type="button" className="cc-guardar" onClick={avisarConElSistema} disabled={estadoAviso !== ""}>
+                  {estadoAviso === "enviando" ? "Enviando…" : estadoAviso === "enviado" ? "Enviado por el sistema" : "Enviar por el sistema"}
+                </button>
+              </>
+            ) : (
+              <span>Este cliente no tiene teléfono registrado: no se le puede avisar.</span>
+            )}
+            <button type="button" className="cc-btn-secundario" onClick={() => setAbonoParaAvisar(null)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
       {reporte && (
         <Modal titulo="Reporte del día" ancho="ancho" onCerrar={cerrarReporte}>
           <div className="cc-reporte">
@@ -452,6 +501,19 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   <Monto valor={m.total} simbolo={simbolo} />
                 </td>
                 <td className="cc-acciones">
+                  {!m.anulado && (m.monto.startsWith("-") || /^\s*(abono|pago)/i.test(m.descripcion ?? "")) && (
+                    <button
+                      className="cc-avisar"
+                      onClick={() => {
+                        setEstadoAviso("");
+                        setAbonoParaAvisar({ monto: m.monto.replace(/^-/, ""), descripcion: m.descripcion ?? m.tipo });
+                      }}
+                      aria-label="Avisar al cliente que se recibió"
+                      title="Avisar al cliente que se recibió"
+                    >
+                      <MessageCircle size={14} />
+                    </button>
+                  )}
                   {puedeAnular && !m.anulado && (
                     <button onClick={() => anular(m.id, m.descripcion ?? m.tipo)} aria-label={`Anular ${m.descripcion ?? m.tipo}`} title="Anular (registra el contrario)">
                       <Undo2 size={14} />
@@ -494,9 +556,13 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           cuenta={actual}
           saldo={estado?.cuenta.saldo_actual ?? cuenta.saldo_actual}
           referencias={referencias}
-          onGuardado={() => {
+          onGuardado={(abono) => {
             void cargar();
             onActualizar();
+            if (abono) {
+              setEstadoAviso("");
+              setAbonoParaAvisar(abono);
+            }
           }}
         />
       ) : (
@@ -515,7 +581,8 @@ function FilaNueva({
   cuenta: CuentaCorrienteResumen;
   saldo: string;
   referencias: string[];
-  onGuardado: () => void;
+  // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
+  onGuardado: (abono?: { monto: string; descripcion: string }) => void;
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
@@ -705,7 +772,7 @@ function FilaNueva({
       if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       cargarRecientes();
-      onGuardado();
+      onGuardado(datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion) ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion } : undefined);
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : "No se pudo guardar el movimiento.";
       setError(`"${escrito.referencia.trim()}" no se guardó: ${mensaje}`);

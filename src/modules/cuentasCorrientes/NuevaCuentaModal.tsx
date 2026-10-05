@@ -15,14 +15,15 @@ export function NuevaCuentaModal({
   onCerrar,
 }: {
   canales: Canal[];
-  modulo?: "CORRIENTE" | "POR_COBRAR";
+  modulo?: "CORRIENTE" | "POR_COBRAR" | "CAJA";
   onPersonalizar: () => void;
   onCreada: (c: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
 }) {
   const [modo, setModo] = useState<"nuevo" | "existente">("nuevo");
   const [nombre, setNombre] = useState("");
-  const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO">("PROVEEDOR");
+  const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO">(modulo === "CAJA" ? "CLIENTE" : "PROVEEDOR");
+  const [referencia, setReferencia] = useState(""); // dato libre del cliente (Cajas y Confirmaciones)
   const [telefono, setTelefono] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<Tercero[]>([]);
@@ -75,6 +76,7 @@ export function NuevaCuentaModal({
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined } }),
         canalId: canalId === "" ? undefined : canalId,
         modulo,
+        referencia: referencia.trim() || undefined,
         ...(monedaCobro ? { monedaCobroId: monedaCobro.id, tasaCobro: nTasaCobro! } : {}),
         monedaId,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
@@ -88,7 +90,7 @@ export function NuevaCuentaModal({
   }
 
   return (
-    <Modal titulo={modulo === "POR_COBRAR" ? "Nueva cuenta por cobrar" : "Nueva cuenta corriente"} onCerrar={onCerrar}>
+    <Modal titulo={modulo === "CAJA" ? "Nuevo cliente" : modulo === "POR_COBRAR" ? "Nueva cuenta por cobrar" : "Nueva cuenta corriente"} onCerrar={onCerrar}>
       <form className="cc-modal" onSubmit={guardar}>
         <div className="cc-segmento" role="tablist">
           <button type="button" role="tab" aria-selected={modo === "nuevo"} className={modo === "nuevo" ? "activo" : ""} onClick={() => setModo("nuevo")}>
@@ -116,7 +118,7 @@ export function NuevaCuentaModal({
                 </select>
               </label>
               <label>
-                Teléfono (opcional)
+                {modulo === "CAJA" ? "Número telefónico del cliente" : "Teléfono (opcional)"}
                 <input value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" />
               </label>
             </div>
@@ -146,6 +148,12 @@ export function NuevaCuentaModal({
           </label>
         )}
 
+        {modulo === "CAJA" && (
+          <label>
+            Referencia
+            <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="ej. quién lo recomendó, de dónde viene, una nota" maxLength={200} />
+          </label>
+        )}
         <div className="cc-modal-fila">
           <label>
             Banco o canal de pago (opcional)
