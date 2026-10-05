@@ -171,6 +171,13 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 /* Confirmaciones: crear el cliente en la misma página, debajo de la búsqueda */
 .cc-crear-en-linea { padding: 14px; border-top: 1px solid #eef0f4; background: #f7f9fc; }
 .cc-crear-en-linea h3 { margin: 0 0 10px; font-family: "Space Grotesk", sans-serif; font-size: 0.95rem; color: var(--color-navy-dark); }
+/* El movimiento dentro del formulario de crear cliente */
+.cc-primer-mov { margin: 0; padding: 12px; border: 1px solid #cfd6e0; border-radius: 8px; background: white; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cc-primer-mov legend { padding: 0 6px; font-size: 0.82rem; font-weight: 700; color: var(--color-navy-dark); }
+.cc-primer-mov-signo { margin-top: 0; align-self: flex-start; }
+.cc-primer-mov-cuenta { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.7fr) auto minmax(0, 1fr); gap: 6px; align-items: end; }
+.cc-primer-mov-cuenta > span { padding-bottom: 10px; color: #9ca3af; font-weight: 700; }
+.cc-primer-mov-cuenta input { text-align: right; width: 100%; box-sizing: border-box; }
 .cc-mas-opciones { display: flex; flex-direction: column; gap: 12px; }
 .cc-mas-opciones summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--color-navy); }
 .cc-mas-opciones[open] summary { margin-bottom: 10px; }
