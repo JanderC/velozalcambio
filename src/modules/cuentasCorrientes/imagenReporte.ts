@@ -28,13 +28,13 @@ interface LineaCuadro {
   total?: boolean;
 }
 
-type MonedaTasa = "USD" | "USDT" | "EUR" | "VES";
+export type MonedaTasa = "USD" | "USDT" | "EUR" | "VES";
 const NOMBRE_MONEDA: Record<MonedaTasa, string> = { USD: "dólares", USDT: "USDT", EUR: "euros", VES: "bolívares" };
 const cantidadTexto = (cantidad: string, moneda: MonedaTasa) => (moneda === "VES" ? `Bs. ${formatearMonto(cantidad)}` : `${formatearMonto(cantidad)} ${moneda}`);
 
 // A qué moneda corresponde una tasa en pesos: primero por la referencia del movimiento, si no por su tamaño
 // (un dólar vale miles de pesos; un bolívar, unos pocos).
-function monedaDeLaTasa(tasa: string, referencia = ""): MonedaTasa | null {
+export function monedaDeLaTasa(tasa: string, referencia = ""): MonedaTasa | null {
   if (/euro/i.test(referencia)) return "EUR";
   if (/usdt/i.test(referencia)) return "USDT";
   if (/zelle|d[oó]lar/i.test(referencia)) return "USD";

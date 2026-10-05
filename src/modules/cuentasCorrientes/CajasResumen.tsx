@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { getTableroCajas, type CajaTablero } from "../../api/cajas.api";
 import { useAuth } from "../../auth/useAuth";
 import { Modal } from "../../components/common/Modal";
@@ -15,7 +16,8 @@ const MONEDAS: { codigo: string; nombre: string; antes: string; despues: string 
 ];
 
 /** Las cajas y cuánto tiene cada una en dólares, bolívares y pesos. Son las mismas cajas del módulo Cajas. */
-export function CajasResumen() {
+// version: cuando cambia (p. ej. tras cargar un movimiento) se vuelven a pedir los saldos
+export function CajasResumen({ version }: { version?: unknown }) {
   const { usuario } = useAuth();
   const puedeVer = usuario?.rol === "ADMIN" || usuario?.rol === "CAJERO";
   const [cajas, setCajas] = useState<CajaTablero[]>([]);
@@ -30,7 +32,8 @@ export function CajasResumen() {
         setError(null);
       })
       .catch((e) => setError((e as Error).message));
-  }, [puedeVer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeVer, version]);
 
   useEffect(cargar, [cargar]);
 
@@ -50,8 +53,11 @@ export function CajasResumen() {
       {cajas.length === 0 && !error && <p className="cc-lista-aviso">Todavía no hay cajas. Creá la primera con «Nueva caja».</p>}
       <div className="cc-cajas-lista">
         {cajas.map((caja) => (
-          <article key={caja.id} className="cc-caja">
-            <h3>{caja.nombre}</h3>
+          // Al tocarla se entra a la caja: sus saldos y todos sus movimientos
+          <Link key={caja.id} to={`/cajas/${caja.id}`} className="cc-caja" title="Entrar a la caja">
+            <h3>
+              {caja.nombre} <ChevronRight size={16} />
+            </h3>
             <dl>
               {MONEDAS.map((m) => {
                 const monto = caja.saldos.find((s) => s.moneda_codigo === m.codigo)?.monto ?? "0";
@@ -67,7 +73,7 @@ export function CajasResumen() {
                 );
               })}
             </dl>
-          </article>
+          </Link>
         ))}
       </div>
 

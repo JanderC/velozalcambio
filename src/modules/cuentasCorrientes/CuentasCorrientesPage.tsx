@@ -127,7 +127,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
         </div>
       </div>
 
-      {modo === "cajas" && <CajasResumen />}
+      {modo === "cajas" && <CajasResumen version={cuentas} />}
 
       {resumen.length > 0 && (
         <div className="cc-resumen">

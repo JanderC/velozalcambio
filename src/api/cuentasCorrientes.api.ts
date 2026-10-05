@@ -213,7 +213,8 @@ interface RegistrarMovimientoInput {
   cuentaDestino?: string;
   categoriaId?: number;
   cajaId?: number;
-  montoCaja?: string;
+  montoCaja?: string; // con signo: + entra a la caja, - sale
+  monedaCajaId?: number; // moneda en la que se mueve la caja (si no es la de la cuenta)
   metodoPagoId?: number;
 }
 

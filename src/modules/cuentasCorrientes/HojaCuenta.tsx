@@ -21,7 +21,8 @@ import {
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { actualizarTercero } from "../../api/terceros.api";
-import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte } from "./imagenReporte";
+import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
+import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
@@ -37,6 +38,7 @@ const REFERENCIAS_OCULTAS = /^(venta de (bancolombia|proveedor(es)?|western unio
 const restaPorReferencia = (referencia: string) => /^\s*(abono|pago)/i.test(referencia) && !/transferencia/i.test(referencia);
 
 const CLAVE_ULTIMA_COMISION = "cc-ultima-comision-pct";
+const CLAVE_ULTIMA_CAJA = "cc-ultima-caja";
 
 // La referencia lleva quién envió la transferencia: "Venta de Zelle · Juan Pérez"
 const SEPARADOR_PERSONA = " · ";
@@ -597,6 +599,12 @@ function FilaNueva({
   const [masOpciones, setMasOpciones] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [cajaId, setCajaId] = useState<number | "">("");
+  const [monedas, setMonedas] = useState<Moneda[]>([]);
+  // Qué le pasa a la caja con este movimiento: se propone solo (un abono entra, una venta sale) y se puede cambiar
+  const [sentidoCaja, setSentidoCaja] = useState<"auto" | "entra" | "sale">("auto");
+  // En Cajas y Confirmaciones todo movimiento alimenta una caja; en las demás es opcional
+  const cajaObligatoria = cuenta.modulo === "CAJA";
+  const conCaja = cajaObligatoria || masOpciones;
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // En el teléfono el formulario es un panel que sube desde abajo; en escritorio está siempre a la vista
@@ -648,8 +656,23 @@ function FilaNueva({
   const decimales = Number(cuenta.moneda_decimales ?? 0);
 
   useEffect(() => {
-    if (masOpciones && cajas.length === 0) getCajas().then(setCajas).catch(() => setCajas([]));
-  }, [masOpciones, cajas.length]);
+    if (!conCaja || cajas.length > 0) return;
+    getCajas()
+      .then((lista) => {
+        setCajas(lista);
+        // La última caja usada viene elegida, igual que la tasa
+        try {
+          const ultima = Number(localStorage.getItem(CLAVE_ULTIMA_CAJA));
+          if (lista.some((c) => c.id === ultima)) setCajaId((actual) => (actual === "" ? ultima : actual));
+        } catch {
+          // sin almacenamiento: se elige a mano
+        }
+      })
+      .catch(() => setCajas([]));
+    getMonedas()
+      .then(setMonedas)
+      .catch(() => setMonedas([]));
+  }, [conCaja, cajas.length]);
 
   const nCantidad = cantidad.trim() ? leerNumero(cantidad) : null;
   // Lo escrito en la casilla (ej. "3" si es comisión) y el multiplicador que se guarda (3% -> "0.03")
@@ -689,6 +712,19 @@ function FilaNueva({
   }
   const montoConSigno = monto && /[1-9]/.test(monto) ? (resta ? `-${monto}` : monto) : null;
   const totalNuevo = montoConSigno ? sumarDecimales(saldo, montoConSigno) : null;
+
+  // Lo que se mueve en la caja: la plata de verdad. Una venta de 403 USD saca 403 USD; un abono en pesos mete esos pesos.
+  const monedaExtranjera =
+    conTasa && !esPorcentaje && !enCobro && nCantidad && nTasa && cuenta.moneda_codigo === "COP" ? monedaDeLaTasa(nTasa, referencia) : null;
+  const movimientoCaja = !monto
+    ? null
+    : enCobro && cobroCodigo && nCantidad
+      ? { codigo: cobroCodigo, cantidad: sinSigno(nCantidad) }
+      : monedaExtranjera && nCantidad
+        ? { codigo: monedaExtranjera as string, cantidad: sinSigno(nCantidad) }
+        : { codigo: cuenta.moneda_codigo, cantidad: monto };
+  const entraACaja = sentidoCaja === "auto" ? resta : sentidoCaja === "entra";
+  const monedaCaja = movimientoCaja ? monedas.find((m) => m.codigo === movimientoCaja.codigo) : undefined;
   const simbolo = cuenta.moneda_codigo === "COP" ? "$" : "";
 
   function alCambiarReferencia(valor: string) {
@@ -707,7 +743,8 @@ function FilaNueva({
     if (conTasa && (!nTasa || !/[1-9]/.test(nTasa) || nTasa.startsWith("-"))) return setError(esPorcentaje ? "El porcentaje no es un número válido." : "La tasa no es un número válido.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
-    if (masOpciones && cajaId === "") return setError("Elegí la caja o banco que también se mueve.");
+    if (conCaja && cajaId === "") return setError(cajaObligatoria ? "Elegí qué caja alimenta este movimiento." : "Elegí la caja o banco que también se mueve.");
+    if (conCaja && !monedaCaja) return setError(`No encuentro la moneda ${movimientoCaja?.codigo ?? ""} para mover la caja.`);
     if (numeroMovimiento) {
       // se vuelve a consultar al guardar: el aviso de arriba puede no haber llegado todavía
       const ya = repetido ?? (await buscarMovimientoPorNumero(numeroMovimiento).catch(() => null));
@@ -730,6 +767,14 @@ function FilaNueva({
     const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
     const escrito = { referencia, persona, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
     setEnCobro(false);
+    setSentidoCaja("auto");
+    if (conCaja && cajaId !== "") {
+      try {
+        localStorage.setItem(CLAVE_ULTIMA_CAJA, String(cajaId));
+      } catch {
+        // no es grave: solo no se recuerda
+      }
+    }
     // La tasa que queda para el próximo: la nueva si se marcó mantenerla; si no, la que venía puesta
     const tasaQueQueda = tasaModificada ? (mantenerTasa ? nEscrita! : recientes.tasaHabitual) : null;
     const tasaSiguiente = tasaModificada && mantenerTasa ? formatearMonto(nEscrita!) : tasaPuesta;
@@ -759,7 +804,9 @@ function FilaNueva({
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
       cuentaDestino: cuentaDestino.trim() || undefined,
-      cajaId: masOpciones && cajaId !== "" ? cajaId : undefined,
+      ...(conCaja && cajaId !== "" && movimientoCaja && monedaCaja
+        ? { cajaId, monedaCajaId: monedaCaja.id, montoCaja: `${entraACaja ? "" : "-"}${movimientoCaja.cantidad}` }
+        : {}),
     };
     pendientes.current++;
     setEnviando(true);
@@ -939,19 +986,39 @@ function FilaNueva({
       })()}
 
       <div className="cc-nueva-pie">
-        <label className="cc-check">
-          <input type="checkbox" checked={masOpciones} onChange={(e) => setMasOpciones(e.target.checked)} />
-          También entra o sale de una caja o banco
-        </label>
-        {masOpciones && (
-          <select value={cajaId} onChange={(e) => setCajaId(e.target.value ? Number(e.target.value) : "")} aria-label="Caja o banco">
-            <option value="">Elegir caja o banco…</option>
-            {cajas.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
+        {!cajaObligatoria && (
+          <label className="cc-check">
+            <input type="checkbox" checked={masOpciones} onChange={(e) => setMasOpciones(e.target.checked)} />
+            También entra o sale de una caja o banco
+          </label>
+        )}
+        {conCaja && (
+          <span className="cc-caja-mov">
+            <select value={cajaId} onChange={(e) => setCajaId(e.target.value ? Number(e.target.value) : "")} aria-label="Caja que alimenta">
+              <option value="">{cajaObligatoria ? "¿Qué caja alimenta?" : "Elegir caja o banco…"}</option>
+              {cajas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+            <span className="cc-c-signo cc-sentido-caja" role="group" aria-label="Entra o sale de la caja">
+              <button type="button" className={entraACaja ? "activo suma" : ""} onClick={() => setSentidoCaja("entra")} aria-pressed={entraACaja}>
+                Entra
+              </button>
+              <button type="button" className={!entraACaja ? "activo resta" : ""} onClick={() => setSentidoCaja("sale")} aria-pressed={!entraACaja}>
+                Sale
+              </button>
+            </span>
+            {movimientoCaja && (
+              <span className="cc-caja-mov-texto">
+                {entraACaja ? "Entran" : "Salen"}{" "}
+                <strong>
+                  {formatearMonto(movimientoCaja.cantidad)} {movimientoCaja.codigo}
+                </strong>
+              </span>
+            )}
+          </span>
         )}
         {enviando && <span className="cc-guardando">Guardando…</span>}
         {enCobro && monto && nCantidad && nEscrita && (

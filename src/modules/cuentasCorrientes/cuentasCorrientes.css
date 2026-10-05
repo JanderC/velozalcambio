@@ -53,7 +53,15 @@
 .cc-cajas-cabeza button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 0.84rem; }
 .cc-cajas-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .cc-caja { background: white; border-radius: 10px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-top: 3px solid var(--color-navy); }
-.cc-caja h3 { margin: 0 0 8px; font-size: 0.95rem; color: var(--color-navy-dark); }
+.cc-caja h3 { margin: 0 0 8px; font-size: 0.95rem; color: var(--color-navy-dark); display: flex; align-items: center; justify-content: space-between; }
+a.cc-caja { display: block; text-decoration: none; color: inherit; transition: box-shadow 0.15s; }
+a.cc-caja:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.14); }
+/* La caja que alimenta el movimiento: cuál, si entra o sale, y cuánto */
+.cc-caja-mov { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cc-nueva .cc-sentido-caja { margin-top: 0; }
+.cc-nueva .cc-sentido-caja button { padding: 8px 12px; }
+.cc-caja-mov-texto { font-size: 0.86rem; color: #4b5563; }
+.cc-caja-mov-texto strong { color: var(--color-navy-dark); font-variant-numeric: tabular-nums; }
 .cc-caja dl { margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .cc-caja dl div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.88rem; }
 .cc-caja dt { color: #6b7280; }
@@ -274,6 +282,8 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-resumen { padding: 0 12px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cc-page:has(.cc-layout.con-hoja) .cc-resumen { display: none; }
   .cc-cajas { padding: 0 12px 12px; }
+  .cc-caja-mov { flex-basis: 100%; }
+  .cc-caja-mov select { flex: 1; min-width: 0; }
   .cc-page:has(.cc-layout.con-hoja) .cc-cajas { display: none; }
   .cc-resumen strong { font-size: 1rem; }
   .cc-mover { padding: 6px 0; font-size: 0.86rem; }
