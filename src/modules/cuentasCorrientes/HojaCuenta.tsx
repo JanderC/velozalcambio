@@ -54,7 +54,9 @@ function telefonoWhatsApp(telefono: string | null) {
 }
 
 /** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
-function tasaTexto(tasa: string, esPorcentaje: boolean) {
+function tasaTexto(tasa: string, esPorcentaje: boolean, descontada = false) {
+  // comisión descontada: se guarda el factor (0.96) y se muestra -4%
+  if (descontada) return `-${formatearMonto(sumarDecimales("100", `-${multiplicarDecimales(tasa, "100", 6)}`))}%`;
   return esPorcentaje ? `${formatearMonto(multiplicarDecimales(tasa, "100", 6))}%` : formatearMonto(tasa);
 }
 
@@ -495,7 +497,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   {m.movimiento_caja_id && <span className="cc-chip-caja">caja</span>}
                 </td>
                 <td className="num">{m.cantidad_base ? <Monto valor={m.cantidad_base} simbolo="" /> : ""}</td>
-                <td className="num">{m.tasa ? tasaTexto(m.tasa, m.tasa_es_porcentaje) : ""}</td>
+                <td className="num">{m.tasa ? tasaTexto(m.tasa, m.tasa_es_porcentaje, m.comision_descontada) : ""}</td>
                 <td className="num">
                   <Monto valor={m.monto} simbolo={simbolo} />
                 </td>
@@ -592,8 +594,11 @@ function FilaNueva({
   const [cuentaDestino, setCuentaDestino] = useState(""); // a qué cuenta del cliente se le pagó (opcional)
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
-  const [tasa, setTasa] = useState("");
-  const [esPorcentaje, setEsPorcentaje] = useState(false); // comisión: cantidad x % en vez de cantidad x tasa
+  // Cliente que se trabaja con comisión descontada: 1.000 - 4% = 960. El % de su primer movimiento ya viene puesto.
+  const comisionDescuenta = cuenta.formula === "COMISION";
+  const pctCuenta = comisionDescuenta && cuenta.comision_pct ? formatearMonto(cuenta.comision_pct) : "";
+  const [tasa, setTasa] = useState(pctCuenta);
+  const [esPorcentaje, setEsPorcentaje] = useState(comisionDescuenta); // comisión: cantidad x % (o cantidad - %) en vez de cantidad x tasa
   // Movimiento hecho en la moneda de cobro (ej. pagó en pesos una cuenta en dólares): cantidad ÷ tasa
   const [enCobro, setEnCobro] = useState(false);
   const [montoDirecto, setMontoDirecto] = useState("");
@@ -680,7 +685,7 @@ function FilaNueva({
     setEsPorcentaje(true);
     if (tasa.trim()) return;
     try {
-      setTasa(recientes.porcentajes[0] ? formatearMonto(recientes.porcentajes[0]) : (localStorage.getItem(CLAVE_ULTIMA_COMISION) ?? ""));
+      setTasa(pctCuenta || (recientes.porcentajes[0] ? formatearMonto(recientes.porcentajes[0]) : (localStorage.getItem(CLAVE_ULTIMA_COMISION) ?? "")));
     } catch {
       // sin almacenamiento disponible: se escribe a mano
     }
@@ -718,7 +723,9 @@ function FilaNueva({
   const nCantidad = cantidad.trim() ? leerNumero(cantidad) : null;
   // Lo escrito en la casilla (ej. "3" si es comisión) y el multiplicador que se guarda (3% -> "0.03")
   const nEscrita = tasa.trim() ? leerNumero(tasa.replace(/%/g, "")) : null;
-  const nTasa = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : nEscrita;
+  const fraccion = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : null;
+  // con comisión descontada el multiplicador es lo que queda: 4% -> 0.96
+  const nTasa = fraccion ? (comisionDescuenta ? sumarDecimales("1", `-${fraccion}`) : fraccion) : nEscrita;
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
   // Ventas y abonos: se puede anotar quién hizo la transferencia; si entró por Zelle es obligatorio
@@ -782,6 +789,7 @@ function FilaNueva({
     if (personaObligatoria && persona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
     if (conTasa && (!nTasa || !/[1-9]/.test(nTasa) || nTasa.startsWith("-"))) return setError(esPorcentaje ? "El porcentaje no es un número válido." : "La tasa no es un número válido.");
+    if (conTasa && esPorcentaje && comisionDescuenta && Number(nEscrita) >= 100) return setError("La comisión tiene que ser menor al 100%.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
     if (conCaja && cajaId === "") return setError(cajaObligatoria ? "Elegí qué caja alimenta este movimiento." : "Elegí la caja o banco que también se mueve.");
@@ -825,10 +833,11 @@ function FilaNueva({
     setPersona("");
     setCuentaDestino("");
     setCantidad("");
-    setTasa(tasaSiguiente);
+    // el cliente de comisión sigue en comisión, con su %
+    setTasa(comisionDescuenta ? pctCuenta || tasa : tasaSiguiente);
     setMontoDirecto("");
     setResta(restaPorReferencia(referenciaPuesta));
-    setEsPorcentaje(false);
+    setEsPorcentaje(comisionDescuenta);
     if (window.matchMedia("(max-width: 860px)").matches) setAbierta(false);
     else refInput.current?.focus();
     const signo = resta ? "-" : "";
@@ -843,7 +852,7 @@ function FilaNueva({
         (enCobro && conTasa ? ` (${formatearMonto(sinSigno(nCantidad!))} ${cobroCodigo} a ${formatearMonto(nTasa!)})` : ""),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
-      ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje } : { monto: montoConSigno }),
+      ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje, comisionDescontada: esPorcentaje && comisionDescuenta } : { monto: montoConSigno }),
       cuentaDestino: cuentaDestino.trim() || undefined,
       ...(conCaja && cajaId !== "" && movimientoCaja && monedaCaja
         ? { cajaId, monedaCajaId: monedaCaja.id, montoCaja: `${entraACaja ? "" : "-"}${movimientoCaja.cantidad}` }
@@ -1087,8 +1096,18 @@ function FilaNueva({
         )}
         {esPorcentaje && monto && nCantidad && nEscrita && (
           <span className="cc-explica-comision">
-            Comisión: el {formatearMonto(nEscrita)}% de {simbolo}
-            {formatearMonto(sinSigno(nCantidad))} = <strong>{simbolo}{formatearMonto(monto)}</strong>
+            {comisionDescuenta ? (
+              <>
+                {simbolo}
+                {formatearMonto(sinSigno(nCantidad))} − {formatearMonto(nEscrita)}% de comisión ={" "}
+              </>
+            ) : (
+              <>
+                Comisión: el {formatearMonto(nEscrita)}% de {simbolo}
+                {formatearMonto(sinSigno(nCantidad))} ={" "}
+              </>
+            )}
+            <strong>{simbolo}{formatearMonto(monto)}</strong>
           </span>
         )}
         {totalNuevo && (

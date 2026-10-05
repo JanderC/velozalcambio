@@ -279,6 +279,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
               enLinea
               canales={canales}
               modulo="CAJA"
+              medio={canales.find((c) => c.id === canalId) ?? null}
               onPersonalizar={() => setPersonalizando(true)}
               onCerrar={() => {}}
               onCreada={async (c) => {

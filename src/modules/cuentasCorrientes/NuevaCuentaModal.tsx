@@ -4,9 +4,11 @@ import { buscarMovimientoPorNumero, crearCuentaCorriente, registrarMovimientoCC,
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
-import { formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
+import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
-const REFERENCIAS_MOVIMIENTO = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
+// Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
+const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
+const MONEDA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "USD", ZELLE: "USD" };
 
 /** Abrir una cuenta: proveedor o cliente (existente o nuevo) + canal de pago + moneda + saldo pendiente inicial. */
 export function NuevaCuentaModal({
@@ -14,6 +16,7 @@ export function NuevaCuentaModal({
   modulo = "CORRIENTE",
   enLinea = false,
   inicial,
+  medio = null,
   onPersonalizar,
   onCreada,
   onCerrar,
@@ -24,6 +27,8 @@ export function NuevaCuentaModal({
   enLinea?: boolean;
   // lo que se está buscando: llena nombre, teléfono o cédula mientras no se hayan escrito a mano
   inicial?: { nombre?: string; telefono?: string; cedula?: string };
+  // el medio elegido arriba en Confirmaciones: banco de la cuenta y moneda del movimiento
+  medio?: Canal | null;
   onPersonalizar: () => void;
   onCreada: (c: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
@@ -77,24 +82,25 @@ export function NuevaCuentaModal({
   const nSaldo = saldo.trim() ? leerNumero(saldo) : null;
   const moneda = monedas.find((m) => m.id === monedaId);
 
-  // Movimiento con el que llega el cliente (solo en la página): cantidad × tasa = monto, o el monto directo si no hay tasa
-  const [movReferencia, setMovReferencia] = useState("");
+  // Movimiento con el que llega el cliente (solo en la página). Dos fórmulas:
+  //   tasa:     cantidad × tasa = total en pesos
+  //   comisión: al monto se le descuenta la comisión (1.000 − 4% = 960), en la moneda del medio
+  // La que se use queda guardada para los próximos movimientos de ese cliente.
+  const [movFormula, setMovFormula] = useState<"tasa" | "comision">("tasa");
   const [movResta, setMovResta] = useState(false);
   const [movCantidad, setMovCantidad] = useState("");
-  const [movTasa, setMovTasa] = useState("");
-  const [movMontoDirecto, setMovMontoDirecto] = useState("");
+  const [movValor, setMovValor] = useState(""); // la tasa o el % de comisión
   const [movPersona, setMovPersona] = useState("");
-  const movConTasa = movTasa.trim() !== "";
+  const etiquetaMedio = medio ? (ETIQUETA_MEDIO[medio.nombre] ?? medio.nombre.replace(/_/g, " ")) : null;
+  const codigoMedio = medio ? (MONEDA_DEL_MEDIO[medio.nombre] ?? "COP") : "COP";
   const nMovCantidad = movCantidad.trim() ? leerNumero(movCantidad)?.replace(/^-/, "") ?? null : null;
-  const nMovTasa = movConTasa ? leerNumero(movTasa) : null;
-  const nMovDirecto = movMontoDirecto.trim() ? leerNumero(movMontoDirecto)?.replace(/^-/, "") ?? null : null;
-  const movMonto = movConTasa ? (nMovCantidad && nMovTasa ? multiplicarDecimales(nMovCantidad, nMovTasa, moneda?.codigo === "COP" ? 0 : 2) : null) : nMovDirecto;
-  const hayMovimiento = movCantidad.trim() !== "" || movMontoDirecto.trim() !== "" || movReferencia.trim() !== "";
-  function alCambiarMovReferencia(valor: string) {
-    setMovReferencia(valor);
-    // "Abono ..." resta, como en la hoja; el abono por transferencia se elige a mano
-    if (/^\s*(abono|pago)/i.test(valor) && !/transferencia/i.test(valor)) setMovResta(true);
-  }
+  const nMovValor = movValor.trim() ? leerNumero(movValor.replace(/%/g, "")) : null;
+  // lo que multiplica a la cantidad: la tasa, o lo que queda tras la comisión (4% -> 0.96)
+  const movFactor = !nMovValor ? null : movFormula === "comision" ? sumarDecimales("1", `-${multiplicarDecimales(nMovValor, "0.01", 8)}`) : nMovValor;
+  // por tasa la cuenta queda en pesos; con comisión (o sin tasa) queda en la moneda del medio
+  const codigoCuenta = movFormula === "tasa" && movFactor ? "COP" : codigoMedio;
+  const movMonto = !nMovCantidad ? null : movFactor ? multiplicarDecimales(nMovCantidad, movFactor, codigoCuenta === "COP" ? 0 : 2) : nMovCantidad;
+  const hayMovimiento = movCantidad.trim() !== "";
   const monedaCobro = monedaCobroId !== monedaId ? monedas.find((m) => m.id === monedaCobroId) : undefined;
   const nTasaCobro = tasaCobro.trim() ? leerNumero(tasaCobro) : null;
 
@@ -109,12 +115,16 @@ export function NuevaCuentaModal({
     // El movimiento es opcional, pero si se empezó a llenar tiene que estar completo
     const conMovimiento = enLinea && hayMovimiento;
     if (conMovimiento) {
-      if (!movReferencia.trim()) return setError("Escribí la referencia del movimiento (qué es).");
-      if (movConTasa && (!nMovTasa || !/[1-9]/.test(nMovTasa) || nMovTasa.startsWith("-"))) return setError("La tasa del movimiento no es un número válido.");
-      if (movConTasa && !nMovCantidad) return setError("Con tasa hace falta la cantidad.");
-      if (!movMonto || !/[1-9]/.test(movMonto)) return setError("Escribí cantidad y tasa, o el monto directo del movimiento.");
-      if (/zelle/i.test(movReferencia) && movPersona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
+      if (!medio) return setError("Elegí arriba el medio del movimiento: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle.");
+      if (!nMovCantidad || !/[1-9]/.test(nMovCantidad)) return setError("La cantidad del movimiento no es un número válido.");
+      if (movValor.trim() && (!nMovValor || !/[1-9]/.test(nMovValor) || nMovValor.startsWith("-"))) return setError(movFormula === "comision" ? "La comisión no es un número válido." : "La tasa no es un número válido.");
+      if (movFormula === "comision" && nMovValor && Number(nMovValor) >= 100) return setError("La comisión tiene que ser menor al 100%.");
+      if (movFormula === "tasa" && !movFactor && codigoMedio !== "COP") return setError(`Escribí la tasa para pasar ${codigoMedio} a pesos, o usá comisión.`);
+      if (!movMonto || !/[1-9]/.test(movMonto)) return setError("El monto del movimiento da cero: revisá la cantidad.");
+      if (medio.nombre === "ZELLE" && movPersona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
     }
+    // En la página no se eligen banco ni moneda: salen del medio de arriba y de la fórmula
+    const monedaCuentaId = enLinea ? (monedas.find((m) => m.codigo === (conMovimiento ? codigoCuenta : "COP"))?.id ?? monedaId) : monedaId;
 
     setEnviando(true);
     try {
@@ -126,11 +136,11 @@ export function NuevaCuentaModal({
       }
       const cuenta = await crearCuentaCorriente({
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
-        canalId: canalId === "" ? undefined : canalId,
+        canalId: enLinea ? medio?.id : canalId === "" ? undefined : canalId,
         modulo,
         referencia: referencia.trim() || undefined,
         ...(monedaCobro ? { monedaCobroId: monedaCobro.id, tasaCobro: nTasaCobro! } : {}),
-        monedaId,
+        monedaId: monedaCuentaId as number,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
       });
       // El cliente ya existe: ahora su movimiento. Si falla, el cliente queda creado y se avisa.
@@ -143,8 +153,11 @@ export function NuevaCuentaModal({
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
             tipo: movResta ? "ABONO" : "CARGO",
-            descripcion: movPersona.trim() ? `${movReferencia.trim()} · ${movPersona.trim()}` : movReferencia.trim(),
-            ...(movConTasa ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: nMovTasa! } : { monto: `${signo}${movMonto!}` }),
+            // la referencia sale del medio: "Venta de Zelle" o "Abono Zelle"
+            descripcion: `${movResta ? "Abono" : "Venta de"} ${etiquetaMedio}${movPersona.trim() ? ` · ${movPersona.trim()}` : ""}`,
+            ...(movFactor
+              ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true } : {}) }
+              : { monto: `${signo}${movMonto!}` }),
           });
         } catch (err) {
           errorMovimiento = err instanceof ApiError ? err.message : "no se pudo guardar";
@@ -152,11 +165,9 @@ export function NuevaCuentaModal({
       }
       if (enLinea) {
         if (!errorMovimiento) {
-          setMovReferencia("");
           setMovResta(false);
           setMovCantidad("");
-          setMovTasa("");
-          setMovMontoDirecto("");
+          setMovValor("");
           setMovPersona("");
         } else {
           setError(`El cliente se creó, pero el movimiento no se guardó (${errorMovimiento}). Cargalo desde su hoja.`);
@@ -274,73 +285,89 @@ export function NuevaCuentaModal({
             <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="ej. quién lo recomendó, de dónde viene, una nota" maxLength={200} />
           </label>
         )}
-        <div className="cc-modal-fila">
-          <label>
-            Banco o canal de pago (opcional)
-            <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? onPersonalizar() : setCanalId(e.target.value ? Number(e.target.value) : ""))}>
-              <option value="">Sin banco</option>
-              {canales.filter((c) => c.nombre !== "SIN_BANCO").map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre.replace(/_/g, " ")}
-                </option>
-              ))}
-              <option value="personalizar">Personalizar…</option>
-            </select>
-          </label>
-          <label>
-            Moneda de la contabilidad
-            <select value={monedaId} onChange={(e) => setMonedaId(e.target.value ? Number(e.target.value) : "")}>
-              {monedas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.codigo} · {m.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+        {!enLinea && (
+          <>
+        <div className="cc-modal-fila">
+          <label>
+            Banco o canal de pago (opcional)
+            <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? onPersonalizar() : setCanalId(e.target.value ? Number(e.target.value) : ""))}>
+              <option value="">Sin banco</option>
+              {canales.filter((c) => c.nombre !== "SIN_BANCO").map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre.replace(/_/g, " ")}
+                </option>
+              ))}
+              <option value="personalizar">Personalizar…</option>
+            </select>
+          </label>
+          <label>
+            Moneda de la contabilidad
+            <select value={monedaId} onChange={(e) => setMonedaId(e.target.value ? Number(e.target.value) : "")}>
+              {monedas.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.codigo} · {m.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+          </>
+        )}
 
-        {/* El movimiento con el que llega el cliente: la misma cuenta que en la hoja (cantidad × tasa = monto) */}
+        {/* El movimiento con el que llega el cliente: por tasa (cantidad × tasa) o con comisión descontada (monto − %) */}
         {enLinea && (
           <fieldset className="cc-primer-mov">
             <legend>Movimiento (opcional)</legend>
-            <label>
-              Referencia del movimiento
-              <input list="cc-primer-mov-referencias" value={movReferencia} onChange={(e) => alCambiarMovReferencia(e.target.value)} placeholder="Venta de Zelle, Abono efectivo…" autoComplete="off" />
-              <datalist id="cc-primer-mov-referencias">
-                {REFERENCIAS_MOVIMIENTO.map((r) => (
-                  <option key={r} value={r} />
-                ))}
-              </datalist>
-            </label>
-            <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Suma o abono">
-              <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta}>
-                + Suma
-              </button>
-              <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta}>
-                − Abono
-              </button>
+            <p className={`cc-primer-mov-medio ${medio ? "" : "falta"}`}>
+              {medio ? (
+                <>
+                  Medio: <strong>{etiquetaMedio}</strong> · se mueve en <strong>{codigoMedio}</strong>. Se cambia en los botones de arriba.
+                </>
+              ) : (
+                "Elegí arriba el medio: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle."
+              )}
+            </p>
+            <div className="cc-primer-mov-opciones">
+              <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Suma o abono">
+                <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta}>
+                  + Suma
+                </button>
+                <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta}>
+                  − Abono
+                </button>
+              </div>
+              <div className="cc-segmento cc-primer-mov-formula" role="group" aria-label="Tasa o comisión">
+                <button type="button" className={movFormula === "tasa" ? "activo" : ""} onClick={() => setMovFormula("tasa")} aria-pressed={movFormula === "tasa"}>
+                  Tasa
+                </button>
+                <button type="button" className={movFormula === "comision" ? "activo" : ""} onClick={() => setMovFormula("comision")} aria-pressed={movFormula === "comision"}>
+                  Comisión %
+                </button>
+              </div>
             </div>
             <div className="cc-primer-mov-cuenta">
               <label>
-                Cantidad
-                <input value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} inputMode="decimal" placeholder="700.000" autoComplete="off" />
+                Cantidad ({codigoMedio})
+                <input value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} inputMode="decimal" placeholder="1.000" autoComplete="off" />
               </label>
-              <span aria-hidden="true">×</span>
+              <span aria-hidden="true">{movFormula === "comision" ? "−" : "×"}</span>
               <label>
-                Tasa
-                <input value={movTasa} onChange={(e) => setMovTasa(e.target.value)} inputMode="decimal" placeholder="3,2" autoComplete="off" />
+                {movFormula === "comision" ? "Comisión %" : "Tasa"}
+                <input value={movValor} onChange={(e) => setMovValor(e.target.value)} inputMode="decimal" placeholder={movFormula === "comision" ? "4" : "3.200"} autoComplete="off" />
               </label>
               <span aria-hidden="true">=</span>
               <label>
-                Monto{moneda ? ` (${moneda.codigo})` : ""}
-                {movConTasa ? (
-                  <output className={`cc-resultado ${movResta ? "cc-neg" : ""}`}>{movMonto ? `${movResta ? "- " : ""}${formatearMonto(movMonto)}` : "—"}</output>
-                ) : (
-                  <input value={movMontoDirecto} onChange={(e) => setMovMontoDirecto(e.target.value)} inputMode="decimal" placeholder="monto" autoComplete="off" />
-                )}
+                Total ({codigoCuenta})
+                <output className={`cc-resultado ${movResta ? "cc-neg" : ""}`}>{movMonto ? `${movResta ? "- " : ""}${formatearMonto(movMonto)}` : "—"}</output>
               </label>
             </div>
-            <small className="cc-primer-mov-nota">Sin tasa, se escribe el monto directo.</small>
+            <small className="cc-primer-mov-nota">
+              {movFormula === "comision"
+                ? nMovCantidad && nMovValor && movMonto
+                  ? `${formatearMonto(nMovCantidad)} − ${formatearMonto(nMovValor)}% de comisión = ${formatearMonto(movMonto)} ${codigoCuenta}. Esta comisión queda guardada para los próximos movimientos del cliente.`
+                  : "A la cantidad se le descuenta la comisión: 1.000 − 4% = 960. Queda guardada para los próximos movimientos del cliente."
+                : "Cantidad × tasa = total en pesos. La tasa queda guardada para los próximos movimientos del cliente."}
+            </small>
             <label>
               Quién envió o número de la transferencia (opcional)
               <input value={movPersona} onChange={(e) => setMovPersona(e.target.value)} placeholder="Nombre de quien envió, y el número si lo hay" autoComplete="off" />

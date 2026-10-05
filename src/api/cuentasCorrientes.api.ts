@@ -20,7 +20,10 @@ export interface CuentaCorrienteResumen {
   tercero_identificacion: string | null; // cédula
   // Dónde se lleva: en Cuentas Corrientes, o pasada a Cuentas por Cobrar (poco movimiento)
   modulo: ModuloCuenta;
-  referencia: string | null; // dato libre del cliente (Cajas y Confirmaciones)
+  referencia: string | null; // dato libre del cliente (Confirmaciones)
+  // Fórmula con la que se le trabaja, guardada con su primer movimiento: por tasa, o con la comisión descontada del monto
+  formula: "TASA" | "COMISION" | null;
+  comision_pct: string | null;
   // Si se le cobra en otra moneda que la de la contabilidad: cuál y a qué tasa manual (1 de la contabilidad = tasa_cobro de la de cobro)
   moneda_cobro_id: number | null;
   moneda_cobro_codigo: string | null;
@@ -52,6 +55,7 @@ export interface FilaEstadoCuenta {
   tasa: string | null;
   tasa_es_porcentaje: boolean; // comisión en %: la tasa viene como fracción (3% = "0.03")
   cuenta_destino: string | null; // a qué cuenta del cliente se le pagó
+  comision_descontada: boolean; // la tasa es el factor (0.96) de una comisión descontada: se muestra -4%
   monto: string;
   total: string;
   anulado: boolean;
@@ -227,6 +231,7 @@ interface RegistrarMovimientoInput {
   monedaBaseId?: number;
   tasa?: string;
   tasaEsPorcentaje?: boolean;
+  comisionDescontada?: boolean; // cantidad - comisión %: la tasa va como factor (4% -> "0.96")
   cuentaDestino?: string;
   categoriaId?: number;
   cajaId?: number;
