@@ -61,17 +61,11 @@ function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaC
     };
   }
   const grupos = new Map<string, { moneda: MonedaTasa; tasa: string; abono: boolean; cantidad: string; pesos: string }>();
-  let abonosPesos = "0";
-  let otrosPesos = "0";
   for (const m of estado.movimientos) {
-    if (m.anulado) continue;
-    const moneda = m.tasa && !m.tasa_es_porcentaje && m.cantidad_base ? monedaDeLaTasa(m.tasa, m.descripcion ?? "") : null;
-    if (!moneda || !m.tasa || !m.cantidad_base) {
-      // sin tasa de otra moneda: es un movimiento en pesos
-      if (esAbono(m.descripcion, m.monto)) abonosPesos = sumarDecimales(abonosPesos, m.monto);
-      else otrosPesos = sumarDecimales(otrosPesos, m.monto);
-      continue;
-    }
+    // Solo lo que se movió en otra moneda: los abonos y demás movimientos en pesos ya están en la tabla
+    if (m.anulado || !m.tasa || m.tasa_es_porcentaje || !m.cantidad_base) continue;
+    const moneda = monedaDeLaTasa(m.tasa, m.descripcion ?? "");
+    if (!moneda) continue;
     const abono = m.monto.startsWith("-");
     const clave = `${moneda}|${Number(m.tasa)}|${abono}`;
     const g = grupos.get(clave) ?? { moneda, tasa: m.tasa, abono, cantidad: "0", pesos: "0" };
@@ -91,14 +85,6 @@ function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaC
       lineas.push({ texto: `${g.cantidad.startsWith("-") ? "- " : ""}${cantidadTexto(g.cantidad.replace(/^-/, ""), moneda)} × ${formatearMonto(g.tasa)}`, monto: g.pesos, prefijo: "$" });
     }
     lineas.push({ texto: `Total ${NOMBRE_MONEDA[moneda]}: ${cantidad.startsWith("-") ? "- " : ""}${cantidadTexto(cantidad.replace(/^-/, ""), moneda)}`, monto: pesos, prefijo: "$", total: true });
-  }
-  // Pesos: los abonos (transferencia, efectivo...) y lo demás que se movió directo en pesos
-  const hayAbonos = /[1-9]/.test(abonosPesos);
-  const hayOtros = /[1-9]/.test(otrosPesos);
-  if (hayAbonos || hayOtros) {
-    if (hayAbonos) lineas.push({ texto: "Abonos en pesos", monto: abonosPesos, prefijo: "$" });
-    if (hayOtros) lineas.push({ texto: "Otros movimientos en pesos", monto: otrosPesos, prefijo: "$" });
-    lineas.push({ texto: "Total pesos", monto: sumarDecimales(abonosPesos, otrosPesos), prefijo: "$", total: true });
   }
   return { titulo: "Por moneda y tasa", lineas };
 }
@@ -220,7 +206,8 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Pro
       c.font = `${l.total ? "700" : "400"} 24px ${FUENTE}`;
       c.fillStyle = colorMonto(l.monto);
       c.textAlign = "right";
-      c.fillText(l.monto.startsWith("-") ? `= - ${l.prefijo}${formatearMonto(l.monto.slice(1))}` : `= ${l.prefijo}${formatearMonto(l.monto)}`, ANCHO - MARGEN - 18, medio);
+      const cifra = l.monto.startsWith("-") ? `- ${l.prefijo}${formatearMonto(l.monto.slice(1))}` : `${l.prefijo}${formatearMonto(l.monto)}`;
+      c.fillText(l.total ? `Total COP: ${cifra}` : `= ${cifra}`, ANCHO - MARGEN - 18, medio);
     });
   }
 
