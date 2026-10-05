@@ -41,6 +41,8 @@ export interface CuentaCorrienteResumen {
   // Lo de hoy: lo que le vendí (positivo) y lo que me vendió o abonó (negativo)
   // Cuentas que no son en pesos: cuántos pesos vale 1 de su moneda (tasa de cobro o la última usada en los movimientos)
   valor_moneda: string | null;
+  // Al buscar: el movimiento de esta cuenta donde apareció lo buscado (una referencia, un MTCN, quién envió)
+  movimiento_coincide?: { descripcion: string; fecha: string; monto: string } | null;
   vendido_hoy: string;
   abonado_hoy: string;
 }

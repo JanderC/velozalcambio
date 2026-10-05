@@ -129,8 +129,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           <input
             value={buscar}
             onChange={(e) => setBuscar(e.target.value)}
-            placeholder="Buscar cliente por nombre, teléfono o cédula"
-            aria-label="Buscar cliente por nombre, teléfono o cédula"
+            placeholder="Buscar por nombre, teléfono, cédula o referencia de la transferencia"
+            aria-label="Buscar por nombre, teléfono, cédula o referencia de la transferencia"
             autoFocus
           />
         </div>
@@ -225,7 +225,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                 : enCobrar
                   ? "Nadie debe ni se le debe por ahora. Las cuentas con saldo aparecen acá solas."
                   : modo === "cajas"
-                    ? "Buscá al cliente arriba por nombre, teléfono o cédula."
+                    ? "Buscá arriba por nombre, teléfono, cédula o referencia de la transferencia."
                     : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
             </p>
           )}
@@ -250,6 +250,13 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   <span className="cc-cuenta-detalle derecha">
                     {c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : "sin movimientos"}
                   </span>
+                  {c.movimiento_coincide && (
+                    <span className="cc-cuenta-coincide">
+                      Referencia encontrada: <b>{c.movimiento_coincide.descripcion}</b> ·{" "}
+                      {new Date(c.movimiento_coincide.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "2-digit" })} ·{" "}
+                      {montoTexto(c.movimiento_coincide.monto.replace(/^-/, ""), c.moneda_codigo)}
+                    </span>
+                  )}
                   {c.valor_moneda && (
                     <span className="cc-cuenta-hoy">
                       1 {c.moneda_codigo} = ${formatearMonto(c.valor_moneda)}
