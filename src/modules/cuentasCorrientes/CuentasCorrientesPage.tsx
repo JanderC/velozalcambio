@@ -4,6 +4,7 @@ import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
 import { getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { CajasResumen } from "./CajasResumen";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
@@ -125,6 +126,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           )}
         </div>
       </div>
+
+      {modo === "cajas" && <CajasResumen />}
 
       {resumen.length > 0 && (
         <div className="cc-resumen">

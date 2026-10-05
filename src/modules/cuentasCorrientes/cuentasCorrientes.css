@@ -46,6 +46,19 @@
 .cc-acciones-cuenta { display: flex; gap: 14px; }
 .cc-mover.cc-eliminar { color: #c0392b; }
 .cc-nueva small.cc-repetido { color: #c0392b; font-weight: 600; font-size: 0.78rem; }
+/* Cajas y Confirmaciones: las cajas y lo que tiene cada una en dólares, bolívares y pesos */
+.cc-cajas { padding: 0 40px 16px; }
+.cc-cajas-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.cc-cajas-cabeza h2 { margin: 0; font-family: "Space Grotesk", sans-serif; font-size: 1.05rem; color: var(--color-navy-dark); }
+.cc-cajas-cabeza button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 0.84rem; }
+.cc-cajas-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.cc-caja { background: white; border-radius: 10px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-top: 3px solid var(--color-navy); }
+.cc-caja h3 { margin: 0 0 8px; font-size: 0.95rem; color: var(--color-navy-dark); }
+.cc-caja dl { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.cc-caja dl div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.88rem; }
+.cc-caja dt { color: #6b7280; }
+.cc-caja dd { margin: 0; font-weight: 700; color: var(--color-navy-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cc-caja dd.vacio { color: #9ca3af; font-weight: 400; }
 /* Cuentas por Cobrar: cuánto me deben y cuánto debo, por moneda */
 .cc-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 0 40px 16px; }
 .cc-resumen div { background: white; border-radius: 10px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-left: 4px solid #1a7f37; }
@@ -260,6 +273,8 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 
   .cc-resumen { padding: 0 12px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cc-page:has(.cc-layout.con-hoja) .cc-resumen { display: none; }
+  .cc-cajas { padding: 0 12px 12px; }
+  .cc-page:has(.cc-layout.con-hoja) .cc-cajas { display: none; }
   .cc-resumen strong { font-size: 1rem; }
   .cc-mover { padding: 6px 0; font-size: 0.86rem; }
   /* Lista de cuentas */
