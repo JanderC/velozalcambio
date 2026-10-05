@@ -3,71 +3,93 @@ import { ApiError } from "../../api/client";
 import { crearOperacionTaquilla, type Taquilla } from "../../api/taquilla.api";
 import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
-// Los dólares no valen igual según el billete: cada clase tiene su precio en pesos, que pone el negocio
-const CLASES = [
-  { clave: "grandes", nombre: "Billetes de 50 y 100", corto: "de 50 y 100" },
-  { clave: "chicos", nombre: "Billetes de 20 para abajo", corto: "de 20 para abajo" },
-  { clave: "deteriorados", nombre: "Billetes deteriorados", corto: "deteriorados" },
-] as const;
-type Clave = (typeof CLASES)[number]["clave"];
-const CLAVE_PRECIOS = "tq-precios-dolar-por-billete";
+// Los billetes no valen igual según su denominación o su estado: cada clase tiene su precio, que pone el negocio
+type Divisa = "USD" | "EUR";
+type Entrega = "COP" | "USD" | "EUR";
+const CLASES: Record<Divisa, { clave: string; nombre: string; corto: string }[]> = {
+  USD: [
+    { clave: "grandes", nombre: "Billetes de 50 y 100", corto: "de 50 y 100" },
+    { clave: "chicos", nombre: "Billetes de 20 para abajo", corto: "de 20 para abajo" },
+    { clave: "deteriorados", nombre: "Billetes deteriorados", corto: "deteriorados" },
+  ],
+  EUR: [
+    { clave: "grandes", nombre: "Billetes de 500 y 200", corto: "de 500 y 200" },
+    { clave: "chicos", nombre: "Sencillo", corto: "sencillo" },
+    { clave: "deteriorados", nombre: "Billetes deteriorados", corto: "deteriorados" },
+  ],
+};
+const NOMBRE: Record<Entrega, string> = { COP: "Pesos", USD: "Dólares", EUR: "Euros" };
+const CLAVE_PRECIOS = "tq-precios-por-billete";
 
-function preciosGuardados(): Record<Clave, string> {
+function dinero(monto: string, codigo: Entrega) {
+  const numero = formatearMonto(monto);
+  return codigo === "COP" ? `$${numero}` : `${numero} ${codigo}`;
+}
+
+type Precios = Record<string, string>; // "USD>COP:grandes" -> "3.900"
+function preciosGuardados(): Precios {
   try {
-    return { grandes: "", chicos: "", deteriorados: "", ...(JSON.parse(localStorage.getItem(CLAVE_PRECIOS) ?? "{}") as Partial<Record<Clave, string>>) };
+    return JSON.parse(localStorage.getItem(CLAVE_PRECIOS) ?? "{}") as Precios;
   } catch {
-    return { grandes: "", chicos: "", deteriorados: "" };
+    return {};
   }
 }
 
-const pesos = (v: string) => `$${formatearMonto(v)}`;
-
 /**
- * Dólares en efectivo por tipo de billete: los de 50 y 100, los de 20 para abajo y los deteriorados,
- * cada uno al precio que pone el negocio. Suma los dólares a la caja y, si se le entregan pesos, los resta.
+ * Dólares o euros en efectivo, desglosados por tipo de billete, cada uno al precio que pone el negocio.
+ * Arriba se elige qué se desglosa (dólares o euros) y en qué se entrega (pesos, o la otra divisa), sin cambiar de pantalla.
+ * Suma la divisa a la caja y, si se le entrega efectivo, lo resta.
  */
 export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onCambio: (t: Taquilla) => void }) {
-  const [precios, setPrecios] = useState<Record<Clave, string>>(preciosGuardados);
-  const [cantidades, setCantidades] = useState<Record<Clave, string>>({ grandes: "", chicos: "", deteriorados: "" });
-  // si se le entregan pesos en efectivo salen de la caja; si los dólares son un pago, solo entran
-  const [entregaPesos, setEntregaPesos] = useState(true);
+  const [divisa, setDivisa] = useState<Divisa>("USD");
+  const [entregaElegida, setEntregaElegida] = useState<Entrega>("COP");
+  // no se entrega en la misma moneda que se recibe
+  const entrega: Entrega = entregaElegida === divisa ? "COP" : entregaElegida;
+  const [precios, setPrecios] = useState<Precios>(preciosGuardados);
+  const [cantidades, setCantidades] = useState<Record<string, string>>({});
+  // si se le entrega efectivo sale de la caja; si la divisa es un pago, solo entra
+  const [seEntrega, setSeEntrega] = useState(true);
   const [cliente, setCliente] = useState("");
   const [telefono, setTelefono] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const filas = CLASES.map((c) => {
-    const cantidad = cantidades[c.clave].trim() ? leerNumero(cantidades[c.clave])?.replace(/^-/, "") ?? null : null;
-    const precio = precios[c.clave].trim() ? leerNumero(precios[c.clave])?.replace(/^-/, "") ?? null : null;
+  const decimales = entrega === "COP" ? 0 : 2;
+  const clavePrecio = (clase: string) => `${divisa}>${entrega}:${clase}`;
+  const filas = CLASES[divisa].map((c) => {
+    const escrito = cantidades[`${divisa}:${c.clave}`] ?? "";
+    const cantidad = escrito.trim() ? leerNumero(escrito)?.replace(/^-/, "") ?? null : null;
+    const precioEscrito = precios[clavePrecio(c.clave)] ?? "";
+    const precio = precioEscrito.trim() ? leerNumero(precioEscrito)?.replace(/^-/, "") ?? null : null;
     const valida = !!cantidad && /[1-9]/.test(cantidad);
-    const subtotal = valida && precio && /[1-9]/.test(precio) ? multiplicarDecimales(cantidad!, precio, 0) : null;
-    return { ...c, cantidad: valida ? cantidad! : null, precio, subtotal, escrita: cantidades[c.clave].trim() !== "" };
+    const subtotal = valida && precio && /[1-9]/.test(precio) ? multiplicarDecimales(cantidad!, precio, decimales) : null;
+    return { ...c, escrito, precioEscrito, cantidad: valida ? cantidad! : null, precio, subtotal };
   });
   const conCantidad = filas.filter((f) => f.cantidad);
-  const totalDolares = conCantidad.reduce((suma, f) => sumarDecimales(suma, f.cantidad!), "0");
-  const totalPesos = conCantidad.reduce((suma, f) => (f.subtotal ? sumarDecimales(suma, f.subtotal) : suma), "0");
+  const totalDivisa = conCantidad.reduce((suma, f) => sumarDecimales(suma, f.cantidad!), "0");
+  const totalEntrega = conCantidad.reduce((suma, f) => (f.subtotal ? sumarDecimales(suma, f.subtotal) : suma), "0");
   const hayAlgo = conCantidad.length > 0;
 
   async function registrar(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (filas.some((f) => f.escrita && !f.cantidad)) return setError("Alguna cantidad de dólares no es un número válido.");
-    if (!hayAlgo) return setError("Escribí cuántos dólares hay de cada tipo de billete.");
+    if (filas.some((f) => f.escrito.trim() && !f.cantidad)) return setError("Alguna cantidad no es un número válido.");
+    if (!hayAlgo) return setError(`Escribí cuántos ${NOMBRE[divisa].toLowerCase()} hay de cada tipo de billete.`);
     const sinPrecio = conCantidad.find((f) => !f.subtotal);
-    if (sinPrecio) return setError(`Falta el valor del dólar para los billetes ${sinPrecio.corto}.`);
+    if (sinPrecio) return setError(`Falta el valor para los billetes ${sinPrecio.corto}.`);
     setEnviando(true);
     try {
       // El detalle queda en la descripción: es lo que se ve en los movimientos y lo que se le envía al cliente
-      const detalle = conCantidad.map((f) => `${formatearMonto(f.cantidad!)} USD ${f.corto} × ${formatearMonto(f.precio!)} = ${pesos(f.subtotal!)}`).join(" + ");
-      const descripcion = `Dólares: ${detalle}. Total ${formatearMonto(totalDolares)} USD = ${pesos(totalPesos)}`;
+      const detalle = conCantidad.map((f) => `${formatearMonto(f.cantidad!)} ${divisa} ${f.corto} × ${formatearMonto(f.precio!)} = ${dinero(f.subtotal!, entrega)}`).join(" + ");
+      const descripcion = `${NOMBRE[divisa]}: ${detalle}. Total ${formatearMonto(totalDivisa)} ${divisa} = ${dinero(totalEntrega, entrega)}`;
       onCambio(
         await crearOperacionTaquilla({
           tipo: "INGRESO",
-          cantidad: totalDolares,
-          monedaOperacion: "USD",
-          monedaResultado: "COP",
-          resultado: totalPesos, // la suma de cada clase a su precio, no una sola tasa
-          cajaLado: entregaPesos ? "AMBOS" : "MONTO",
+          cantidad: totalDivisa,
+          monedaOperacion: divisa,
+          monedaResultado: entrega,
+          resultado: totalEntrega, // la suma de cada clase a su precio, no una sola tasa
+          cajaLado: seEntrega ? "AMBOS" : "MONTO",
           medio: "EFECTIVO",
           descripcion: descripcion.slice(0, 300),
           clienteNombre: cliente.trim() || undefined,
@@ -80,7 +102,7 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
       } catch {
         // no es grave: solo no se recuerdan los precios
       }
-      setCantidades({ grandes: "", chicos: "", deteriorados: "" });
+      setCantidades({});
       setCliente("");
       setTelefono("");
     } catch (err) {
@@ -93,15 +115,41 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
   return (
     <form className="tq-operacion tq-billetes" onSubmit={registrar}>
       <div className="tq-operacion-cabeza">
-        <h2>Dólares por tipo de billete</h2>
+        <h2>Billetes por tipo</h2>
       </div>
+      {/* Cambio rápido: qué se desglosa y en qué se entrega */}
+      <div className="tq-billetes-selectores">
+        <div className="tq-operacion-grupo">
+          <span>Trae</span>
+          <div className="cc-segmento" role="group" aria-label="Qué billetes trae">
+            {(["USD", "EUR"] as Divisa[]).map((d) => (
+              <button key={d} type="button" className={divisa === d ? "activo" : ""} onClick={() => setDivisa(d)} aria-pressed={divisa === d}>
+                {NOMBRE[d]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="tq-operacion-grupo">
+          <span>Se le entrega en</span>
+          <div className="cc-segmento" role="group" aria-label="En qué se le entrega">
+            {(["COP", "USD", "EUR"] as Entrega[])
+              .filter((m) => m !== divisa)
+              .map((m) => (
+                <button key={m} type="button" className={entrega === m ? "activo" : ""} onClick={() => setEntregaElegida(m)} aria-pressed={entrega === m}>
+                  {NOMBRE[m]}
+                </button>
+              ))}
+          </div>
+        </div>
+      </div>
+
       <table>
         <thead>
           <tr>
             <th>Billete</th>
-            <th>Dólares</th>
-            <th>Valor del dólar</th>
-            <th>En pesos</th>
+            <th>{NOMBRE[divisa]}</th>
+            <th>Valor en {NOMBRE[entrega].toLowerCase()}</th>
+            <th>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -110,52 +158,52 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
               <td>{f.nombre}</td>
               <td>
                 <input
-                  value={cantidades[f.clave]}
-                  onChange={(e) => setCantidades((c) => ({ ...c, [f.clave]: e.target.value }))}
+                  value={f.escrito}
+                  onChange={(e) => setCantidades((c) => ({ ...c, [`${divisa}:${f.clave}`]: e.target.value }))}
                   inputMode="decimal"
                   placeholder="0"
                   autoComplete="off"
-                  aria-label={`Dólares en ${f.nombre.toLowerCase()}`}
+                  aria-label={`${NOMBRE[divisa]} en ${f.nombre.toLowerCase()}`}
                 />
               </td>
               <td>
                 <input
-                  value={precios[f.clave]}
-                  onChange={(e) => setPrecios((p) => ({ ...p, [f.clave]: e.target.value }))}
+                  value={f.precioEscrito}
+                  onChange={(e) => setPrecios((p) => ({ ...p, [clavePrecio(f.clave)]: e.target.value }))}
                   inputMode="decimal"
-                  placeholder="ej. 3.900"
+                  placeholder={entrega === "COP" ? "ej. 3.900" : "ej. 1,08"}
                   autoComplete="off"
-                  aria-label={`Valor del dólar para ${f.nombre.toLowerCase()}`}
+                  aria-label={`Valor para ${f.nombre.toLowerCase()}`}
                 />
               </td>
-              <td className="num">{f.subtotal ? pesos(f.subtotal) : "—"}</td>
+              <td className="num">{f.subtotal ? dinero(f.subtotal, entrega) : "—"}</td>
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr>
             <td>Total</td>
-            <td className="num">{hayAlgo ? `${formatearMonto(totalDolares)} USD` : "—"}</td>
+            <td className="num">{hayAlgo ? dinero(totalDivisa, divisa) : "—"}</td>
             <td />
-            <td className="num">{hayAlgo ? pesos(totalPesos) : "—"}</td>
+            <td className="num">{hayAlgo ? dinero(totalEntrega, entrega) : "—"}</td>
           </tr>
         </tfoot>
       </table>
 
       <label className="cc-check tq-entrega">
-        <input type="checkbox" checked={entregaPesos} onChange={(e) => setEntregaPesos(e.target.checked)} />
-        Se le entregan los pesos en efectivo
+        <input type="checkbox" checked={seEntrega} onChange={(e) => setSeEntrega(e.target.checked)} />
+        Se le entregan los {NOMBRE[entrega].toLowerCase()} en efectivo
       </label>
       <div className="tq-operacion-caja">
         <span>
-          Se suman <strong>{hayAlgo ? `${formatearMonto(totalDolares)} USD` : "—"}</strong> a la caja
-          {entregaPesos ? (
+          Se suman <strong>{hayAlgo ? dinero(totalDivisa, divisa) : "—"}</strong> a la caja
+          {seEntrega ? (
             <>
               {" "}
-              y se restan <strong>{hayAlgo ? pesos(totalPesos) : "—"}</strong>
+              y se restan <strong>{hayAlgo ? dinero(totalEntrega, entrega) : "—"}</strong>
             </>
           ) : (
-            " (los pesos no salen: los dólares son un pago)"
+            ` (no sale nada: los ${NOMBRE[divisa].toLowerCase()} son un pago)`
           )}
         </span>
       </div>
@@ -171,9 +219,9 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
         </label>
       </div>
       <div className="tq-operacion-pie">
-        <span className="tq-operacion-nota">Los valores del dólar quedan guardados en este equipo.</span>
+        <span className="tq-operacion-nota">Los valores quedan guardados en este equipo.</span>
         <button type="submit" className="cc-guardar" disabled={enviando || !abierta} title={abierta ? undefined : "Primero abrí la caja de taquilla"}>
-          {enviando ? "Registrando…" : "Registrar dólares"}
+          {enviando ? "Registrando…" : `Registrar ${NOMBRE[divisa].toLowerCase()}`}
         </button>
       </div>
       {error && <p className="cc-form-error">{error}</p>}

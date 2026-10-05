@@ -241,3 +241,9 @@
   .tq-billetes table { font-size: 0.82rem; }
   .tq-billetes td:first-child { max-width: 110px; }
 }
+
+/* Billetes por tipo: cambio rápido de divisa (dólares o euros) y de en qué se entrega */
+.tq-billetes-selectores { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+@media (max-width: 860px) {
+  .tq-billetes-selectores { grid-template-columns: minmax(0, 1fr); }
+}
