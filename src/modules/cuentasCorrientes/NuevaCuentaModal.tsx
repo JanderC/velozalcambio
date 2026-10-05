@@ -97,6 +97,8 @@ export function NuevaCuentaModal({
   const [movPersona, setMovPersona] = useState("");
   // Western Union: se anota el MTCN y el movimiento nace en proceso de confirmación
   const [movMtcn, setMovMtcn] = useState("");
+  // La confirmación es parte del movimiento: marcada entra confirmada; sin marcar, queda pendiente
+  const [movConfirmada, setMovConfirmada] = useState(false);
   const esWestern = medio?.nombre === "WESTERN_UNION";
   const nMovMtcn = esWestern ? movMtcn.replace(/\D/g, "") : "";
   const movPersonaCompleta = [movPersona.trim(), nMovMtcn ? `MTCN ${nMovMtcn}` : ""].filter(Boolean).join(" ");
@@ -218,7 +220,8 @@ export function NuevaCuentaModal({
               `${movResta ? "Recibe" : "Retiro"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
               // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
               (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
-            ...(esWestern ? { estadoConfirmacion: "EN_PROCESO" as const } : {}),
+            // lleva confirmación lo que llega por transferencia: lo que el cliente pasa a cobrar (Retiro) y todo Western Union
+            ...(esWestern || !movResta ? { estadoConfirmacion: movConfirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) } : {}),
             ...(movFactor
               ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true } : {}) }
               : { monto: `${signo}${movMonto!}` }),
@@ -234,6 +237,7 @@ export function NuevaCuentaModal({
           setMovValor("");
           setMovPersona("");
           setMovMtcn("");
+          setMovConfirmada(false);
           setAvisoLectura(null);
         } else {
           setError(`El cliente se creó, pero el movimiento no se guardó (${errorMovimiento}). Cargalo desde su hoja.`);
@@ -476,7 +480,13 @@ export function NuevaCuentaModal({
               <label>
                 MTCN (referencia de Western Union)
                 <input value={movMtcn} onChange={(e) => setMovMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
-                <small>El movimiento queda en proceso de confirmación hasta que Western lo verifique. Desde la hoja del cliente se le avisa y después se marca como confirmada.</small>
+              </label>
+            )}
+            {(esWestern || !movResta) && (
+              <label className={`cc-check cc-confirmada ${movConfirmada ? "si" : ""}`}>
+                <input type="checkbox" checked={movConfirmada} onChange={(e) => setMovConfirmada(e.target.checked)} />
+                Transferencia confirmada
+                <small>{movConfirmada ? "Entra al sistema ya confirmada." : "Sin marcar, entra como pendiente de confirmar; después se confirma desde la hoja del cliente."}</small>
               </label>
             )}
           </fieldset>

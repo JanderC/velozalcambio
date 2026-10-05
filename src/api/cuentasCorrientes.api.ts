@@ -238,7 +238,7 @@ interface RegistrarMovimientoInput {
   monedaBaseId?: number;
   tasa?: string;
   tasaEsPorcentaje?: boolean;
-  estadoConfirmacion?: "EN_PROCESO"; // nace en proceso de confirmación (Western Union)
+  estadoConfirmacion?: "EN_PROCESO" | "CONFIRMADA"; // la transferencia entra confirmada o queda pendiente
   comisionDescontada?: boolean; // cantidad - comisión %: la tasa va como factor (4% -> "0.96")
   cuentaDestino?: string;
   categoriaId?: number;

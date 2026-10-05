@@ -149,6 +149,12 @@ a.cc-caja:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.14); }
 .cc-c-persona { grid-column: 2 / 6; grid-row: 3; }
 /* La cuenta a la que se pagó: renglón propio, debajo de la referencia (y de quién envió, si está) */
 .cc-c-destino { grid-column: 2 / 6; grid-row: 2; }
+/* Transferencia confirmada o pendiente: se decide al cargar el movimiento */
+.cc-nueva label.cc-confirmada, .cc-modal label.cc-confirmada { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: #fff4e0; color: #a8531f; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+.cc-nueva label.cc-confirmada.si, .cc-modal label.cc-confirmada.si { background: #e8f6ec; color: #1a7f37; }
+.cc-confirmada input { width: 18px; height: 18px; padding: 0 !important; flex: 0 0 auto; }
+.cc-confirmada small { flex-basis: 100%; font-weight: 400; color: inherit; }
+.cc-modal label.cc-confirmada { margin-top: 0; }
 /* Western Union: estado de la confirmación y su casillero */
 .cc-estado-conf { margin-left: 6px; font-size: 0.72rem; font-weight: 700; padding: 1px 8px; border-radius: 8px; white-space: nowrap; }
 .cc-estado-conf.proceso { background: #fff4e0; color: #a8531f; }
