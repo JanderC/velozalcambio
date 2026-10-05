@@ -135,6 +135,19 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           />
         </div>
       )}
+      {/* Confirmaciones: los medios van arriba, bajo el buscador. Filtran la lista y definen el medio del movimiento. */}
+      {enConfirmaciones && (
+        <div className="cc-chips cc-medios-top" role="tablist" aria-label="Medio">
+          <button role="tab" aria-selected={canalId === ""} className={canalId === "" ? "activo" : ""} onClick={() => setCanalId("")}>
+            Todos
+          </button>
+          {bancosConfirmaciones.map((c) => (
+            <button key={c.id} role="tab" aria-selected={canalId === c.id} className={canalId === c.id ? "activo" : ""} onClick={() => setCanalId(c.id)}>
+              {ETIQUETA_BANCO[c.nombre] ?? c.nombre.replace(/_/g, " ")}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="cc-header">
         <div>
           <h1>{enCobrar ? "Cuentas por Cobrar / Pagar" : modo === "cajas" ? "Confirmaciones" : "Cuentas Corrientes"}</h1>
@@ -157,7 +170,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
         </div>
       </div>
 
-      {resumen.length > 0 && (
+      {/* En Confirmaciones no van las tarjetas de Me deben / Yo debo */}
+      {!enConfirmaciones && resumen.length > 0 && (
         <div className="cc-resumen">
           {resumen.flatMap(([moneda, t]) => [
             <div key={`${moneda}-me-deben`}>
@@ -180,20 +194,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
               <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre" aria-label="Buscar cuenta" />
             </div>
           )}
-          {enConfirmaciones ? (
-            <div className="cc-filtros cc-filtros-bancos">
-              <div className="cc-chips" role="tablist">
-                <button role="tab" aria-selected={canalId === ""} className={canalId === "" ? "activo" : ""} onClick={() => setCanalId("")}>
-                  Todos
-                </button>
-                {bancosConfirmaciones.map((c) => (
-                  <button key={c.id} role="tab" aria-selected={canalId === c.id} className={canalId === c.id ? "activo" : ""} onClick={() => setCanalId(c.id)}>
-                    {ETIQUETA_BANCO[c.nombre] ?? c.nombre.replace(/_/g, " ")}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
+          {enConfirmaciones ? null : (
             <div className="cc-filtros">
               <div className="cc-chips" role="tablist">
                 {chips.map((t) => (
