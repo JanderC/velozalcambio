@@ -36,7 +36,8 @@ const SENTIDOS: { valor: string; etiqueta: string }[] = [
 ];
 
 const conSaldo = (c: CuentaCorrienteResumen) => /[1-9]/.test(c.saldo_actual);
-const yoDebo = (c: CuentaCorrienteResumen) => conSaldo(c) && c.saldo_actual.startsWith("-");
+// En Confirmaciones el saldo se lee al revés: lo que el cliente pasó a cobrar (positivo) es lo que le debemos
+const yoDebo = (c: CuentaCorrienteResumen) => conSaldo(c) && c.saldo_actual.startsWith("-") !== (c.modulo === "CAJA");
 
 function montoTexto(valor: string, moneda: string) {
   const negativo = valor.startsWith("-");
@@ -94,8 +95,9 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
     for (const c of cuentas) {
       if (!conSaldo(c)) continue;
       const t = porMoneda.get(c.moneda_codigo) ?? { meDeben: "0", debo: "0" };
-      if (yoDebo(c)) t.debo = sumarDecimales(t.debo, c.saldo_actual.slice(1));
-      else t.meDeben = sumarDecimales(t.meDeben, c.saldo_actual);
+      const valor = c.saldo_actual.replace(/^-/, "");
+      if (yoDebo(c)) t.debo = sumarDecimales(t.debo, valor);
+      else t.meDeben = sumarDecimales(t.meDeben, valor);
       porMoneda.set(c.moneda_codigo, t);
     }
     return [...porMoneda.entries()];
@@ -236,7 +238,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                     {c.estado !== "DISPONIBLE" && <span className={`cc-estado-badge cc-estado-${c.estado.toLowerCase()}`}>{c.estado.toLowerCase()}</span>}
                     {enCobrar && c.modulo === "POR_COBRAR" && <span className="cc-estado-badge cc-estado-cobrar">solo por cobrar</span>}
                   </span>
-                  <span className={`cc-cuenta-saldo ${c.saldo_actual.startsWith("-") ? "cc-neg" : ""}`}>{montoTexto(c.saldo_actual, c.moneda_codigo)}</span>
+                  <span className={`cc-cuenta-saldo ${yoDebo(c) ? "cc-neg" : ""}`}>{montoTexto(c.modulo === "CAJA" ? c.saldo_actual.replace(/^-/, "") : c.saldo_actual, c.moneda_codigo)}</span>
                   <span className="cc-cuenta-detalle">
                     {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : c.tercero_tipo === "AMIGO" ? "Amigo" : "Mixto"}
                     {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
@@ -261,7 +263,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   )}
                   {(/[1-9]/.test(c.vendido_hoy) || /[1-9]/.test(c.abonado_hoy)) && (
                     <span className="cc-cuenta-hoy">
-                      Hoy: le vendí <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · me vendió o abonó <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>
+                      Hoy: {c.modulo === "CAJA" ? "pasó a cobrar" : "le vendí"} <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · {c.modulo === "CAJA" ? "recibió" : "me vendió o abonó"} <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>
                     </span>
                   )}
                 </button>

@@ -37,7 +37,7 @@ const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", 
 const REFERENCIAS_OCULTAS = /^(venta de (bancolombia|proveedor(es)?|western union)|abono nequi)$/i;
 
 // Un abono resta solo. El abono por transferencia no: a veces suma y a veces resta, se elige a mano
-const restaPorReferencia = (referencia: string) => /^\s*(abono|pago|retiro)/i.test(referencia) && !/transferencia/i.test(referencia);
+const restaPorReferencia = (referencia: string) => /^\s*(abono|pago|recibe)/i.test(referencia) && !/transferencia/i.test(referencia);
 
 const CLAVE_ULTIMA_COMISION = "cc-ultima-comision-pct";
 const CLAVE_ULTIMA_CAJA = "cc-ultima-caja";
@@ -264,7 +264,9 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         : null;
   const equivalenteTexto = cobro ? (cobro.codigo === "COP" ? `$${formatearMonto(cobro.equivalente)} COP` : `${formatearMonto(cobro.equivalente)} ${cobro.codigo}`) : "";
   // Igual que el Excel: en negativo es lo que yo le debo
-  const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") ? "Yo le debo" : "Me debe";
+  // En Confirmaciones el saldo se lee al revés: lo que el cliente pasó a cobrar (en positivo) es plata que nosotros le debemos
+  const esConfirmaciones = cuenta.modulo === "CAJA";
+  const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") !== esConfirmaciones ? "Yo le debo" : "Me debe";
   // Enlace a WhatsApp (sin API): abre el chat del cliente con el saldo ya escrito, listo para enviar
   const telefono = telefonoWhatsApp(estado?.cuenta.tercero_telefono ?? cuenta.tercero_telefono);
   const saldoSinSigno = `${simbolo}${formatearMonto(saldoActual.replace(/^-/, ""))}${sufijo}`;
@@ -294,7 +296,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     : abonoParaAvisar.sentido === "recibe"
       ? `Hola ${cuenta.tercero_nombre}, te entregamos ${montoAviso}. ${saldoParaCliente}`
       : abonoParaAvisar.sentido === "retiro"
-        ? `Hola ${cuenta.tercero_nombre}, recibimos tu pago de ${montoAviso}. ${saldoParaCliente}`
+        ? `Hola ${cuenta.tercero_nombre}, recibimos ${montoAviso} que pasaste a cobrar. ${saldoParaCliente}`
         : `Hola ${cuenta.tercero_nombre}, he recibido ${montoAviso} (${abonoParaAvisar.descripcion}). ` +
           (lecturaSaldo === "Yo le debo"
             ? `Tu saldo a favor queda en ${saldoSinSigno}.`
@@ -334,12 +336,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           </span>
           {estado && (
             <span className="cc-hoy">
-              {dia === hoyBogota() ? "Hoy" : fechaCorta(`${dia}T12:00:00-05:00`)}: le vendí{" "}
+              {dia === hoyBogota() ? "Hoy" : fechaCorta(`${dia}T12:00:00-05:00`)}: {esConfirmaciones ? "pasó a cobrar" : "le vendí"}{" "}
               <b>
                 <Monto valor={estado.sumas} simbolo={simbolo} />
                 {sufijo}
               </b>{" "}
-              · me vendió o abonó{" "}
+              · {esConfirmaciones ? "recibió" : "me vendió o abonó"}{" "}
               <b>
                 <Monto valor={estado.abonos.replace(/^-/, "")} simbolo={simbolo} />
                 {sufijo}
@@ -366,7 +368,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         <div className={`cc-hoja-saldo ${lecturaSaldo === "Yo le debo" ? "debo" : ""}`}>
           <span>{lecturaSaldo}</span>
           <strong>
-            <Monto valor={saldoActual} simbolo={simbolo} />
+            <Monto valor={esConfirmaciones ? saldoActual.replace(/^-/, "") : saldoActual} simbolo={simbolo} />
             {sufijo}
           </strong>
           {cobro && lecturaSaldo !== "Saldo" && (
@@ -558,7 +560,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                             : m.estado_confirmacion === "CONFIRMADA"
                               ? { sentido: "confirmada" as const }
                               : cuenta.modulo === "CAJA"
-                                ? { sentido: m.monto.startsWith("-") ? ("retiro" as const) : ("recibe" as const) }
+                                ? { sentido: m.monto.startsWith("-") ? ("recibe" as const) : ("retiro" as const) }
                                 : {}),
                         });
                       }}
@@ -647,8 +649,8 @@ function FilaNueva({
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
   // Cliente que se trabaja con comisión descontada: 1.000 - 4% = 960. El % de su primer movimiento ya viene puesto.
-  // Confirmaciones: en vez de suma/abono se habla de "Recibe" (el cliente recibe efectivo: sale de nuestra caja)
-  // y "Retiro" (el cliente nos paga: entra a nuestra caja)
+  // Confirmaciones: en vez de suma/abono se habla de "Retiro" (el cliente nos paga o pasa un monto a cobrar: entra a nuestra caja
+  // y queda a su favor) y "Recibe" (el cliente recibe efectivo: sale de nuestra caja y se le descuenta)
   const enConfirmaciones = cuenta.modulo === "CAJA";
   const comisionDescuenta = cuenta.formula === "COMISION";
   const pctCuenta = comisionDescuenta && cuenta.comision_pct ? formatearMonto(cuenta.comision_pct) : "";
@@ -832,7 +834,8 @@ function FilaNueva({
       : monedaExtranjera && nCantidad
         ? { codigo: monedaExtranjera as string, cantidad: sinSigno(nCantidad) }
         : { codigo: cuenta.moneda_codigo, cantidad: monto };
-  const entraACaja = sentidoCaja === "auto" ? resta : sentidoCaja === "entra";
+  // un abono entra a la caja; en Confirmaciones entra lo que el cliente pasa a cobrar (Retiro) y sale lo que recibe
+  const entraACaja = sentidoCaja === "auto" ? resta !== enConfirmaciones : sentidoCaja === "entra";
   const monedaCaja = movimientoCaja ? monedas.find((m) => m.codigo === movimientoCaja.codigo) : undefined;
   const simbolo = cuenta.moneda_codigo === "COP" ? "$" : "";
 
@@ -945,7 +948,7 @@ function FilaNueva({
         datos.estadoConfirmacion === "EN_PROCESO"
           ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso" }
           : enConfirmaciones
-          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: datos.tipo === "ABONO" ? "retiro" : "recibe" }
+          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: datos.tipo === "ABONO" ? "recibe" : "retiro" }
           : datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion)
             ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion }
             : undefined
@@ -1037,24 +1040,24 @@ function FilaNueva({
           Cuenta a la que se pagó (opcional)
           <input value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)} placeholder="ej. Bancolombia ahorros 1234, Nequi 300…" autoComplete="off" maxLength={120} />
         </label>
-        <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Recibe o retiro" : "Suma o abono"}>
+        <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Retiro o recibe" : "Suma o abono"}>
           <button
             type="button"
             className={!resta ? "activo suma" : ""}
             onClick={() => setResta(false)}
             aria-pressed={!resta}
-            title={enConfirmaciones ? "El cliente recibe efectivo: sale de nuestra caja" : undefined}
+            title={enConfirmaciones ? "El cliente nos paga o pasa un monto a cobrar: entra a nuestra caja" : undefined}
           >
-            {enConfirmaciones ? "Recibe" : "+ Suma"}
+            {enConfirmaciones ? "Retiro" : "+ Suma"}
           </button>
           <button
             type="button"
             className={resta ? "activo resta" : ""}
             onClick={() => setResta(true)}
             aria-pressed={resta}
-            title={enConfirmaciones ? "El cliente nos paga: entra a nuestra caja" : undefined}
+            title={enConfirmaciones ? "El cliente recibe efectivo: sale de nuestra caja" : undefined}
           >
-            {enConfirmaciones ? "Retiro" : "− Abono"}
+            {enConfirmaciones ? "Recibe" : "− Abono"}
           </button>
         </div>
         <label className="cc-c-num">

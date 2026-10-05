@@ -213,9 +213,9 @@ export function NuevaCuentaModal({
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
             tipo: movResta ? "ABONO" : "CARGO",
-            // la referencia sale del medio: "Recibe Zelle" o "Retiro Zelle"
+            // la referencia sale del medio: "Retiro Zelle" (lo que pasó a cobrar) o "Recibe Zelle"
             descripcion:
-              `${movResta ? "Retiro" : "Recibe"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
+              `${movResta ? "Recibe" : "Retiro"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
               // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
               (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
             ...(esWestern ? { estadoConfirmacion: "EN_PROCESO" as const } : {}),
@@ -408,13 +408,13 @@ export function NuevaCuentaModal({
             <small className="cc-primer-mov-nota">O pegá la captura con Ctrl+V en cualquier parte de este formulario.</small>
             {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
             <div className="cc-primer-mov-opciones">
-              {/* Recibe: el cliente recibe efectivo (sale de nuestra caja). Retiro: el cliente nos paga (entra a nuestra caja). */}
-              <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Recibe o retiro">
-                <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta} title="El cliente recibe efectivo: sale de nuestra caja">
-                  Recibe
-                </button>
-                <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta} title="El cliente nos paga: entra a nuestra caja">
+              {/* Retiro: el cliente nos paga o pasa un monto a cobrar (entra a nuestra caja, queda a su favor). Recibe: el cliente recibe efectivo (sale de nuestra caja). */}
+              <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Retiro o recibe">
+                <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta} title="El cliente nos paga o pasa un monto a cobrar: entra a nuestra caja">
                   Retiro
+                </button>
+                <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta} title="El cliente recibe efectivo: sale de nuestra caja">
+                  Recibe
                 </button>
               </div>
               <div className="cc-segmento cc-primer-mov-formula" role="group" aria-label="Tasa o comisión">
@@ -439,7 +439,7 @@ export function NuevaCuentaModal({
               )}
             </div>
             <small className="cc-primer-mov-nota">
-              {movResta ? "Retiro: el cliente nos paga, entra a nuestra caja." : "Recibe: el cliente recibe efectivo, sale de nuestra caja."}
+              {movResta ? "Recibe: el cliente recibe efectivo, sale de nuestra caja." : "Retiro: el cliente pasa un monto a cobrar, entra a nuestra caja y queda a su favor."}
             </small>
             <div className="cc-primer-mov-cuenta">
               <label>
