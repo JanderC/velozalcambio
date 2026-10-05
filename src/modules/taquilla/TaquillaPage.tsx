@@ -115,72 +115,81 @@ export function TaquillaPage() {
   return (
     <div className="cc-page">
       <Header />
-      <div className="cc-header">
-        <div>
-          <h1>Taquilla</h1>
-          <p>Todas las solicitudes de Confirmaciones: acá se le entrega el efectivo al cliente y se descuenta de la caja.</p>
-        </div>
+      {/* Arriba de todo: el buscador */}
+      <div className="cc-buscador-top tq-buscador">
+        <Search size={20} />
+        <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre, teléfono, cédula o referencia" aria-label="Buscar solicitud" autoFocus />
       </div>
 
+      {/* La caja, en chico: cuánto hay en cada moneda y abrir o cerrar */}
       <section className="tq-caja" aria-label="Caja de taquilla">
-        <div className="tq-caja-cabeza">
-          <h2>
-            Caja de taquilla
+        <div className="tq-caja-franja">
+          <span className="tq-caja-titulo">
+            Caja
             {taquilla && <span className={`tq-estado ${abierta ? "abierta" : "cerrada"}`}>{abierta ? "abierta" : "cerrada"}</span>}
-          </h2>
+          </span>
+          {(taquilla?.caja.saldos ?? []).map((m) => (
+            <button
+              key={m.codigo}
+              className="tq-moneda-chica"
+              onClick={() => abierta && setMoviendo(m)}
+              disabled={!abierta}
+              title={abierta ? `Sumar o descontar ${NOMBRE_MONEDA[m.codigo]?.toLowerCase()}` : "Abrí la caja para mover efectivo"}
+            >
+              <span>{NOMBRE_MONEDA[m.codigo] ?? m.codigo}</span>
+              <strong>{dinero(m.monto, m.codigo)}</strong>
+            </button>
+          ))}
           {taquilla &&
             (abierta ? (
-              <button className="cc-guardar" onClick={() => setCerrando(true)}>
-                <Lock size={15} /> Cerrar caja y cuadrar
+              <button className="cc-btn-secundario tq-caja-accion" onClick={() => setCerrando(true)}>
+                <Lock size={14} /> Cerrar y cuadrar
               </button>
             ) : (
-              <button className="cc-guardar" onClick={() => setAbriendo(true)}>
-                <LockOpen size={15} /> Abrir caja
+              <button className="cc-guardar tq-caja-accion" onClick={() => setAbriendo(true)}>
+                <LockOpen size={14} /> Abrir caja
               </button>
             ))}
         </div>
-        {taquilla && abierta && taquilla.sesion.abierta_en && (
-          <p className="tq-sesion-nota">
-            Abierta el {fechaHora(taquilla.sesion.abierta_en)} por {taquilla.sesion.abierta_por}. Todo lo que se paga y se suma se va acumulando hasta el cierre.
-          </p>
-        )}
         {taquilla && !abierta && <p className="tq-sesion-nota cerrada">La caja está cerrada: para pagar solicitudes hay que abrirla con el efectivo con que arranca el día.</p>}
 
-        <div className="tq-caja-monedas">
-          {(taquilla?.caja.saldos ?? []).map((s) => (
-            <article key={s.codigo} className="tq-moneda">
-              <span>{NOMBRE_MONEDA[s.codigo] ?? s.codigo}</span>
-              <strong>{dinero(s.monto, s.codigo)}</strong>
-              {abierta && s.inicial !== null && (
-                <dl>
-                  <div>
-                    <dt>Abrió con</dt>
-                    <dd>{dinero(s.inicial, s.codigo)}</dd>
-                  </div>
-                  <div>
-                    <dt>Entró</dt>
-                    <dd>{dinero(s.entradas, s.codigo)}</dd>
-                  </div>
-                  <div>
-                    <dt>Salió</dt>
-                    <dd>{dinero(s.salidas, s.codigo)}</dd>
-                  </div>
-                </dl>
-              )}
-              {abierta && (
-                <button className="cc-btn-secundario" onClick={() => setMoviendo(s)}>
-                  Sumar o descontar
-                </button>
-              )}
-            </article>
-          ))}
-        </div>
-
+        {/* El detalle de la sesión y el último cuadre quedan plegados */}
+        {taquilla && abierta && taquilla.sesion.abierta_en && (
+          <details className="tq-caja-detalle">
+            <summary>
+              Abierta el {fechaHora(taquilla.sesion.abierta_en)} por {taquilla.sesion.abierta_por} · ver lo que entró y salió
+            </summary>
+            <table>
+              <thead>
+                <tr>
+                  <th>Moneda</th>
+                  <th>Abrió con</th>
+                  <th>Entró</th>
+                  <th>Salió</th>
+                  <th>Debe haber</th>
+                </tr>
+              </thead>
+              <tbody>
+                {taquilla.caja.saldos.map((m) => (
+                  <tr key={m.codigo}>
+                    <td>{NOMBRE_MONEDA[m.codigo] ?? m.codigo}</td>
+                    <td>{dinero(m.inicial ?? "0", m.codigo)}</td>
+                    <td>{dinero(m.entradas, m.codigo)}</td>
+                    <td>{dinero(m.salidas, m.codigo)}</td>
+                    <td>
+                      <b>{dinero(m.monto, m.codigo)}</b>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
         {taquilla?.ultimoCierre && !abierta && (
-          <div className="tq-ultimo-cierre">
-            <h3>
+          <details className="tq-caja-detalle">
+            <summary>
               Último cuadre · {fechaHora(taquilla.ultimoCierre.cerrada_en)} · {taquilla.ultimoCierre.por}
-            </h3>
+            </summary>
             <table>
               <thead>
                 <tr>
@@ -205,16 +214,11 @@ export function TaquillaPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </details>
         )}
       </section>
 
       {error && <p className="cc-form-error tq-error">{error}</p>}
-
-      <div className="cc-buscador-top tq-buscador">
-        <Search size={20} />
-        <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre, teléfono, cédula o referencia" aria-label="Buscar solicitud" />
-      </div>
 
       <section className="tq-lista" aria-label="Solicitudes por pagar">
         <h2>

@@ -79,3 +79,29 @@
   .tq-moneda dl { flex-basis: 100%; }
   .tq-detalle-accion .tq-pagar { flex: 1; justify-content: center; }
 }
+
+/* La caja en chico, debajo del buscador: una franja con lo que hay en cada moneda */
+.tq-buscador { margin: 16px 40px 12px; }
+.tq-caja { padding: 0 40px 14px; }
+.tq-caja-franja { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: white; border-radius: 10px; padding: 8px 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+.tq-caja-titulo { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: var(--color-navy-dark); margin-right: 4px; }
+.tq-moneda-chica { display: inline-flex; align-items: baseline; gap: 6px; border: 1px solid #dfe5ee; background: #f7f9fc; border-radius: 8px; padding: 5px 10px; font-family: inherit; cursor: pointer; }
+.tq-moneda-chica:disabled { cursor: default; opacity: 0.85; }
+.tq-moneda-chica:not(:disabled):hover { border-color: var(--color-navy); }
+.tq-moneda-chica span { font-size: 0.7rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.03em; }
+.tq-moneda-chica strong { font-size: 0.92rem; color: var(--color-navy-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tq-caja-accion { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px !important; font-size: 0.82rem !important; }
+.tq-caja .tq-sesion-nota { margin: 8px 0 0; }
+.tq-caja-detalle { margin-top: 6px; font-size: 0.82rem; color: #4b5563; }
+.tq-caja-detalle summary { cursor: pointer; padding: 2px 4px; }
+.tq-caja-detalle table { margin-top: 6px; width: 100%; border-collapse: collapse; background: white; border-radius: 8px; font-variant-numeric: tabular-nums; }
+.tq-caja-detalle th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; padding: 6px 10px; white-space: nowrap; }
+.tq-caja-detalle td { padding: 6px 10px; border-top: 1px solid #f1f2f4; white-space: nowrap; }
+.tq-caja-detalle td.falta { color: #c0392b; font-weight: 700; }
+.tq-caja-detalle td.sobra { color: #a8531f; font-weight: 700; }
+@media (max-width: 860px) {
+  .tq-buscador { margin: 10px 12px 10px; }
+  .tq-caja { padding: 0 12px 12px; }
+  .tq-caja-accion { margin-left: 0; flex: 1; justify-content: center; }
+  .tq-caja-detalle { overflow-x: auto; }
+}
