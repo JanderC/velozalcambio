@@ -285,8 +285,15 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const saldoParaCliente =
     lecturaSaldo === "Yo le debo" ? `Tienes ${saldoSinSigno} a tu favor.` : lecturaSaldo === "Me debe" ? `Tu saldo por pagar es de ${saldoSinSigno}.` : "Quedas al día, sin saldo pendiente.";
   // Western Union: el MTCN va anotado en la referencia del movimiento
-  const mtcnAviso = abonoParaAvisar ? (/MTCN\s*(\d+)/i.exec(abonoParaAvisar.descripcion)?.[1] ?? null) : null;
-  const conMtcn = mtcnAviso ? ` (MTCN ${mtcnAviso})` : "";
+  // La referencia de la transferencia va anotada en el movimiento, después del " · ": el MTCN o el número que se cargó
+  const refAviso = (() => {
+    if (!abonoParaAvisar) return null;
+    const mtcn = /MTCN\s*(\d+)/i.exec(abonoParaAvisar.descripcion)?.[1];
+    if (mtcn) return `MTCN ${mtcn}`;
+    const anotado = (abonoParaAvisar.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
+    return /[A-Z0-9-]*\d{4,}[A-Z0-9-]*/i.exec(anotado)?.[0] ?? null;
+  })();
+  const conMtcn = refAviso ? ` (referencia ${refAviso})` : "";
   const mensajeAbono = !abonoParaAvisar
     ? ""
     : abonoParaAvisar.sentido === "proceso"
@@ -296,7 +303,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     : abonoParaAvisar.sentido === "recibe"
       ? `Hola ${cuenta.tercero_nombre}, te entregamos ${montoAviso}. ${saldoParaCliente}`
       : abonoParaAvisar.sentido === "retiro"
-        ? `Hola ${cuenta.tercero_nombre}, recibimos ${montoAviso} que pasaste a cobrar. ${saldoParaCliente}`
+        ? `Hola ${cuenta.tercero_nombre}, recibimos ${montoAviso}${conMtcn} que pasaste a cobrar. ${saldoParaCliente}`
         : `Hola ${cuenta.tercero_nombre}, he recibido ${montoAviso} (${abonoParaAvisar.descripcion}). ` +
           (lecturaSaldo === "Yo le debo"
             ? `Tu saldo a favor queda en ${saldoSinSigno}.`
@@ -812,7 +819,7 @@ function FilaNueva({
     return () => clearTimeout(t);
   }, [numeroMovimiento]);
   const avisoRepetido = (m: MovimientoConNumero) =>
-    `Ya hay un movimiento con el número ${numeroMovimiento}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
+    `Ya hay un movimiento con la referencia ${numeroMovimiento}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   const sinSigno = (v: string) => v.replace(/^-/, "");
   // Se escribió una tasa distinta a la que venía puesta
@@ -876,7 +883,10 @@ function FilaNueva({
       const ya = repetido ?? (await buscarMovimientoPorNumero(numeroMovimiento).catch(() => null));
       if (ya) {
         setRepetido(ya);
-        return setError(`${avisoRepetido(ya)} No se puede registrar dos veces.`);
+        // referencia repetida: no se genera el movimiento y se avisa con una alerta
+        const aviso = `${avisoRepetido(ya)} No se puede registrar dos veces: el movimiento NO se generó.`;
+        window.alert(`Referencia repetida\n\n${aviso}`);
+        return setError(aviso);
       }
     }
 
@@ -1030,8 +1040,8 @@ function FilaNueva({
         </label>
         {pidePersona && (
           <label className="cc-c-persona">
-            Quién envió o número de la transferencia{personaObligatoria ? "" : " (opcional)"}
-            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Nombre de quien envió, y el número si lo hay" autoComplete="off" />
+            Referencia de la transferencia y quién envió{personaObligatoria ? "" : " (opcional)"}
+            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Número de referencia, y el nombre de quien envió" autoComplete="off" />
             {repetido && <small className="cc-repetido">{avisoRepetido(repetido)}</small>}
           </label>
         )}

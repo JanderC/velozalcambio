@@ -192,7 +192,12 @@ export function NuevaCuentaModal({
       const numero = !conMovimiento ? null : nMovMtcn.length >= 4 ? nMovMtcn : (movPersona.match(/\d{4,30}/)?.[0] ?? null);
       if (numero) {
         const ya = await buscarMovimientoPorNumero(numero).catch(() => null);
-        if (ya) return setError(`Ya hay un movimiento con el número ${numero}: "${ya.descripcion}" de ${ya.tercero_nombre}. No se puede registrar dos veces.`);
+        if (ya) {
+          // referencia repetida: no se crea el cliente ni se genera el movimiento, y se avisa con una alerta
+          const aviso = `Ya hay un movimiento con la referencia ${numero}: "${ya.descripcion}" de ${ya.tercero_nombre}. No se puede registrar dos veces: el movimiento NO se generó.`;
+          window.alert(`Referencia repetida\n\n${aviso}`);
+          return setError(aviso);
+        }
       }
       const cuenta = await crearCuentaCorriente({
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
@@ -473,8 +478,8 @@ export function NuevaCuentaModal({
                   : "Cantidad × tasa = total en pesos. La tasa queda guardada para los próximos movimientos del cliente."}
             </small>
             <label>
-              Quién envió o número de la transferencia (opcional)
-              <input value={movPersona} onChange={(e) => setMovPersona(e.target.value)} placeholder="Nombre de quien envió, y el número si lo hay" autoComplete="off" />
+              Referencia de la transferencia y quién envió (opcional)
+              <input value={movPersona} onChange={(e) => setMovPersona(e.target.value)} placeholder="Número de referencia, y el nombre de quien envió" autoComplete="off" />
             </label>
             {esWestern && (
               <label>
