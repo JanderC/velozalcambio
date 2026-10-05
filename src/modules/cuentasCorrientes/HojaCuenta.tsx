@@ -5,6 +5,7 @@ import {
   confirmarMovimientoCC,
   avisarClienteCuenta,
   buscarMovimientoPorNumero,
+  codigoDeReferencia,
   eliminarCuentaCorriente,
   type MovimientoConNumero,
   cerrarDiaCuenta,
@@ -291,7 +292,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     const mtcn = /MTCN\s*(\d+)/i.exec(abonoParaAvisar.descripcion)?.[1];
     if (mtcn) return `MTCN ${mtcn}`;
     const anotado = (abonoParaAvisar.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
-    return /[A-Z0-9-]*\d{4,}[A-Z0-9-]*/i.exec(anotado)?.[0] ?? null;
+    return codigoDeReferencia(anotado);
   })();
   const conMtcn = refAviso ? ` (referencia ${refAviso})` : "";
   const mensajeAbono = !abonoParaAvisar
@@ -806,7 +807,7 @@ function FilaNueva({
   // Lleva confirmación lo que llega por transferencia: en Confirmaciones, lo que el cliente pasa a cobrar (Retiro); y todo Western Union
   const llevaConfirmacion = esWestern || (enConfirmaciones && !resta);
   const personaCompleta = [persona.trim(), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
-  const numeroMovimiento = nMtcn.length >= 4 ? nMtcn : pidePersona ? (persona.match(/\d{4,30}/)?.[0] ?? null) : null;
+  const numeroMovimiento = nMtcn.length >= 4 ? nMtcn : pidePersona ? codigoDeReferencia(persona) : null;
   const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
   useEffect(() => {
     setRepetido(null);

@@ -174,9 +174,18 @@ export interface MovimientoConNumero {
   tercero_nombre: string;
 }
 
+/**
+ * El código de referencia dentro de lo que se escribió (junto al nombre de quien envió): un número de 4 dígitos o más,
+ * o un código con letras y números de 5 caracteres o más, como "d1a1kat6i". null si no hay ninguno.
+ */
+export function codigoDeReferencia(texto: string): string | null {
+  const palabras = texto.match(/[A-Za-z0-9-]+/g) ?? [];
+  return palabras.map((p) => p.replace(/^-+|-+$/g, "")).find((p) => /^\d{4,}$/.test(p) || (/\d/.test(p) && /[A-Za-z]/.test(p) && p.length >= 5)) ?? null;
+}
+
 /** El movimiento ya registrado con ese número de transferencia, si lo hay. */
 export async function buscarMovimientoPorNumero(numero: string) {
-  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${numero}`)).movimiento;
+  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${encodeURIComponent(numero)}`)).movimiento;
 }
 
 /** Manda un mensaje al cliente por el WhatsApp conectado al sistema. */

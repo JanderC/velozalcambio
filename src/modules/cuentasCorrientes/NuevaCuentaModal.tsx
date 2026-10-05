@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, crearCuentaCorriente, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarMovimientoPorNumero, codigoDeReferencia, crearCuentaCorriente, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { leerComprobante } from "./ocrComprobante";
@@ -189,7 +189,7 @@ export function NuevaCuentaModal({
     setEnviando(true);
     try {
       // Un número de transferencia no se registra dos veces
-      const numero = !conMovimiento ? null : nMovMtcn.length >= 4 ? nMovMtcn : (movPersona.match(/\d{4,30}/)?.[0] ?? null);
+      const numero = !conMovimiento ? null : nMovMtcn.length >= 4 ? nMovMtcn : codigoDeReferencia(movPersona);
       if (numero) {
         const ya = await buscarMovimientoPorNumero(numero).catch(() => null);
         if (ya) {
