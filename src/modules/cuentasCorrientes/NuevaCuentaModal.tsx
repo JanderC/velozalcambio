@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
-import { buscarMovimientoPorNumero, crearCuentaCorriente, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { Camera } from "lucide-react";
+import { buscarMovimientoPorNumero, crearCuentaCorriente, leerComprobante, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
@@ -101,6 +102,36 @@ export function NuevaCuentaModal({
   const codigoCuenta = movFormula === "tasa" && movFactor ? "COP" : codigoMedio;
   const movMonto = !nMovCantidad ? null : movFactor ? multiplicarDecimales(nMovCantidad, movFactor, codigoCuenta === "COP" ? 0 : 2) : nMovCantidad;
   const hayMovimiento = movCantidad.trim() !== "";
+
+  // Leer la imagen del comprobante: pone el monto en la cantidad y la referencia (con quien envía) en su casillero
+  const [leyendo, setLeyendo] = useState(false);
+  const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
+  async function cargarComprobante(archivo: File | undefined) {
+    if (!archivo) return;
+    setError(null);
+    setAvisoLectura(null);
+    setLeyendo(true);
+    try {
+      const d = await leerComprobante(archivo);
+      const partes: string[] = [];
+      if (d.monto) {
+        setMovCantidad(formatearMonto(d.monto));
+        partes.push(`monto ${formatearMonto(d.monto)}${d.moneda ? ` ${d.moneda}` : ""}`);
+      }
+      const quien = [d.remitente, d.referencia].filter(Boolean).join(" ");
+      if (quien) {
+        setMovPersona(quien);
+        if (d.referencia) partes.push(`referencia ${d.referencia}`);
+      }
+      // si el comprobante está en otra moneda que la del medio elegido, se avisa: la cuenta no se cambia sola
+      const otraMoneda = d.moneda && medio && d.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${d.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
+      setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}` : "No encontré monto ni referencia en esa imagen.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo leer la imagen.");
+    } finally {
+      setLeyendo(false);
+    }
+  }
   const monedaCobro = monedaCobroId !== monedaId ? monedas.find((m) => m.id === monedaCobroId) : undefined;
   const nTasaCobro = tasaCobro.trim() ? leerNumero(tasaCobro) : null;
 
@@ -169,6 +200,7 @@ export function NuevaCuentaModal({
           setMovCantidad("");
           setMovValor("");
           setMovPersona("");
+          setAvisoLectura(null);
         } else {
           setError(`El cliente se creó, pero el movimiento no se guardó (${errorMovimiento}). Cargalo desde su hoja.`);
         }
@@ -327,6 +359,19 @@ export function NuevaCuentaModal({
                 "Elegí arriba el medio: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle."
               )}
             </p>
+            <label className={`cc-leer-comprobante cc-primer-mov-leer ${leyendo ? "leyendo" : ""}`}>
+              <Camera size={15} /> {leyendo ? "Leyendo la imagen…" : "Cargar imagen del comprobante"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={leyendo}
+                onChange={(e) => {
+                  void cargarComprobante(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
             <div className="cc-primer-mov-opciones">
               <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Suma o abono">
                 <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta}>

@@ -164,8 +164,10 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-modo-tasa button.activo { background: var(--color-navy); color: white; }
 /* Leer la imagen del comprobante para llenar el movimiento */
 .cc-nueva-titulo { display: flex; align-items: center; gap: 12px; }
-.cc-nueva label.cc-leer-comprobante { flex-direction: row; align-items: center; gap: 6px; margin-left: auto; padding: 7px 12px; border: 1px solid var(--color-navy); border-radius: 6px; background: white; color: var(--color-navy); font-size: 0.82rem; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: pointer; }
-.cc-nueva label.cc-leer-comprobante.leyendo { opacity: 0.6; cursor: default; }
+.cc-nueva label.cc-leer-comprobante, .cc-modal label.cc-leer-comprobante { flex-direction: row; align-items: center; gap: 6px; margin-left: auto; padding: 7px 12px; border: 1px solid var(--color-navy); border-radius: 6px; background: white; color: var(--color-navy); font-size: 0.82rem; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.cc-nueva label.cc-leer-comprobante.leyendo, .cc-modal label.cc-leer-comprobante.leyendo { opacity: 0.6; cursor: default; }
+.cc-modal label.cc-primer-mov-leer { margin-left: 0; align-self: flex-start; padding: 10px 14px; font-size: 0.88rem; }
+.cc-primer-mov .cc-aviso-lectura { margin: 0; }
 .cc-leer-comprobante input { display: none; }
 .cc-aviso-lectura { margin: 8px 0 0; padding: 8px 10px; border-radius: 6px; background: #e6f0fb; color: #14406f; font-size: 0.84rem; font-weight: 600; }
 /* Confirmaciones: crear el cliente en la misma página, debajo de la búsqueda */
