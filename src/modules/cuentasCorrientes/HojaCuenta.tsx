@@ -271,14 +271,11 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   // Enlace a WhatsApp (sin API): abre el chat del cliente con el saldo ya escrito, listo para enviar
   const telefono = telefonoWhatsApp(estado?.cuenta.tercero_telefono ?? cuenta.tercero_telefono);
   const saldoSinSigno = `${simbolo}${formatearMonto(saldoActual.replace(/^-/, ""))}${sufijo}`;
+  // Enviar saldo: el mismo formato de los demás avisos al cliente
   const mensajeSaldo =
-    `Hola ${cuenta.tercero_nombre}, te comparto tu saldo al ${fechaCorta(new Date().toISOString())}: ` +
-    (lecturaSaldo === "Yo le debo"
-      ? `tienes un saldo a favor de ${saldoSinSigno} (es lo que te debemos).`
-      : lecturaSaldo === "Me debe"
-        ? `tienes un saldo pendiente por pagar de ${saldoSinSigno}.`
-        : "tu cuenta está al día, sin saldo pendiente.") +
-    (cobro && lecturaSaldo !== "Saldo" ? ` Equivale a ${equivalenteTexto} (tasa ${formatearMonto(cobro.tasa)}).` : "");
+    `Estimado(a), le informamos su saldo al ${fechaCorta(new Date().toISOString())}.\n\n` +
+    (lecturaSaldo === "Yo le debo" ? `Saldo a su favor: ${saldoSinSigno}` : lecturaSaldo === "Me debe" ? `Saldo por pagar: ${saldoSinSigno}` : "Sin saldo pendiente") +
+    (cobro && lecturaSaldo !== "Saldo" ? `\nEquivale a: ${equivalenteTexto} (tasa ${formatearMonto(cobro.tasa)})` : "");
   // Confirmación de un abono: "he recibido tanto" y cómo queda el saldo
   // En Confirmaciones el mensaje depende de qué pasó: "recibe" = se le entregó plata al cliente (sale de nuestra caja);
   // "retiro" = el cliente nos pagó (entra a nuestra caja). El saldo se dice desde el lado del cliente.
