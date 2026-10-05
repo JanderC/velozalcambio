@@ -13,7 +13,6 @@ import {
   getCanales,
   getEstadoCuenta,
   getTasasRecientes,
-  leerComprobante,
   guardarTasaHabitual,
   type TasasRecientes,
   registrarMovimientoCC,
@@ -29,6 +28,7 @@ import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { CobroModal } from "./CobroModal";
+import { leerComprobante } from "./ocrComprobante";
 
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
@@ -657,7 +657,7 @@ function FilaNueva({
       setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de agregar.` : "No encontré referencia, monto ni fecha en esa imagen.");
       setAbierta(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo leer la imagen.");
+      setError(err instanceof Error ? err.message : "No se pudo leer la imagen.");
     } finally {
       setLeyendo(false);
     }

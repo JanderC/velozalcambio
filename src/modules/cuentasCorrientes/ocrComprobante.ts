@@ -1,0 +1,135 @@
+// Lectura de comprobantes en el propio navegador (OCR), sin IA ni claves: saca el texto de la imagen
+// y busca en él el monto, el número de referencia y la fecha.
+
+export interface DatosComprobante {
+  referencia: string | null;
+  monto: string | null; // decimal normalizado: "1250000" o "403.5"
+  moneda: string | null; // COP, USD, VES, EUR, USDT
+  fecha: string | null; // AAAA-MM-DD
+  banco: string | null;
+  remitente: string | null;
+}
+
+// El motor de OCR pesa unos MB: se carga la primera vez que se usa y queda listo para las siguientes
+type Lector = { recognize: (imagen: File) => Promise<{ data: { text: string } }> };
+let lector: Promise<Lector> | null = null;
+function obtenerLector() {
+  lector ??= import("tesseract.js")
+    .then(({ createWorker }) => createWorker(["spa", "eng"]) as unknown as Promise<Lector>)
+    .catch((e) => {
+      lector = null; // que el próximo intento vuelva a probar
+      throw e;
+    });
+  return lector;
+}
+
+/** "1.250.000,50", "1,250,000.50" o "403.5" -> "1250000.5" / "403.5". null si no es un número. */
+export function normalizarMonto(crudo: string): string | null {
+  let s = crudo.replace(/[^\d.,]/g, "").replace(/^[.,]+|[.,]+$/g, "");
+  if (!/\d/.test(s)) return null;
+  const separador = Math.max(s.lastIndexOf(","), s.lastIndexOf("."));
+  // El último separador es decimal solo si deja 1 o 2 dígitos detrás; si deja 3, es de miles
+  const decimales = separador >= 0 ? s.length - separador - 1 : 0;
+  if (separador >= 0 && decimales >= 1 && decimales <= 2) s = `${s.slice(0, separador).replace(/[.,]/g, "")}.${s.slice(separador + 1)}`;
+  else s = s.replace(/[.,]/g, "");
+  const limpio = s.replace(/^0+(?=\d)/, "").replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  return /[1-9]/.test(limpio) ? limpio : null;
+}
+
+const NUMERO = String.raw`\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?`;
+const MONEDA = String.raw`US\$|USDT|USD|COP|VES|EUR|Bs\.?S?\.?|\$|€`;
+
+function monedaDe(simbolo: string | undefined, texto: string): string | null {
+  const s = (simbolo ?? "").toUpperCase();
+  if (s.startsWith("BS") || s === "VES") return "VES";
+  if (s === "USDT") return "USDT";
+  if (s === "USD" || s === "US$") return "USD";
+  if (s === "COP") return "COP";
+  if (s === "EUR" || s === "€") return "EUR";
+  // Solo "$": se decide por lo que diga el resto del comprobante
+  if (/usdt|binance/i.test(texto)) return "USDT";
+  if (/zelle|usd|d[oó]lar/i.test(texto)) return "USD";
+  if (/bancolombia|nequi|daviplata|cop|pesos/i.test(texto)) return "COP";
+  if (/bol[ií]var|pago m[oó]vil|banco de venezuela|banesco|mercantil/i.test(texto)) return "VES";
+  return null;
+}
+
+function buscarMonto(lineas: string[], texto: string): { monto: string | null; moneda: string | null } {
+  const conMoneda = new RegExp(String.raw`(${MONEDA})\s*(${NUMERO})|(${NUMERO})\s*(${MONEDA})`, "i");
+  const clave = /monto|valor|total|importe|cantidad|amount|enviaste|recibiste|transferiste|pagaste|cu[aá]nto|env[ií]o de|you sent|sent/i;
+  const candidatos: { monto: string; moneda: string | null; peso: number }[] = [];
+  lineas.forEach((linea, i) => {
+    // el monto puede venir en la misma línea que su etiqueta o en la siguiente
+    const etiquetada = clave.test(linea) || (i > 0 && clave.test(lineas[i - 1]!) && !/\d/.test(lineas[i - 1]!));
+    const m = conMoneda.exec(linea);
+    if (m) {
+      const monto = normalizarMonto(m[2] ?? m[3] ?? "");
+      if (monto) candidatos.push({ monto, moneda: monedaDe(m[1] ?? m[4], texto), peso: etiquetada ? 3 : 2 });
+    } else if (etiquetada) {
+      const suelto = new RegExp(NUMERO).exec(linea.replace(clave, ""));
+      const monto = suelto ? normalizarMonto(suelto[0]) : null;
+      if (monto) candidatos.push({ monto, moneda: monedaDe(undefined, texto), peso: 1 });
+    }
+  });
+  // Gana el mejor etiquetado; entre iguales, el más grande (comisiones y saldos de impuestos son menores)
+  candidatos.sort((a, b) => b.peso - a.peso || Number(b.monto) - Number(a.monto));
+  return candidatos[0] ? { monto: candidatos[0].monto, moneda: candidatos[0].moneda } : { monto: null, moneda: null };
+}
+
+function buscarReferencia(lineas: string[]): string | null {
+  const clave = /referencia|ref\b\.?|comprobante|confirmaci[oó]n|confirmation|aprobaci[oó]n|n[uú]mero de (?:operaci[oó]n|transacci[oó]n|documento|recibo)|n[°ºo]\.? ?de (?:operaci[oó]n|transacci[oó]n)|operaci[oó]n|transaction id|id de (?:la )?transacci[oó]n|c[oó]digo|order id|orden/i;
+  const codigo = /[A-Z0-9][A-Z0-9-]{3,}/gi;
+  const valido = (c: string) => /\d{3,}/.test(c) && !/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(c);
+  for (let i = 0; i < lineas.length; i++) {
+    const partes = lineas[i]!.split(clave);
+    if (partes.length < 2) continue;
+    // lo que sigue a la etiqueta en la misma línea, o la línea de abajo
+    for (const donde of [partes[partes.length - 1] ?? "", lineas[i + 1] ?? ""]) {
+      const encontrado = (donde.match(codigo) ?? []).find(valido);
+      if (encontrado) return encontrado.replace(/^-+|-+$/g, "");
+    }
+  }
+  return null;
+}
+
+const MESES: Record<string, number> = { ene: 1, jan: 1, feb: 2, mar: 3, abr: 4, apr: 4, may: 5, jun: 6, jul: 7, ago: 8, aug: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12, dec: 12 };
+
+function buscarFecha(texto: string): string | null {
+  const iso = (a: number, m: number, d: number) => {
+    const anio = a < 100 ? 2000 + a : a;
+    if (m < 1 || m > 12 || d < 1 || d > 31 || anio < 2020 || anio > 2100) return null;
+    return `${anio}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  };
+  let m = /\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/.exec(texto);
+  if (m) return iso(Number(m[1]), Number(m[2]), Number(m[3]));
+  m = /\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b/.exec(texto); // día/mes/año, como se escribe acá
+  if (m) return iso(Number(m[3]), Number(m[2]), Number(m[1]));
+  m = /\b(\d{1,2})\s*(?:de\s+)?([a-zñ]{3})[a-zñ]*\.?\s*(?:de\s+|,\s*)?(\d{4})\b/i.exec(texto); // 12 de octubre de 2026
+  if (m && MESES[m[2]!.toLowerCase()]) return iso(Number(m[3]), MESES[m[2]!.toLowerCase()]!, Number(m[1]));
+  m = /\b([a-zñ]{3})[a-zñ]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/i.exec(texto); // Oct 12, 2026
+  if (m && MESES[m[1]!.toLowerCase()]) return iso(Number(m[3]), MESES[m[1]!.toLowerCase()]!, Number(m[2]));
+  return null;
+}
+
+function buscarBanco(texto: string): string | null {
+  const bancos = ["Zelle", "Bancolombia", "Nequi", "Daviplata", "Binance", "Western Union", "Banco de Venezuela", "Banesco", "Mercantil", "Provincial", "Pago Móvil"];
+  return bancos.find((b) => new RegExp(b.replace("ó", "[oó]"), "i").test(texto)) ?? null;
+}
+
+/** Saca los datos del texto ya leído de un comprobante. Separado del OCR para poder probarlo. */
+export function extraerDatos(texto: string): DatosComprobante {
+  const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const { monto, moneda } = buscarMonto(lineas, texto);
+  return { referencia: buscarReferencia(lineas), monto, moneda, fecha: buscarFecha(texto), banco: buscarBanco(texto), remitente: null };
+}
+
+/** Lee la imagen de un comprobante en el navegador: referencia, monto y fecha de la transacción. */
+export async function leerComprobante(imagen: File): Promise<DatosComprobante> {
+  let texto: string;
+  try {
+    texto = (await (await obtenerLector()).recognize(imagen)).data.text;
+  } catch {
+    throw new Error("No se pudo leer la imagen. Revisá la conexión (el lector se descarga la primera vez) y probá de nuevo.");
+  }
+  return extraerDatos(texto);
+}

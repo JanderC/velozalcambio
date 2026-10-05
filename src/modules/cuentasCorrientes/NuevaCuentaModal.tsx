@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, crearCuentaCorriente, leerComprobante, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarMovimientoPorNumero, crearCuentaCorriente, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
+import { leerComprobante } from "./ocrComprobante";
 import { ApiError } from "../../api/client";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
@@ -137,7 +138,7 @@ export function NuevaCuentaModal({
       const otraMoneda = d.moneda && medio && d.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${d.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
       setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}` : "No encontré monto ni referencia en esa imagen.");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo leer la imagen.");
+      setError(err instanceof Error ? err.message : "No se pudo leer la imagen.");
     } finally {
       setLeyendo(false);
     }
