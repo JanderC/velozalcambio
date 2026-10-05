@@ -3,7 +3,7 @@ import { CheckCircle2, Image as IconoImagen, Lock, LockOpen, Search } from "luci
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
-import { getUrlComprobante } from "../../api/cuentasCorrientes.api";
+import { confirmarMovimientoCC, getUrlComprobante } from "../../api/cuentasCorrientes.api";
 import {
   abrirCajaTaquilla,
   cerrarCajaTaquilla,
@@ -95,9 +95,37 @@ export function TaquillaPage() {
     }
   }
 
+  // Western o Zelle ya verificó: se confirma acá mismo y queda lista para pagarse
+  async function confirmar(s: SolicitudTaquilla) {
+    if (!window.confirm(`¿Confirmar la transferencia de ${s.cliente_nombre} por ${dinero(s.monto, s.moneda_codigo)}? Queda lista para pagarse.`)) return;
+    setPagando(s.id);
+    try {
+      await confirmarMovimientoCC(s.id);
+      const nueva = await getTaquilla();
+      setTaquilla(nueva);
+      // el detalle abierto se actualiza: ahora muestra Se pagó
+      setDetalle((d) => (d && d.id === s.id ? (nueva.pendientes.find((x) => x.id === s.id) ?? null) : d));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo confirmar la transferencia.");
+    } finally {
+      setPagando(null);
+    }
+  }
+
   const botonPagar = (s: SolicitudTaquilla) =>
     porConfirmar(s) ? (
-      <span className="tq-sin-confirmar" title="Se confirma en Confirmaciones, en la hoja del cliente, y después se paga">Falta confirmar</span>
+      <button
+        className="tq-confirmar"
+        onClick={(e) => {
+          e.stopPropagation();
+          void confirmar(s);
+        }}
+        disabled={pagando !== null}
+        title="La transferencia ya fue verificada: confirmarla para poder pagarla"
+      >
+        <CheckCircle2 size={18} /> {pagando === s.id ? "Confirmando…" : "Confirmar transferencia"}
+      </button>
     ) : (
       <button
         className="tq-pagar"
@@ -345,7 +373,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
     [comision ? "Comisión" : "Tasa", comision ? `${formatearMonto(comision)}%` : s.tasa ? formatearMonto(s.tasa) : null],
     ["Recibe", dinero(s.monto, s.moneda_codigo)],
     ["Registrada", `${fechaHora(s.fecha)} por ${s.registrado_por_nombre}`],
-    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia (se confirma en Confirmaciones)" : s.pagado_en ? `Pagada ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
+    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
   ];
 
   return (

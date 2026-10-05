@@ -105,3 +105,12 @@
   .tq-caja-accion { margin-left: 0; flex: 1; justify-content: center; }
   .tq-caja-detalle { overflow-x: auto; }
 }
+
+/* Confirmar desde taquilla las transferencias que estaban pendientes (Western, Zelle) */
+.tq-confirmar { display: inline-flex; align-items: center; gap: 8px; background: #e0a100; color: white; border: none; border-radius: 8px; padding: 13px 18px; font-family: inherit; font-size: 0.95rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.tq-confirmar:hover:not(:disabled) { background: #b98600; }
+.tq-confirmar:disabled { opacity: 0.55; cursor: default; }
+@media (max-width: 860px) {
+  .tq-confirmar { grid-column: 1 / -1; justify-content: center; padding: 15px; }
+  .tq-detalle-accion .tq-confirmar { flex: 1; }
+}
