@@ -200,3 +200,21 @@
   .tq-movimiento-acciones { flex-wrap: wrap; }
   .tq-movimiento-acciones .cc-whatsapp { flex: 1; justify-content: center; padding: 11px; }
 }
+
+/* Conversión: monto en una moneda, resultado en otra, y qué lado mueve la caja */
+.tq-operacion-opciones { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.tq-operacion-cuenta { grid-template-columns: minmax(0, 1.3fr) auto minmax(0, 0.8fr) auto minmax(0, 1.3fr); }
+.tq-operacion-cuenta label select { margin-bottom: 4px; }
+.tq-operacion-total.neutro { background: #eef3f9; color: var(--color-navy-dark); border-color: #b8c4d4; }
+.tq-operacion-caja { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 9px 12px; border-radius: 8px; background: #e8f6ec; color: #14532d; font-size: 0.9rem; }
+.tq-operacion-caja strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tq-operacion-caja.egreso { background: #fdecea; color: #8a231a; }
+.tq-operacion-caja.banco { background: #eaf1f8; color: var(--color-navy); }
+.tq-lado { flex: 0 1 380px; }
+.tq-lado button { padding: 6px 8px !important; font-size: 0.8rem !important; white-space: nowrap; }
+@media (max-width: 860px) {
+  .tq-operacion-opciones { grid-template-columns: minmax(0, 1fr); }
+  .tq-operacion-cuenta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tq-operacion-cuenta label:last-of-type { grid-column: 1 / -1; }
+  .tq-lado { flex-basis: 100%; }
+}

@@ -63,7 +63,11 @@ export interface OperacionTaquilla {
   estado: "PENDIENTE" | "CONFIRMADA" | "ANULADA";
   created_at: string;
   confirmado_en: string | null;
-  moneda_codigo: CodigoTaquilla;
+  // lo que mueve la caja (total) va en moneda_codigo; puede ser lo que trajo el cliente o el resultado de la cuenta
+  moneda_codigo: string;
+  resultado: string | null; // lo que sale de la cuenta, en moneda_resultado
+  moneda_resultado: string | null;
+  caja_lado: "MONTO" | "RESULTADO";
   usuario_nombre: string;
   confirmado_por_nombre: string | null;
 }
@@ -107,12 +111,13 @@ export function pagarSolicitud(id: number, medio: "EFECTIVO" | "BANCOLOMBIA" = "
 
 export interface NuevaOperacionTaquilla {
   tipo: "INGRESO" | "EGRESO";
-  monedaCodigo: CodigoTaquilla;
   cantidad: string;
-  monedaOperacion?: string;
+  monedaOperacion: string;
   tasa?: string;
   dividir?: boolean;
   comisionPct?: string;
+  monedaResultado: string;
+  cajaLado: "MONTO" | "RESULTADO";
   medio?: "EFECTIVO" | "BANCOLOMBIA";
   descripcion?: string;
   clienteNombre?: string;

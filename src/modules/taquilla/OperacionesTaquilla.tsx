@@ -1,30 +1,26 @@
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
 import { ApiError } from "../../api/client";
-import {
-  anularOperacionTaquilla,
-  confirmarOperacionTaquilla,
-  crearOperacionTaquilla,
-  type CodigoTaquilla,
-  type OperacionTaquilla,
-  type Taquilla,
-} from "../../api/taquilla.api";
+import { anularOperacionTaquilla, confirmarOperacionTaquilla, crearOperacionTaquilla, type OperacionTaquilla, type Taquilla } from "../../api/taquilla.api";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
-const NOMBRE_MONEDA: Record<CodigoTaquilla, string> = { COP: "Pesos", USD: "Dólares", EUR: "Euros" };
-// Lo que se compra o se vende en la ventanilla
-const MONEDAS_OPERACION: { codigo: string; nombre: string }[] = [
+// Las monedas que se compran, se venden o se convierten en la ventanilla
+const MONEDAS: { codigo: string; nombre: string }[] = [
+  { codigo: "COP", nombre: "Pesos" },
   { codigo: "VES", nombre: "Bolívares" },
   { codigo: "USD", nombre: "Dólares" },
   { codigo: "USDT", nombre: "USDT" },
   { codigo: "EUR", nombre: "Euros" },
-  { codigo: "COP", nombre: "Pesos" },
 ];
+// La caja de taquilla solo tiene efectivo en estas
+const DE_LA_CAJA = ["COP", "USD", "EUR"];
+const nombreDe = (codigo: string | null) => MONEDAS.find((m) => m.codigo === codigo)?.nombre ?? codigo ?? "";
+const decimalesDe = (codigo: string) => (codigo === "COP" ? 0 : 2);
 type Formula = "tasa" | "dividir" | "comision";
 
-function dinero(monto: string, codigo: string) {
+function dinero(monto: string, codigo: string | null) {
   const numero = formatearMonto(monto.replace(/^-/, ""));
-  return codigo === "COP" ? `$${numero}` : codigo === "VES" ? `Bs. ${numero}` : `${numero} ${codigo}`;
+  return codigo === "COP" ? `$${numero}` : codigo === "VES" ? `Bs. ${numero}` : codigo ? `${numero} ${codigo}` : numero;
 }
 
 const hora = (fecha: string) => new Date(fecha).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", hour: "numeric", minute: "2-digit" });
@@ -38,26 +34,31 @@ function telefonoWhatsApp(telefono: string | null) {
   return d;
 }
 
-/** La cuenta del movimiento, como se muestra: 100.000 × 3,3, 82.500 ÷ 3.280 o 1.000 − 4%. */
+/** La cuenta del movimiento, como se muestra: Bs. 100.000 × 3,3 = $330.000, o $100.000 ÷ 3,3 = Bs. 30.303. */
 function cuentaDe(o: OperacionTaquilla) {
-  const moneda = o.moneda_operacion ?? "";
-  const base = moneda ? dinero(o.cantidad, moneda) : formatearMonto(o.cantidad);
+  const base = dinero(o.cantidad, o.moneda_operacion);
   const tasa = o.tasa ? ` ${o.divide ? "÷" : "×"} ${formatearMonto(o.tasa)}` : "";
   const comision = o.comision_pct && /[1-9]/.test(o.comision_pct) ? ` − ${formatearMonto(o.comision_pct)}%` : "";
-  return `${base}${tasa}${comision}`;
+  // las operaciones viejas no guardaban el resultado aparte: era el total
+  const resultado = o.resultado ? dinero(o.resultado, o.moneda_resultado) : dinero(o.total, o.moneda_codigo);
+  return `${base}${tasa}${comision} = ${resultado}`;
 }
 
 /**
- * Ingreso / egreso de ventanilla: una compra o venta hecha en la taquilla.
- * Igual que en Confirmaciones, la cuenta es por tasa (monto × tasa), dividiendo (monto ÷ tasa) o con comisión (monto − %).
+ * Ingreso / egreso de ventanilla, que casi siempre es una conversión: el cliente trae una moneda y se lleva otra.
+ *   me venden 100.000 Bs a 3,3   -> Bs 100.000 × 3,3 = $330.000    (la caja se mueve por el resultado, en pesos)
+ *   trae $100.000 y quiere Bs    -> $100.000 ÷ 3,3 = Bs 30.303     (la caja se mueve por lo que trae, en pesos)
+ * La cuenta es como en Confirmaciones: por tasa (×), dividiendo (÷) o con comisión (− %).
  * En efectivo mueve la caja (el egreso al registrarlo, el ingreso al confirmarlo); por Bancolombia es transferencia y no la toca.
  */
 export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla; onCambio: (t: Taquilla) => void }) {
   const [tipo, setTipo] = useState<"INGRESO" | "EGRESO">("INGRESO");
-  const [monedaOperacion, setMonedaOperacion] = useState("VES");
+  const [monedaMonto, setMonedaMonto] = useState("VES"); // en qué está lo que trae el cliente o se negocia
+  const [monedaResultado, setMonedaResultado] = useState("COP"); // en qué queda la cuenta
   const [formula, setFormula] = useState<Formula>("tasa");
-  const [moneda, setMoneda] = useState<CodigoTaquilla>("COP");
   const [medio, setMedio] = useState<"EFECTIVO" | "BANCOLOMBIA">("EFECTIVO");
+  // qué lado mueve la caja: se elige solo (el que sea efectivo de la caja) y se puede cambiar
+  const [ladoElegido, setLadoElegido] = useState<"MONTO" | "RESULTADO" | null>(null);
   const [monto, setMonto] = useState("");
   const [valor, setValor] = useState(""); // la tasa o el % de comisión
   const [descripcion, setDescripcion] = useState("");
@@ -74,9 +75,9 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
   const nMonto = monto.trim() ? leerNumero(monto)?.replace(/^-/, "") ?? null : null;
   const nValor = valor.trim() ? leerNumero(valor.replace(/%/g, "")) : null;
   const valorValido = !!nValor && /[1-9]/.test(nValor) && !nValor.startsWith("-");
-  const decimales = moneda === "COP" ? 0 : 2;
+  const decimales = decimalesDe(monedaResultado);
   // por tasa: monto × tasa · dividiendo: monto ÷ tasa · con comisión: monto − % (sin valor, el monto tal cual)
-  const total = !nMonto
+  const resultado = !nMonto
     ? null
     : !valorValido
       ? formula === "dividir"
@@ -87,6 +88,15 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
         : formula === "dividir"
           ? dividirDecimales(nMonto, nValor!, decimales)
           : multiplicarDecimales(nMonto, sumarDecimales("1", `-${multiplicarDecimales(nValor!, "0.01", 8)}`), decimales);
+
+  // La caja se mueve por el lado que es efectivo suyo: el resultado si está en pesos/dólares/euros; si no, lo que trae el cliente
+  const ladoAuto: "MONTO" | "RESULTADO" = DE_LA_CAJA.includes(monedaResultado) ? "RESULTADO" : "MONTO";
+  const lado = ladoElegido ?? ladoAuto;
+  const monedaCaja = lado === "MONTO" ? monedaMonto : monedaResultado;
+  const montoCaja = lado === "MONTO" ? (nMonto ? multiplicarDecimales(nMonto, "1", decimalesDe(monedaMonto)) : null) : resultado;
+  const cajaPuede = DE_LA_CAJA.includes(monedaCaja);
+  const ambosDeLaCaja = DE_LA_CAJA.includes(monedaMonto) && DE_LA_CAJA.includes(monedaResultado) && monedaMonto !== monedaResultado;
+
   const pendientes = taquilla.operaciones.filter((o) => o.estado === "PENDIENTE").length;
   // con la caja cerrada solo se puede lo que no la toca: una transferencia, o un ingreso que queda pendiente
   const necesitaCaja = !porBanco && (tipo === "EGRESO" || confirmada);
@@ -98,16 +108,18 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
     if (valor.trim() && !valorValido) return setError(formula === "comision" ? "La comisión no es un número válido." : "La tasa no es un número válido.");
     if (formula === "dividir" && !valorValido) return setError("Para dividir hace falta la tasa.");
     if (formula === "comision" && valorValido && Number(nValor) >= 100) return setError("La comisión tiene que ser menor al 100%.");
-    if (!total || !/[1-9]/.test(total)) return setError("El total da cero: revisá el monto y la tasa o la comisión.");
+    if (!resultado || !/[1-9]/.test(resultado)) return setError("El resultado da cero: revisá el monto y la tasa o la comisión.");
+    if (!porBanco && !cajaPuede) return setError(`La caja solo tiene pesos, dólares y euros: no puede moverse en ${nombreDe(monedaCaja).toLowerCase()}. Elegí Bancolombia o cambiá las monedas.`);
     setOcupado("nueva");
     try {
       onCambio(
         await crearOperacionTaquilla({
           tipo,
-          monedaCodigo: moneda,
-          monedaOperacion,
           cantidad: nMonto,
+          monedaOperacion: monedaMonto,
           ...(valorValido ? (formula === "comision" ? { comisionPct: nValor! } : { tasa: nValor!, dividir: formula === "dividir" }) : {}),
+          monedaResultado,
+          cajaLado: lado,
           medio,
           descripcion: descripcion.trim() || undefined,
           clienteNombre: cliente.trim() || undefined,
@@ -123,6 +135,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
       setTelefono("");
       setCedula("");
       setConfirmada(false);
+      setLadoElegido(null);
       setVerMovimientos(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar.");
@@ -148,7 +161,22 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
     }
   }
 
-  const nombreOperacion = MONEDAS_OPERACION.find((m) => m.codigo === monedaOperacion)?.nombre.toLowerCase() ?? "";
+  const selectorMoneda = (valorActual: string, cambiar: (c: string) => void, etiqueta: string) => (
+    <select
+      value={valorActual}
+      onChange={(e) => {
+        cambiar(e.target.value);
+        setLadoElegido(null);
+      }}
+      aria-label={etiqueta}
+    >
+      {MONEDAS.map((m) => (
+        <option key={m.codigo} value={m.codigo}>
+          {m.nombre}
+        </option>
+      ))}
+    </select>
+  );
 
   return (
     <section className="tq-operaciones" aria-label="Ingreso o egreso de caja">
@@ -157,31 +185,21 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           <h2>Ingreso / egreso de caja</h2>
           <div className="cc-segmento" role="group" aria-label="Ingreso o egreso">
             <button type="button" className={tipo === "INGRESO" ? "activo" : ""} onClick={() => setTipo("INGRESO")} aria-pressed={tipo === "INGRESO"}>
-              Ingreso
+              Ingreso (suma)
             </button>
             <button type="button" className={tipo === "EGRESO" ? "activo" : ""} onClick={() => setTipo("EGRESO")} aria-pressed={tipo === "EGRESO"}>
-              Egreso
+              Egreso (resta)
             </button>
           </div>
         </div>
 
         <div className="tq-operacion-opciones">
-          <label>
-            Moneda que se compra o se vende
-            <select value={monedaOperacion} onChange={(e) => setMonedaOperacion(e.target.value)}>
-              {MONEDAS_OPERACION.map((m) => (
-                <option key={m.codigo} value={m.codigo}>
-                  {m.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
           <div className="tq-operacion-grupo">
             <span>Cuenta</span>
-            <div className="cc-segmento" role="group" aria-label="Tasa, dividir o comisión">
+            <div className="cc-segmento" role="group" aria-label="Multiplicar por la tasa, dividir o comisión">
               {(
                 [
-                  ["tasa", "Tasa"],
+                  ["tasa", "Multiplicar ×"],
                   ["dividir", "Dividir ÷"],
                   ["comision", "Comisión %"],
                 ] as [Formula, string][]
@@ -207,8 +225,9 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
 
         <div className="tq-operacion-cuenta">
           <label>
-            Monto en {nombreOperacion}
-            <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="100.000" autoComplete="off" />
+            Monto, en
+            {selectorMoneda(monedaMonto, setMonedaMonto, "Moneda del monto")}
+            <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="100.000" autoComplete="off" aria-label="Monto" />
           </label>
           <span aria-hidden="true">{formula === "comision" ? "−" : formula === "dividir" ? "÷" : "×"}</span>
           <label>
@@ -217,29 +236,44 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           </label>
           <span aria-hidden="true">=</span>
           <label>
-            Total, en
-            <select value={moneda} onChange={(e) => setMoneda(e.target.value as CodigoTaquilla)} aria-label="Moneda del total">
-              {(Object.keys(NOMBRE_MONEDA) as CodigoTaquilla[]).map((c) => (
-                <option key={c} value={c}>
-                  {NOMBRE_MONEDA[c]}
-                </option>
-              ))}
-            </select>
+            Resultado, en
+            {selectorMoneda(monedaResultado, setMonedaResultado, "Moneda del resultado")}
+            <output className="tq-operacion-total neutro">{resultado ? dinero(resultado, monedaResultado) : "—"}</output>
           </label>
-          <output className={`tq-operacion-total ${tipo === "EGRESO" ? "egreso" : ""} ${porBanco ? "banco" : ""}`}>{total ? `${tipo === "EGRESO" ? "− " : "+ "}${dinero(total, moneda)}` : "—"}</output>
         </div>
-        <p className="tq-operacion-nota">
-          {porBanco
-            ? "Por Bancolombia es una transferencia: queda registrado, pero no suma ni resta de la caja."
-            : tipo === "EGRESO"
-              ? "En efectivo: el egreso descuenta de la caja al registrarlo."
-              : "En efectivo: el ingreso suma a la caja cuando se confirma."}
-        </p>
+
+        {/* Lo que pasa con la caja, dicho claro */}
+        <div className={`tq-operacion-caja ${porBanco ? "banco" : tipo === "EGRESO" ? "egreso" : ""}`}>
+          {porBanco ? (
+            <span>Por Bancolombia es una transferencia: queda registrado, pero no suma ni resta de la caja.</span>
+          ) : !cajaPuede ? (
+            <span>La caja no tiene efectivo en {nombreDe(monedaCaja).toLowerCase()}: elegí qué lado la mueve, o Bancolombia.</span>
+          ) : (
+            <span>
+              {tipo === "INGRESO" ? "Suma a la caja" : "Resta de la caja"}:{" "}
+              <strong>
+                {tipo === "INGRESO" ? "+ " : "− "}
+                {montoCaja ? dinero(montoCaja, monedaCaja) : "—"}
+              </strong>
+              {tipo === "INGRESO" && !confirmada ? " (cuando se confirme)" : ""}
+            </span>
+          )}
+          {!porBanco && (ambosDeLaCaja || !cajaPuede) && (
+            <span className="cc-segmento tq-lado" role="group" aria-label="Qué mueve la caja">
+              <button type="button" className={lado === "MONTO" ? "activo" : ""} onClick={() => setLadoElegido("MONTO")} aria-pressed={lado === "MONTO"}>
+                El monto ({nombreDe(monedaMonto)})
+              </button>
+              <button type="button" className={lado === "RESULTADO" ? "activo" : ""} onClick={() => setLadoElegido("RESULTADO")} aria-pressed={lado === "RESULTADO"}>
+                El resultado ({nombreDe(monedaResultado)})
+              </button>
+            </span>
+          )}
+        </div>
 
         <div className="tq-operacion-datos">
           <label className="ancho">
             Descripción (es lo que se le envía al cliente por WhatsApp)
-            <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="ej. Compra de 100.000 Bs a 3,3: recibe $330.000" maxLength={300} autoComplete="off" />
+            <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="ej. Recibimos $100.000, le enviamos Bs. 30.303 a tasa 3,3" maxLength={300} autoComplete="off" />
           </label>
           <label>
             Cliente
@@ -284,7 +318,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           {taquilla.operaciones.map((o) => {
             const wa = telefonoWhatsApp(o.cliente_telefono);
             // Al cliente se le envía la descripción que se escribió; si no hay, la cuenta del movimiento
-            const mensaje = o.descripcion?.trim() || `${cuentaDe(o)} = ${dinero(o.total, o.moneda_codigo)}`;
+            const mensaje = o.descripcion?.trim() || cuentaDe(o);
             return (
               <li key={o.id} className={`tq-movimiento ${o.tipo === "EGRESO" ? "egreso" : ""} ${o.estado.toLowerCase()}`}>
                 <div className="tq-movimiento-datos">
@@ -299,7 +333,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
                     {[o.cliente_nombre, o.cliente_cedula ? `CC ${o.cliente_cedula}` : null, o.cliente_telefono].filter(Boolean).join(" · ") || "sin datos del cliente"} · {hora(o.created_at)} · {o.usuario_nombre}
                   </span>
                 </div>
-                <strong className="tq-movimiento-total">
+                <strong className="tq-movimiento-total" title="Lo que mueve la caja">
                   {o.tipo === "EGRESO" ? "− " : "+ "}
                   {dinero(o.total, o.moneda_codigo)}
                 </strong>
