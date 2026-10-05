@@ -26,6 +26,7 @@ export interface SolicitudTaquilla {
   estado_confirmacion: "EN_PROCESO" | "CONFIRMADA" | null;
   tiene_comprobante: boolean;
   pagado_en: string | null;
+  pagado_medio: "EFECTIVO" | "BANCOLOMBIA" | null; // por Bancolombia no descuenta de la caja
   pagado_por_nombre: string | null;
   registrado_por_nombre: string;
   cuenta_id: number;
@@ -45,6 +46,8 @@ export interface CierreTaquilla {
 }
 
 export interface Taquilla {
+  // Pagos hechos por Bancolombia (de esta caja abierta, o de hoy si está cerrada): no tocan la caja
+  pagosBancolombia: { cantidad: number; totales: { codigo: string; total: string }[] };
   caja: { id: number; nombre: string; saldos: SaldoTaquilla[] };
   sesion: { abierta: boolean; abierta_en: string | null; abierta_por: string | null };
   ultimoCierre: CierreTaquilla | null;
@@ -73,6 +76,6 @@ export function moverCajaTaquilla(monedaCodigo: CodigoTaquilla, monto: string) {
   return api.post<Taquilla>("/taquilla/caja", { monedaCodigo, monto });
 }
 
-export function pagarSolicitud(id: number) {
-  return api.post<Taquilla>(`/taquilla/solicitudes/${id}/pagar`);
+export function pagarSolicitud(id: number, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
+  return api.post<Taquilla>(`/taquilla/solicitudes/${id}/pagar`, { medio });
 }

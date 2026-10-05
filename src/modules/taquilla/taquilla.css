@@ -106,6 +106,21 @@
   .tq-caja-detalle { overflow-x: auto; }
 }
 
+/* Pago por Bancolombia: no descuenta de la caja; arriba se ve cuántos van */
+.tq-pagos { display: inline-flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.tq-pagar-banco { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: white; color: var(--color-navy); border: 1px solid var(--color-navy); border-radius: 8px; padding: 7px 12px; font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.tq-pagar-banco:hover:not(:disabled) { background: #eaf1f8; }
+.tq-pagar-banco:disabled { opacity: 0.55; cursor: default; }
+.tq-banco-chip { display: inline-flex; align-items: baseline; gap: 6px; border: 1px solid #c9d8ec; background: #eaf1f8; color: var(--color-navy); border-radius: 8px; padding: 5px 10px; }
+.tq-banco-chip svg { align-self: center; }
+.tq-banco-chip span { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.tq-banco-chip strong { font-size: 0.92rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 860px) {
+  .tq-pagos { grid-column: 1 / -1; }
+  .tq-pagar-banco { padding: 12px; font-size: 0.9rem; }
+  .tq-detalle-accion .tq-pagos { flex: 1; }
+}
+
 /* Confirmar desde taquilla las transferencias que estaban pendientes (Western, Zelle) */
 .tq-confirmar { display: inline-flex; align-items: center; gap: 8px; background: #e0a100; color: white; border: none; border-radius: 8px; padding: 13px 18px; font-family: inherit; font-size: 0.95rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .tq-confirmar:hover:not(:disabled) { background: #b98600; }

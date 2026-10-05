@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, Image as IconoImagen, Lock, LockOpen, Search } from "lucide-react";
+import { CheckCircle2, Image as IconoImagen, Landmark, Lock, LockOpen, Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
@@ -80,11 +80,16 @@ export function TaquillaPage() {
   const pagadas = useMemo(() => (taquilla?.pagadasHoy ?? []).filter(coincide), [taquilla, coincide]);
   const abierta = taquilla?.sesion.abierta ?? false;
 
-  async function pagar(s: SolicitudTaquilla) {
-    if (!window.confirm(`¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre}? Se descuenta de la caja de taquilla.`)) return;
+  // En efectivo descuenta de la caja; por Bancolombia no la toca (solo queda contado arriba)
+  async function pagar(s: SolicitudTaquilla, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
+    const pregunta =
+      medio === "BANCOLOMBIA"
+        ? `¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} por Bancolombia? No se descuenta de la caja.`
+        : `¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} en efectivo? Se descuenta de la caja de taquilla.`;
+    if (!window.confirm(pregunta)) return;
     setPagando(s.id);
     try {
-      setTaquilla(await pagarSolicitud(s.id));
+      setTaquilla(await pagarSolicitud(s.id, medio));
       setDetalle(null);
       setError(null);
     } catch (e) {
@@ -127,17 +132,30 @@ export function TaquillaPage() {
         <CheckCircle2 size={18} /> {pagando === s.id ? "Confirmando…" : "Confirmar transferencia"}
       </button>
     ) : (
-      <button
-        className="tq-pagar"
-        onClick={(e) => {
-          e.stopPropagation();
-          void pagar(s);
-        }}
-        disabled={pagando !== null || !abierta}
-        title={abierta ? undefined : "Primero abrí la caja de taquilla"}
-      >
-        <CheckCircle2 size={18} /> {pagando === s.id ? "Registrando…" : "Se pagó"}
-      </button>
+      <span className="tq-pagos">
+        <button
+          className="tq-pagar"
+          onClick={(e) => {
+            e.stopPropagation();
+            void pagar(s);
+          }}
+          disabled={pagando !== null || !abierta}
+          title={abierta ? "Se le entregó en efectivo: descuenta de la caja" : "Primero abrí la caja de taquilla"}
+        >
+          <CheckCircle2 size={18} /> {pagando === s.id ? "Registrando…" : "Se pagó"}
+        </button>
+        <button
+          className="tq-pagar-banco"
+          onClick={(e) => {
+            e.stopPropagation();
+            void pagar(s, "BANCOLOMBIA");
+          }}
+          disabled={pagando !== null}
+          title="Se le pagó por transferencia de Bancolombia: no descuenta de la caja"
+        >
+          <Landmark size={15} /> Por Bancolombia
+        </button>
+      </span>
     );
 
   return (
@@ -168,6 +186,16 @@ export function TaquillaPage() {
               <strong>{dinero(m.monto, m.codigo)}</strong>
             </button>
           ))}
+          {taquilla && (
+            <span className="tq-banco-chip" title="Pagos hechos por transferencia de Bancolombia: no descuentan de la caja">
+              <Landmark size={13} />
+              <span>Pagos Bancolombia</span>
+              <strong>
+                {taquilla.pagosBancolombia.cantidad}
+                {taquilla.pagosBancolombia.totales.length > 0 && ` · ${taquilla.pagosBancolombia.totales.map((t) => dinero(t.total, t.codigo)).join(" + ")}`}
+              </strong>
+            </span>
+          )}
           {taquilla &&
             (abierta ? (
               <button className="cc-btn-secundario tq-caja-accion" onClick={() => setCerrando(true)}>
@@ -291,7 +319,8 @@ export function TaquillaPage() {
                     Ref: <b>{referenciaDe(s) || "—"}</b>
                   </span>
                   <span>
-                    Pagada {s.pagado_en ? fechaHora(s.pagado_en) : ""}
+                    Pagada {s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia " : "en efectivo "}
+                    {s.pagado_en ? fechaHora(s.pagado_en) : ""}
                     {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
                   </span>
                 </div>
@@ -373,7 +402,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
     [comision ? "Comisión" : "Tasa", comision ? `${formatearMonto(comision)}%` : s.tasa ? formatearMonto(s.tasa) : null],
     ["Recibe", dinero(s.monto, s.moneda_codigo)],
     ["Registrada", `${fechaHora(s.fecha)} por ${s.registrado_por_nombre}`],
-    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
+    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada ${s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia" : "en efectivo"} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
   ];
 
   return (
