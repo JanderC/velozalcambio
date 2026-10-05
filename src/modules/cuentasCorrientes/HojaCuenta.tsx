@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Camera, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   avisarClienteCuenta,
@@ -13,6 +13,7 @@ import {
   getCanales,
   getEstadoCuenta,
   getTasasRecientes,
+  leerComprobante,
   guardarTasaHabitual,
   type TasasRecientes,
   registrarMovimientoCC,
@@ -614,6 +615,46 @@ function FilaNueva({
   const [recientes, setRecientes] = useState<TasasRecientes>({ tasas: [], porcentajes: [], tasaHabitual: null, referenciaFrecuente: null });
   // Si se cambia la tasa que venía puesta: ¿queda esta para los próximos movimientos?
   const [mantenerTasa, setMantenerTasa] = useState(false);
+  // Leer la imagen del comprobante: llena el número de referencia, el monto y la fecha
+  const [leyendo, setLeyendo] = useState(false);
+  const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
+  async function cargarComprobante(archivo: File | undefined) {
+    if (!archivo) return;
+    setError(null);
+    setAvisoLectura(null);
+    setLeyendo(true);
+    try {
+      const d = await leerComprobante(archivo);
+      const partes: string[] = [];
+      const quien = [d.remitente, d.referencia].filter(Boolean).join(" ");
+      if (quien) {
+        setPersona(quien);
+        if (d.referencia) partes.push(`referencia ${d.referencia}`);
+      }
+      if (d.monto) {
+        // En la moneda de la cuenta es el monto directo; en otra, es la cantidad y se aplica la tasa
+        if (!d.moneda || d.moneda === cuenta.moneda_codigo) {
+          setTasa("");
+          setEsPorcentaje(false);
+          setEnCobro(false);
+          setMontoDirecto(formatearMonto(d.monto));
+        } else {
+          setCantidad(formatearMonto(d.monto));
+        }
+        partes.push(`monto ${formatearMonto(d.monto)}${d.moneda ? ` ${d.moneda}` : ""}`);
+      }
+      if (d.fecha && d.fecha <= hoyBogota()) {
+        setFecha(d.fecha);
+        partes.push(`fecha ${fechaCorta(`${d.fecha}T12:00:00-05:00`)}`);
+      }
+      setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de agregar.` : "No encontré referencia, monto ni fecha en esa imagen.");
+      setAbierta(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo leer la imagen.");
+    } finally {
+      setLeyendo(false);
+    }
+  }
   const cargarRecientes = useCallback(() => {
     getTasasRecientes(cuenta.id)
       .then(setRecientes)
@@ -849,6 +890,18 @@ function FilaNueva({
     <form className={`cc-nueva ${abierta ? "abierta" : ""}`} onSubmit={guardar}>
       <div className="cc-nueva-titulo">
         Nuevo movimiento
+        <label className={`cc-leer-comprobante ${leyendo ? "leyendo" : ""}`}>
+          <Camera size={15} /> {leyendo ? "Leyendo la imagen…" : "Leer comprobante"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={leyendo}
+            onChange={(e) => {
+              void cargarComprobante(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
         <button type="button" className="cc-cerrar-panel" onClick={() => setAbierta(false)} aria-label="Cerrar">
           <X size={18} />
         </button>
@@ -959,6 +1012,7 @@ function FilaNueva({
         </button>
       </div>
 
+      {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
       {tasaModificada && (
         <label className="cc-check cc-mantener-tasa">
           <input type="checkbox" checked={mantenerTasa} onChange={(e) => setMantenerTasa(e.target.checked)} />

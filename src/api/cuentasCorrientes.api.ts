@@ -176,6 +176,22 @@ export function avisarClienteCuenta(id: number, texto: string) {
   return api.post<{ ok: true }>(`/cuentas-corrientes/${id}/avisar`, { texto });
 }
 
+export interface DatosComprobante {
+  referencia: string | null;
+  monto: string | null; // decimal normalizado
+  moneda: string | null;
+  fecha: string | null; // AAAA-MM-DD
+  banco: string | null;
+  remitente: string | null;
+}
+
+/** Lee la imagen de un comprobante: referencia, monto y fecha de la transacción. */
+export function leerComprobante(imagen: File) {
+  const formData = new FormData();
+  formData.append("imagen", imagen);
+  return api.postForm<DatosComprobante>("/cuentas-corrientes/leer-comprobante", formData);
+}
+
 export function eliminarCuentaCorriente(id: number) {
   return api.delete<void>(`/cuentas-corrientes/${id}`);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { crearCuentaCorriente, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
@@ -10,12 +10,18 @@ import { formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/mo
 export function NuevaCuentaModal({
   canales,
   modulo = "CORRIENTE",
+  enLinea = false,
+  inicial,
   onPersonalizar,
   onCreada,
   onCerrar,
 }: {
   canales: Canal[];
   modulo?: "CORRIENTE" | "POR_COBRAR" | "CAJA";
+  // enLinea: el formulario va en la página (sin ventana ni pestañas), siempre para alguien nuevo
+  enLinea?: boolean;
+  // lo que se está buscando: llena nombre, teléfono o cédula mientras no se hayan escrito a mano
+  inicial?: { nombre?: string; telefono?: string; cedula?: string };
   onPersonalizar: () => void;
   onCreada: (c: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
@@ -57,6 +63,15 @@ export function NuevaCuentaModal({
     return () => clearTimeout(t);
   }, [busqueda, modo]);
 
+  // Lo escrito a mano manda sobre lo que viene de la búsqueda
+  const tocado = useRef({ nombre: false, telefono: false, cedula: false });
+  useEffect(() => {
+    if (!inicial) return;
+    if (!tocado.current.nombre) setNombre(inicial.nombre ?? "");
+    if (!tocado.current.telefono) setTelefono(inicial.telefono ?? "");
+    if (!tocado.current.cedula) setCedula(inicial.cedula ?? "");
+  }, [inicial?.nombre, inicial?.telefono, inicial?.cedula]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const nSaldo = saldo.trim() ? leerNumero(saldo) : null;
   const moneda = monedas.find((m) => m.id === monedaId);
   const monedaCobro = monedaCobroId !== monedaId ? monedas.find((m) => m.id === monedaCobroId) : undefined;
@@ -82,6 +97,15 @@ export function NuevaCuentaModal({
         monedaId,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
       });
+      if (enLinea) {
+        // el formulario sigue en la página: queda limpio para el siguiente cliente
+        tocado.current = { nombre: false, telefono: false, cedula: false };
+        setNombre("");
+        setTelefono("");
+        setCedula("");
+        setReferencia("");
+        setSaldo("");
+      }
       onCreada(cuenta);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo crear la cuenta.");
@@ -90,45 +114,71 @@ export function NuevaCuentaModal({
     }
   }
 
-  return (
-    <Modal titulo={modulo === "CAJA" ? "Nuevo cliente" : modulo === "POR_COBRAR" ? "Nueva cuenta por cobrar" : "Nueva cuenta corriente"} onCerrar={onCerrar}>
+  const formulario = (
       <form className="cc-modal" onSubmit={guardar}>
-        <div className="cc-segmento" role="tablist">
-          <button type="button" role="tab" aria-selected={modo === "nuevo"} className={modo === "nuevo" ? "activo" : ""} onClick={() => setModo("nuevo")}>
-            Crear nuevo
-          </button>
-          <button type="button" role="tab" aria-selected={modo === "existente"} className={modo === "existente" ? "activo" : ""} onClick={() => setModo("existente")}>
-            Ya está en el sistema
-          </button>
-        </div>
+        {!enLinea && (
+          <div className="cc-segmento" role="tablist">
+            <button type="button" role="tab" aria-selected={modo === "nuevo"} className={modo === "nuevo" ? "activo" : ""} onClick={() => setModo("nuevo")}>
+              Crear nuevo
+            </button>
+            <button type="button" role="tab" aria-selected={modo === "existente"} className={modo === "existente" ? "activo" : ""} onClick={() => setModo("existente")}>
+              Ya está en el sistema
+            </button>
+          </div>
+        )}
 
         {modo === "nuevo" ? (
           <>
             <label>
               Nombre
-              <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="ej. Daniel" autoFocus />
+              <input
+                value={nombre}
+                onChange={(e) => {
+                  tocado.current.nombre = true;
+                  setNombre(e.target.value);
+                }}
+                placeholder="ej. Daniel"
+                autoFocus={!enLinea}
+              />
             </label>
             <div className="cc-modal-fila">
-              <label>
-                Es
-                <select value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)}>
-                  <option value="PROVEEDOR">Proveedor</option>
-                  <option value="CLIENTE">Cliente</option>
-                  <option value="MIXTO">Cliente y proveedor</option>
-                  <option value="AMIGO">Amigo</option>
-                </select>
-              </label>
+              {!enLinea && (
+                <label>
+                  Es
+                  <select value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)}>
+                    <option value="PROVEEDOR">Proveedor</option>
+                    <option value="CLIENTE">Cliente</option>
+                    <option value="MIXTO">Cliente y proveedor</option>
+                    <option value="AMIGO">Amigo</option>
+                  </select>
+                </label>
+              )}
               <label>
                 {modulo === "CAJA" ? "Número telefónico del cliente" : "Teléfono (opcional)"}
-                <input value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" />
+                <input
+                  value={telefono}
+                  onChange={(e) => {
+                    tocado.current.telefono = true;
+                    setTelefono(e.target.value);
+                  }}
+                  inputMode="tel"
+                />
               </label>
+              {modulo === "CAJA" && (
+                <label>
+                  Cédula (opcional)
+                  <input
+                    value={cedula}
+                    onChange={(e) => {
+                      tocado.current.cedula = true;
+                      setCedula(e.target.value);
+                    }}
+                    inputMode="numeric"
+                    placeholder="Para encontrarlo después"
+                  />
+                </label>
+              )}
             </div>
-            {modulo === "CAJA" && (
-              <label>
-                Cédula (opcional)
-                <input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" placeholder="Para encontrarlo después por la cédula" />
-              </label>
-            )}
           </>
         ) : tercero ? (
           <p className="cc-elegido">
@@ -186,6 +236,9 @@ export function NuevaCuentaModal({
           </label>
         </div>
 
+        {/* En la página se deja a la vista solo lo del cliente: cobro en otra moneda y saldo inicial van plegados */}
+        <details className="cc-mas-opciones" open={!enLinea}>
+          <summary>Más opciones: cobro en otra moneda y saldo inicial</summary>
         <div className="cc-modal-fila">
           <label>
             Le cobro en
@@ -231,17 +284,33 @@ export function NuevaCuentaModal({
               : "Lo que venía del Excel. Si yo le debo, va en negativo. Se puede dejar en cero."}
           </small>
         </label>
+        </details>
 
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">
-          <button type="button" className="cc-btn-secundario" onClick={onCerrar}>
-            Cancelar
-          </button>
+          {!enLinea && (
+            <button type="button" className="cc-btn-secundario" onClick={onCerrar}>
+              Cancelar
+            </button>
+          )}
           <button type="submit" className="cc-guardar" disabled={enviando}>
-            {enviando ? "Creando…" : "Crear cuenta"}
+            {enviando ? "Creando…" : modulo === "CAJA" ? "Crear cliente" : "Crear cuenta"}
           </button>
         </div>
       </form>
+  );
+
+  if (enLinea) {
+    return (
+      <section className="cc-crear-en-linea" aria-label="Crear cliente">
+        <h3>¿No está? Crealo acá</h3>
+        {formulario}
+      </section>
+    );
+  }
+  return (
+    <Modal titulo={modulo === "CAJA" ? "Nuevo cliente" : modulo === "POR_COBRAR" ? "Nueva cuenta por cobrar" : "Nueva cuenta corriente"} onCerrar={onCerrar}>
+      {formulario}
     </Modal>
   );
 }

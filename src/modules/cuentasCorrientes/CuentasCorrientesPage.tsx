@@ -28,6 +28,15 @@ const ETIQUETA_BANCO: Record<string, string> = {
   ZELLE: "Zelle",
 };
 
+/** Lo que se escribió en el buscador, puesto donde corresponde al crear el cliente: un celular, una cédula o un nombre. */
+function datosDeLaBusqueda(texto: string) {
+  const limpio = texto.trim();
+  const digitos = limpio.replace(/[\s+().-]/g, "");
+  if (!/^\d{5,}$/.test(digitos)) return { nombre: limpio };
+  const esCelular = digitos.length > 10 || (digitos.length === 10 && digitos.startsWith("3")) || (digitos.length === 11 && digitos.startsWith("04"));
+  return esCelular ? { telefono: limpio } : { cedula: limpio };
+}
+
 // En Cuentas por Cobrar se filtra por quién le debe a quién
 const SENTIDOS: { valor: string; etiqueta: string }[] = [
   { valor: "", etiqueta: "Todos" },
@@ -103,10 +112,12 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
 
   // En Cuentas por Cobrar: primero las deudas más grandes
   const visibles = useMemo(() => {
+    // En Confirmaciones no se listan todos al entrar: solo lo que se busca o se filtra por banco
+    if (modo === "cajas" && !buscar.trim() && canalId === "") return [];
     if (!enCobrar) return cuentas;
     const filtradas = cuentas.filter((c) => (sentido === "me-deben" ? conSaldo(c) && !yoDebo(c) : sentido === "yo-debo" ? yoDebo(c) : true));
     return [...filtradas].sort((a, b) => Math.abs(Number(b.saldo_actual)) - Math.abs(Number(a.saldo_actual)));
-  }, [cuentas, enCobrar, sentido]);
+  }, [cuentas, enCobrar, sentido, modo, buscar, canalId]);
 
   const seleccionada = cuentas.find((c) => c.id === seleccionadaId) ?? null;
   const chips = enCobrar ? SENTIDOS : TIPOS;
@@ -144,9 +155,10 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
         </div>
         <div className="cc-header-acciones">
           {modo === "corrientes" && usuario?.rol === "ADMIN" && <ImportarSaldosForm onImportado={cargar} />}
-          {puedeCrear && (
+          {/* En Confirmaciones no hay botón: el cliente se crea debajo de la búsqueda */}
+          {puedeCrear && modo !== "cajas" && (
             <button className="cc-nueva-cuenta" onClick={() => setCreando(true)}>
-              <Plus size={16} /> {modo === "cajas" ? "Nuevo cliente" : "Nueva cuenta"}
+              <Plus size={16} /> Nueva cuenta
             </button>
           )}
         </div>
@@ -214,11 +226,13 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           {!cargando && visibles.length === 0 && !error && (
             <p className="cc-lista-aviso">
               {buscar || tipo || sentido || canalId
-                ? "Ninguna cuenta coincide."
+                ? modo === "cajas"
+                  ? "No hay ningún cliente con ese dato."
+                  : "Ninguna cuenta coincide."
                 : enCobrar
                   ? "Nadie debe ni se le debe por ahora. Las cuentas con saldo aparecen acá solas."
                   : modo === "cajas"
-                    ? "Todavía no hay clientes. Creá el primero con «Nuevo cliente»."
+                    ? "Buscá al cliente arriba por nombre, teléfono o cédula. Si no está, se crea acá mismo."
                     : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
             </p>
           )}
@@ -263,6 +277,23 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
               </li>
             ))}
           </ul>
+          {/* Confirmaciones: el cliente nuevo se crea acá abajo, con lo que se estaba buscando ya puesto */}
+          {enConfirmaciones && puedeCrear && buscar.trim().length >= 2 && (
+            <NuevaCuentaModal
+              enLinea
+              canales={canales}
+              modulo="CAJA"
+              inicial={datosDeLaBusqueda(buscar)}
+              onPersonalizar={() => setPersonalizando(true)}
+              onCerrar={() => {}}
+              onCreada={async (c) => {
+                setCanalId("");
+                setBuscar(c.tercero_nombre);
+                await cargar();
+                setSeleccionadaId(c.id);
+              }}
+            />
+          )}
         </aside>
 
         {seleccionada ? (

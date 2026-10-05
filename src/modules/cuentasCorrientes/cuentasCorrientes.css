@@ -162,6 +162,19 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-modo-tasa { display: flex; gap: 2px; height: 0.95rem; }
 .cc-modo-tasa button { border: none; background: none; padding: 0 5px; font-family: inherit; font-size: 0.72rem; font-weight: 600; color: #9ca3af; cursor: pointer; border-radius: 4px; white-space: nowrap; }
 .cc-modo-tasa button.activo { background: var(--color-navy); color: white; }
+/* Leer la imagen del comprobante para llenar el movimiento */
+.cc-nueva-titulo { display: flex; align-items: center; gap: 12px; }
+.cc-nueva label.cc-leer-comprobante { flex-direction: row; align-items: center; gap: 6px; margin-left: auto; padding: 7px 12px; border: 1px solid var(--color-navy); border-radius: 6px; background: white; color: var(--color-navy); font-size: 0.82rem; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.cc-nueva label.cc-leer-comprobante.leyendo { opacity: 0.6; cursor: default; }
+.cc-leer-comprobante input { display: none; }
+.cc-aviso-lectura { margin: 8px 0 0; padding: 8px 10px; border-radius: 6px; background: #e6f0fb; color: #14406f; font-size: 0.84rem; font-weight: 600; }
+/* Confirmaciones: crear el cliente en la misma página, debajo de la búsqueda */
+.cc-crear-en-linea { padding: 14px; border-top: 1px solid #eef0f4; background: #f7f9fc; }
+.cc-crear-en-linea h3 { margin: 0 0 10px; font-family: "Space Grotesk", sans-serif; font-size: 0.95rem; color: var(--color-navy-dark); }
+.cc-mas-opciones { display: flex; flex-direction: column; gap: 12px; }
+.cc-mas-opciones summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--color-navy); }
+.cc-mas-opciones[open] summary { margin-bottom: 10px; }
+.cc-mas-opciones > * + * { margin-top: 12px; }
 /* Últimas tasas o comisiones: un toque y quedan puestas */
 .cc-recientes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .cc-recientes span { font-size: 0.76rem; font-weight: 600; color: #6b7280; margin-right: 2px; }
@@ -335,6 +348,8 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-nueva { position: fixed; left: 0; right: 0; bottom: 0; z-index: 51; margin: 0; border: none; border-radius: 18px 18px 0 0; background: white; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); max-height: 92dvh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.2); transform: translateY(105%); visibility: hidden; transition: transform 0.22s ease, visibility 0.22s; }
   .cc-nueva.abierta { transform: none; visibility: visible; }
   .cc-nueva-titulo { display: flex; justify-content: space-between; align-items: center; font-size: 0.95rem; }
+  .cc-nueva label.cc-leer-comprobante { padding: 10px 12px; font-size: 0.86rem; }
+  .cc-lista { overflow: visible; }
   .cc-cerrar-panel { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; border-radius: 50%; background: #eef0f4; color: #374151; cursor: pointer; }
   .cc-nueva-campos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: end; }
   .cc-nueva label { font-size: 0.82rem; }
