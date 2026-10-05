@@ -602,8 +602,8 @@ function FilaNueva({
   const [monedas, setMonedas] = useState<Moneda[]>([]);
   // Qué le pasa a la caja con este movimiento: se propone solo (un abono entra, una venta sale) y se puede cambiar
   const [sentidoCaja, setSentidoCaja] = useState<"auto" | "entra" | "sale">("auto");
-  // Toda transacción alimenta una caja, en los tres módulos: siempre se elige
-  const cajaObligatoria = true;
+  // Mover una caja con el movimiento es opcional (casilla "También entra o sale de una caja o banco")
+  const cajaObligatoria = false;
   const conCaja = cajaObligatoria || masOpciones;
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);

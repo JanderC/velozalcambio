@@ -129,7 +129,7 @@ export const MODULOS: ModuloConfig[] = [
   },
   {
     id: "cajas-confirmaciones",
-    titulo: "Cajas y Confirmaciones",
+    titulo: "Confirmaciones",
     categoria: "Gestión financiera",
     acento: ACENTO_FINANCIERO,
     icono: Inbox,

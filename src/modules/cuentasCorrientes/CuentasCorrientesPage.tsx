@@ -4,7 +4,6 @@ import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
 import { getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
-import { CajasResumen } from "./CajasResumen";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
@@ -40,7 +39,7 @@ function montoTexto(valor: string, moneda: string) {
  * - corrientes: las cuentas de movimiento diario.
  * - cobrar: Cuentas por Cobrar / Pagar. Se alimenta de las mismas cuentas: toda la que tenga saldo
  *   (me deben o yo debo) más las que se pasaron para allá por ser de poco movimiento.
- * - cajas: Cajas y Confirmaciones. Los clientes que llegan se crean ahí mismo y se llevan con la misma hoja.
+ * - cajas: Confirmaciones. Los clientes que llegan se crean ahí mismo y se llevan con la misma hoja.
  */
 export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrientes" | "cobrar" | "cajas" }) {
   const { usuario } = useAuth();
@@ -108,7 +107,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
       <Header />
       <div className="cc-header">
         <div>
-          <h1>{enCobrar ? "Cuentas por Cobrar / Pagar" : modo === "cajas" ? "Cajas y Confirmaciones" : "Cuentas Corrientes"}</h1>
+          <h1>{enCobrar ? "Cuentas por Cobrar / Pagar" : modo === "cajas" ? "Confirmaciones" : "Cuentas Corrientes"}</h1>
           <p>
             {enCobrar
               ? "Quién me debe y a quién le debo, con las mismas cuentas de Cuentas Corrientes."
@@ -126,8 +125,6 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           )}
         </div>
       </div>
-
-      {modo === "cajas" && <CajasResumen version={cuentas} />}
 
       {resumen.length > 0 && (
         <div className="cc-resumen">
