@@ -157,6 +157,10 @@ a.cc-caja:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.14); }
 .cc-confirmada input { width: 18px; height: 18px; padding: 0 !important; flex: 0 0 auto; }
 .cc-confirmada small { flex-basis: 100%; font-weight: 400; color: inherit; }
 .cc-modal label.cc-confirmada { margin-top: 0; }
+/* La imagen del comprobante guardada con el movimiento */
+.cc-ver-comprobante { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; border: none; background: #e6f0fb; color: #14406f; border-radius: 8px; padding: 1px 8px; font-family: inherit; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
+.cc-imagen-adjunta { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font-size: 0.82rem; color: #14406f; font-weight: 600; }
+.cc-imagen-adjunta button { border: none; background: none; color: #c0392b; text-decoration: underline; cursor: pointer; font-family: inherit; font-size: inherit; }
 /* Western Union: estado de la confirmación y su casillero */
 .cc-estado-conf { margin-left: 6px; font-size: 0.72rem; font-weight: 700; padding: 1px 8px; border-radius: 8px; white-space: nowrap; }
 .cc-estado-conf.proceso { background: #fff4e0; color: #a8531f; }

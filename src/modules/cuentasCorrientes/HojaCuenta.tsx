@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
-import { ArrowLeft, Camera, CheckCircle2, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -15,6 +15,8 @@ import {
   getCanales,
   getEstadoCuenta,
   getTasasRecientes,
+  getUrlComprobante,
+  subirComprobanteMovimiento,
   guardarTasaHabitual,
   type TasasRecientes,
   registrarMovimientoCC,
@@ -157,6 +159,16 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       await cargar();
       setEstadoAviso("");
       setAbonoParaAvisar({ ...avisoDeMovimiento(m), sentido: "confirmada" });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  // La imagen del comprobante guardada con el movimiento
+  const [imagenComprobante, setImagenComprobante] = useState<string | null>(null);
+  async function verComprobante(movimientoId: number) {
+    try {
+      setImagenComprobante(await getUrlComprobante(movimientoId));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -478,6 +490,13 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           </div>
         </div>
       )}
+      {imagenComprobante && (
+        <Modal titulo="Comprobante" ancho="ancho" onCerrar={() => setImagenComprobante(null)}>
+          <div className="cc-reporte">
+            <img src={imagenComprobante} alt="Imagen del comprobante" />
+          </div>
+        </Modal>
+      )}
       {reporte && (
         <Modal titulo="Reporte del día" ancho="ancho" onCerrar={cerrarReporte}>
           <div className="cc-reporte">
@@ -556,6 +575,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   {m.descripcion ?? m.tipo}
                   {m.anulado && !m.reverso_de_id && <em> (anulado)</em>}
                   {m.cuenta_destino && <span className="cc-cuenta-destino-chip">→ {m.cuenta_destino}</span>}
+                  {m.tiene_comprobante && (
+                    <button type="button" className="cc-ver-comprobante" onClick={() => verComprobante(m.id)} title="Ver la imagen del comprobante">
+                      <IconoImagen size={13} /> comprobante
+                    </button>
+                  )}
+                  {m.pagado_en && <span className="cc-estado-conf ok">pagada en taquilla</span>}
                   {!m.anulado && m.estado_confirmacion && (
                     <span className={`cc-estado-conf ${m.estado_confirmacion === "EN_PROCESO" ? "proceso" : "ok"}`}>
                       {m.estado_confirmacion === "EN_PROCESO" ? "pendiente de confirmar" : "confirmada"}
@@ -706,8 +731,11 @@ function FilaNueva({
   // Leer la imagen del comprobante: llena el número de referencia, el monto y la fecha
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
+  // La imagen se guarda con el movimiento al agregarlo, para verla después (en la hoja y en Taquilla)
+  const [imagenAdjunta, setImagenAdjunta] = useState<File | null>(null);
   async function cargarComprobante(archivo: File | undefined) {
     if (!archivo) return;
+    setImagenAdjunta(archivo);
     setError(null);
     setAvisoLectura(null);
     setLeyendo(true);
@@ -818,8 +846,10 @@ function FilaNueva({
   const esWestern = /western/i.test(referencia) || cuenta.canal_nombre === "WESTERN_UNION";
   const nMtcn = esWestern ? mtcn.replace(/\D/g, "") : "";
   // quién envió + el MTCN: así queda en la referencia del movimiento y entra en la revisión de números repetidos
-  // Lleva confirmación lo que llega por transferencia: en Confirmaciones, lo que le compramos al cliente (Compra); y todo Western Union
-  const llevaConfirmacion = esWestern || (enConfirmaciones && !resta);
+  // Solo Western Union puede quedar pendiente (tarda en verificar): ahí se elige si ya está confirmada
+  const llevaConfirmacion = esWestern;
+  // en Confirmaciones, una Compra que no es por Western entra confirmada de una vez: pasa directo a Taquilla
+  const confirmadaDirecto = enConfirmaciones && !resta && !esWestern;
   const personaCompleta = [persona.trim(), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
   const numeroMovimiento = nMtcn.length >= 4 ? nMtcn : pidePersona ? codigoDeReferencia(persona) : null;
   const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
@@ -917,6 +947,9 @@ function FilaNueva({
     }
     // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
     const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
+    const adjunta = imagenAdjunta;
+    setImagenAdjunta(null);
+    setAvisoLectura(null);
     const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
     setEnCobro(iniciaEnCobro);
     setSentidoCaja("auto");
@@ -960,7 +993,11 @@ function FilaNueva({
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje, comisionDescontada: esPorcentaje && comisionDescuenta } : { monto: montoConSigno }),
       cuentaDestino: cuentaDestino.trim() || undefined,
-      ...(llevaConfirmacion ? { estadoConfirmacion: confirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) } : {}),
+      ...(llevaConfirmacion
+        ? { estadoConfirmacion: confirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) }
+        : confirmadaDirecto
+          ? { estadoConfirmacion: "CONFIRMADA" as const }
+          : {}),
       ...(conCaja && cajaId !== "" && movimientoCaja && monedaCaja
         ? { cajaId, monedaCajaId: monedaCaja.id, montoCaja: `${entraACaja ? "" : "-"}${movimientoCaja.cantidad}` }
         : {}),
@@ -970,7 +1007,13 @@ function FilaNueva({
     const turno = cola.current.then(() => registrarMovimientoCC(datos));
     cola.current = turno.catch(() => {});
     try {
-      await turno;
+      const creado = await turno;
+      // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
+      if (adjunta) {
+        await subirComprobanteMovimiento(creado.movimiento.id, adjunta).catch((e) =>
+          setError(`El movimiento se guardó, pero la imagen del comprobante no: ${(e as Error).message}`)
+        );
+      }
       // si no tiene permiso para cambiarla, la tasa de la cuenta queda como estaba
       if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
@@ -1160,6 +1203,14 @@ function FilaNueva({
       </div>
 
       {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
+      {imagenAdjunta && (
+        <p className="cc-imagen-adjunta">
+          <IconoImagen size={14} /> Imagen del comprobante lista: se guarda con el movimiento.
+          <button type="button" onClick={() => setImagenAdjunta(null)}>
+            Quitar
+          </button>
+        </p>
+      )}
       {tasaModificada && (
         <label className="cc-check cc-mantener-tasa">
           <input type="checkbox" checked={mantenerTasa} onChange={(e) => setMantenerTasa(e.target.checked)} />
@@ -1189,8 +1240,8 @@ function FilaNueva({
       {llevaConfirmacion && (
         <label className={`cc-check cc-confirmada ${confirmada ? "si" : ""}`}>
           <input type="checkbox" checked={confirmada} onChange={(e) => setConfirmada(e.target.checked)} />
-          Transferencia confirmada
-          <small>{confirmada ? "Entra al sistema ya confirmada." : "Sin marcar, entra como pendiente de confirmar."}</small>
+          Western ya confirmó la transferencia
+          <small>{confirmada ? "Entra ya confirmada y pasa a Taquilla para pagarse." : "Sin marcar, queda pendiente hasta que Western la confirme."}</small>
         </label>
       )}
       <div className="cc-nueva-pie">

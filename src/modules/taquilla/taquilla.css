@@ -35,3 +35,47 @@
   .tq-solicitud { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; }
   .tq-pagar { grid-column: 1 / -1; justify-content: center; padding: 15px; font-size: 1.02rem; }
 }
+
+/* Sesión de caja: abrir, ver lo que entró y salió, cerrar y cuadrar */
+.tq-caja-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.tq-caja-cabeza h2 { margin: 0; }
+.tq-caja-cabeza .cc-guardar { gap: 8px; }
+.tq-estado { font-size: 0.72rem; font-weight: 700; border-radius: 10px; padding: 2px 10px; text-transform: uppercase; letter-spacing: 0.04em; font-family: "Inter", sans-serif; }
+.tq-estado.abierta { background: #e8f6ec; color: #1a7f37; }
+.tq-estado.cerrada { background: #fdecea; color: #c0392b; }
+.tq-sesion-nota { margin: 0 0 12px; font-size: 0.86rem; color: #4b5563; }
+.tq-sesion-nota.cerrada { background: #fff4e0; color: #a8531f; font-weight: 600; padding: 10px 12px; border-radius: 8px; }
+.tq-moneda dl { margin: 2px 0 4px; display: flex; flex-direction: column; gap: 2px; }
+.tq-moneda dl div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.82rem; }
+.tq-moneda dt { color: #6b7280; }
+.tq-moneda dd { margin: 0; font-variant-numeric: tabular-nums; color: #374151; white-space: nowrap; }
+.tq-ultimo-cierre { margin-top: 14px; background: white; border-radius: 10px; padding: 12px 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); overflow-x: auto; }
+.tq-ultimo-cierre h3 { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-navy-dark); }
+.tq-ultimo-cierre table { width: 100%; border-collapse: collapse; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.tq-ultimo-cierre th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; padding: 4px 8px 4px 0; white-space: nowrap; }
+.tq-ultimo-cierre td { padding: 5px 8px 5px 0; border-top: 1px solid #f1f2f4; white-space: nowrap; }
+.tq-ultimo-cierre td.falta, .tq-falta { color: #c0392b !important; font-weight: 700 !important; }
+.tq-ultimo-cierre td.sobra, .tq-sobra { color: #a8531f !important; font-weight: 700 !important; }
+.tq-cuadra { color: #1a7f37 !important; font-weight: 700 !important; }
+
+/* Cada solicitud se abre para ver todos sus datos y el comprobante */
+.tq-solicitud { cursor: pointer; }
+.tq-solicitud:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+.tq-solicitud-datos strong { display: inline-flex; align-items: center; gap: 6px; }
+.tq-solicitud.sin-confirmar { border-left-color: #e0a100; }
+.tq-sin-confirmar { background: #fff4e0; color: #a8531f; font-weight: 700; font-size: 0.86rem; border-radius: 8px; padding: 10px 14px; white-space: nowrap; }
+.tq-detalle { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 20px; align-items: start; }
+.tq-detalle dl { margin: 0; display: flex; flex-direction: column; }
+.tq-detalle dl div { display: flex; justify-content: space-between; gap: 14px; padding: 7px 0; border-bottom: 1px solid #f1f2f4; font-size: 0.9rem; }
+.tq-detalle dt { color: #6b7280; }
+.tq-detalle dd { margin: 0; font-weight: 600; color: var(--color-navy-dark); text-align: right; overflow-wrap: anywhere; }
+.tq-detalle-imagen img { width: 100%; height: auto; border: 1px solid #e5e7eb; border-radius: 8px; display: block; }
+.tq-detalle-accion { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+@media (max-width: 860px) {
+  .tq-detalle { grid-template-columns: minmax(0, 1fr); }
+  .tq-sin-confirmar { grid-column: 1 / -1; text-align: center; }
+  .tq-caja-cabeza .cc-guardar { flex: 1; padding: 13px; }
+  .tq-moneda dl { flex-basis: 100%; }
+  .tq-detalle-accion .tq-pagar { flex: 1; justify-content: center; }
+}

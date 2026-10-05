@@ -59,6 +59,8 @@ export interface FilaEstadoCuenta {
   cuenta_destino: string | null; // a qué cuenta del cliente se le pagó
   // Movimientos que esperan verificación (Western Union): en proceso o ya confirmados. null = no aplica
   estado_confirmacion: "EN_PROCESO" | "CONFIRMADA" | null;
+  tiene_comprobante: boolean; // tiene guardada la imagen del comprobante
+  pagado_en: string | null; // cuándo se le pagó en Taquilla
   comision_descontada: boolean; // la tasa es el factor (0.96) de una comisión descontada: se muestra -4%
   monto: string;
   total: string;
@@ -260,7 +262,19 @@ interface RegistrarMovimientoInput {
 }
 
 export function registrarMovimientoCC(data: RegistrarMovimientoInput) {
-  return api.post("/cuentas-corrientes/movimientos", data);
+  return api.post<{ movimiento: { id: number }; saldoNuevo: string }>("/cuentas-corrientes/movimientos", data);
+}
+
+/** Guarda la imagen del comprobante con el movimiento ya creado. */
+export function subirComprobanteMovimiento(movimientoId: number, imagen: File) {
+  const formData = new FormData();
+  formData.append("imagen", imagen);
+  return api.postForm<{ ok: true }>(`/cuentas-corrientes/movimientos/${movimientoId}/comprobante`, formData);
+}
+
+/** Enlace temporal para ver la imagen del comprobante de un movimiento. */
+export async function getUrlComprobante(movimientoId: number) {
+  return (await api.get<{ url: string }>(`/cuentas-corrientes/movimientos/${movimientoId}/comprobante`)).url;
 }
 
 export function configurarCobroCuenta(id: number, datos: { monedaCobroId: number | null; tasaCobro?: string }) {

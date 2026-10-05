@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, codigoDeReferencia, crearCuentaCorriente, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarMovimientoPorNumero, codigoDeReferencia, crearCuentaCorriente, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { leerComprobante } from "./ocrComprobante";
@@ -124,8 +124,11 @@ export function NuevaCuentaModal({
   // Leer la imagen del comprobante: pone el monto en la cantidad y la referencia (con quien envía) en su casillero
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
+  // La imagen se guarda con el movimiento, para verla después (en la hoja y en Taquilla)
+  const [imagenAdjunta, setImagenAdjunta] = useState<File | null>(null);
   async function cargarComprobante(archivo: File | undefined) {
     if (!archivo) return;
+    setImagenAdjunta(archivo);
     setError(null);
     setAvisoLectura(null);
     setLeyendo(true);
@@ -215,7 +218,7 @@ export function NuevaCuentaModal({
       if (conMovimiento) {
         const signo = movResta ? "-" : "";
         try {
-          await registrarMovimientoCC({
+          const creado = await registrarMovimientoCC({
             terceroId: cuenta.tercero_id,
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
@@ -225,12 +228,18 @@ export function NuevaCuentaModal({
               `${movResta ? "Venta" : "Compra"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
               // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
               (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
-            // lleva confirmación lo que llega por transferencia: lo que le compramos al cliente (Compra) y todo Western Union
-            ...(esWestern || !movResta ? { estadoConfirmacion: movConfirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) } : {}),
+            // solo Western puede quedar pendiente (tarda en verificar); las demás compras entran confirmadas y pasan a Taquilla
+            ...(esWestern
+              ? { estadoConfirmacion: movConfirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) }
+              : !movResta
+                ? { estadoConfirmacion: "CONFIRMADA" as const }
+                : {}),
             ...(movFactor
               ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true } : {}) }
               : { monto: `${signo}${movMonto!}` }),
           });
+          // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
+          if (imagenAdjunta) await subirComprobanteMovimiento(creado.movimiento.id, imagenAdjunta).catch(() => {});
         } catch (err) {
           errorMovimiento = err instanceof ApiError ? err.message : "no se pudo guardar";
         }
@@ -243,6 +252,7 @@ export function NuevaCuentaModal({
           setMovPersona("");
           setMovMtcn("");
           setMovConfirmada(false);
+          setImagenAdjunta(null);
           setAvisoLectura(null);
         } else {
           setError(`El cliente se creó, pero el movimiento no se guardó (${errorMovimiento}). Cargalo desde su hoja.`);
@@ -416,6 +426,7 @@ export function NuevaCuentaModal({
             </label>
             <small className="cc-primer-mov-nota">O pegá la captura con Ctrl+V en cualquier parte de este formulario.</small>
             {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
+            {imagenAdjunta && <p className="cc-imagen-adjunta">Imagen del comprobante lista: se guarda con el movimiento.</p>}
             <div className="cc-primer-mov-opciones">
               {/* Compra: le compramos al cliente lo que nos pasa (nos resta pesos o dólares). Venta: le vendemos bolívares o dólares (nos aumenta el saldo en pesos). */}
               <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Compra o venta">
@@ -487,11 +498,11 @@ export function NuevaCuentaModal({
                 <input value={movMtcn} onChange={(e) => setMovMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
               </label>
             )}
-            {(esWestern || !movResta) && (
+            {esWestern && (
               <label className={`cc-check cc-confirmada ${movConfirmada ? "si" : ""}`}>
                 <input type="checkbox" checked={movConfirmada} onChange={(e) => setMovConfirmada(e.target.checked)} />
-                Transferencia confirmada
-                <small>{movConfirmada ? "Entra al sistema ya confirmada." : "Sin marcar, entra como pendiente de confirmar; después se confirma desde la hoja del cliente."}</small>
+                Western ya confirmó la transferencia
+                <small>{movConfirmada ? "Entra ya confirmada y pasa a Taquilla para pagarse." : "Sin marcar, queda pendiente hasta que Western la confirme; se confirma desde la hoja del cliente."}</small>
               </label>
             )}
           </fieldset>
