@@ -283,6 +283,9 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
   .cc-lista { position: static; max-height: none; }
   .cc-layout.con-hoja .cc-lista { display: none; }
   .cc-layout:not(.con-hoja):not(.con-crear) .cc-hoja { display: none; }
+  /* Confirmaciones en una columna: primero el formulario de cliente nuevo y debajo la lista de clientes */
+  .cc-layout.con-crear:not(.con-hoja) .cc-hoja { order: 1; }
+  .cc-layout.con-crear:not(.con-hoja) .cc-lista { order: 2; }
   .cc-crear-en-linea .cc-modal, .cc-crear-en-linea .cc-modal-fila { grid-template-columns: minmax(0, 1fr); }
   .cc-hoja.cc-crear-panel { padding-bottom: 16px; }
   .cc-volver { display: inline-flex; }
