@@ -24,6 +24,9 @@ function dinero(monto: string, codigo: string | null) {
   return codigo === "COP" ? `$${numero}` : codigo === "VES" ? `Bs. ${numero}` : codigo ? `${numero} ${codigo}` : numero;
 }
 
+// Los datos que suele llevar el mensaje al cliente, uno por línea
+const PLANTILLA_DESCRIPCION = ["Banco: ", "Tipo de cuenta: ", "Número de cuenta: ", "Nombre: ", "Cédula: ", "Monto: "].join("\n");
+
 const hora = (fecha: string) => new Date(fecha).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", hour: "numeric", minute: "2-digit" });
 
 /** Teléfono como lo pide wa.me: solo dígitos y con código de país (celular colombiano o venezolano sin él -> se le agrega). */
@@ -282,9 +285,23 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
         </div>
 
         <div className="tq-operacion-datos">
-          <label className="ancho">
-            Descripción (es lo que se le envía al cliente por WhatsApp)
-            <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="ej. Recibimos $100.000, le enviamos Bs. 30.303 a tasa 3,3" maxLength={300} autoComplete="off" />
+          <label className="ancho tq-descripcion">
+            <span className="tq-descripcion-cabeza">
+              Descripción (es lo que se le envía al cliente por WhatsApp)
+              {!descripcion.trim() && (
+                <button type="button" onClick={() => setDescripcion(PLANTILLA_DESCRIPCION)}>
+                  Usar plantilla
+                </button>
+              )}
+            </span>
+            <textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              rows={6}
+              maxLength={1000}
+              placeholder={"Banco: Bancolombia\nTipo de cuenta: Ahorros\nNúmero de cuenta: 123-456789-00\nNombre: Juan Pérez\nCédula: 12.345.678\nMonto: $330.000"}
+            />
+            <small>Cada dato en su renglón: Enter (o Shift + Enter) baja de línea, y así mismo le llega al cliente.</small>
           </label>
           <label>
             Cliente
@@ -343,11 +360,11 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
                 <div className="tq-movimiento-datos">
                   <strong>
                     {o.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
-                    {o.descripcion ? ` · ${o.descripcion}` : ""}
                     <span className={`tq-mov-estado ${o.estado.toLowerCase()}`}>{o.estado === "PENDIENTE" ? "por confirmar" : o.estado === "ANULADA" ? "anulado" : "confirmado"}</span>
                     {o.medio === "BANCOLOMBIA" && <span className="tq-mov-estado banco">Bancolombia · no mueve la caja</span>}
                   </strong>
                   <span>{cuentaDe(o)}</span>
+                  {o.descripcion && <span className="tq-mov-descripcion">{o.descripcion}</span>}
                   <span>
                     {[o.cliente_nombre, o.cliente_cedula ? `CC ${o.cliente_cedula}` : null, o.cliente_telefono].filter(Boolean).join(" · ") || "sin datos del cliente"} · {hora(o.created_at)} · {o.usuario_nombre}
                   </span>

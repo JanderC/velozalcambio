@@ -91,7 +91,7 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
           resultado: totalEntrega, // la suma de cada clase a su precio, no una sola tasa
           cajaLado: seEntrega ? "AMBOS" : "MONTO",
           medio: "EFECTIVO",
-          descripcion: descripcion.slice(0, 300),
+          descripcion: descripcion.slice(0, 1000),
           clienteNombre: cliente.trim() || undefined,
           clienteTelefono: telefono.trim() || undefined,
           confirmada: true, // el efectivo se recibe en la mano: entra de una vez
