@@ -17,6 +17,7 @@ export interface CuentaCorrienteResumen {
   tercero_id: number;
   tercero_nombre: string;
   tercero_telefono: string | null;
+  tercero_identificacion: string | null; // cédula
   // Dónde se lleva: en Cuentas Corrientes, o pasada a Cuentas por Cobrar (poco movimiento)
   modulo: ModuloCuenta;
   referencia: string | null; // dato libre del cliente (Cajas y Confirmaciones)
@@ -100,7 +101,7 @@ export function actualizarCanal(id: number, cambios: { nombre?: string; activo?:
 
 export function crearCuentaCorriente(data: {
   terceroId?: number;
-  nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO"; telefono?: string };
+  nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO"; telefono?: string; identificacion?: string };
   canalId?: number; // sin banco: no es obligatorio
   modulo?: ModuloCuenta;
   referencia?: string;

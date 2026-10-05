@@ -23,7 +23,8 @@ export function NuevaCuentaModal({
   const [modo, setModo] = useState<"nuevo" | "existente">("nuevo");
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO">(modulo === "CAJA" ? "CLIENTE" : "PROVEEDOR");
-  const [referencia, setReferencia] = useState(""); // dato libre del cliente (Cajas y Confirmaciones)
+  const [referencia, setReferencia] = useState(""); // dato libre del cliente (Confirmaciones)
+  const [cedula, setCedula] = useState("");
   const [telefono, setTelefono] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<Tercero[]>([]);
@@ -73,7 +74,7 @@ export function NuevaCuentaModal({
     setEnviando(true);
     try {
       const cuenta = await crearCuentaCorriente({
-        ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined } }),
+        ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
         canalId: canalId === "" ? undefined : canalId,
         modulo,
         referencia: referencia.trim() || undefined,
@@ -122,6 +123,12 @@ export function NuevaCuentaModal({
                 <input value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" />
               </label>
             </div>
+            {modulo === "CAJA" && (
+              <label>
+                Cédula (opcional)
+                <input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" placeholder="Para encontrarlo después por la cédula" />
+              </label>
+            )}
           </>
         ) : tercero ? (
           <p className="cc-elegido">

@@ -67,6 +67,10 @@ a.cc-caja:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.14); }
 .cc-caja dt { color: #6b7280; }
 .cc-caja dd { margin: 0; font-weight: 700; color: var(--color-navy-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cc-caja dd.vacio { color: #9ca3af; font-weight: 400; }
+/* Confirmaciones: el buscador de clientes va arriba de todo */
+.cc-buscador-top { display: flex; align-items: center; gap: 10px; margin: 16px 40px 0; padding: 0 16px; background: white; border: 2px solid var(--color-navy); border-radius: 12px; color: var(--color-navy); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+.cc-buscador-top input { flex: 1; min-width: 0; border: none; background: transparent; padding: 14px 0; font-family: inherit; font-size: 1.05rem; outline: none; color: #111827; }
+.cc-filtros-bancos { padding-top: 12px; }
 /* Cuentas por Cobrar: cuánto me deben y cuánto debo, por moneda */
 .cc-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 0 40px 16px; }
 .cc-resumen div { background: white; border-radius: 10px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border-left: 4px solid #1a7f37; }
@@ -281,6 +285,9 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 
   .cc-resumen { padding: 0 12px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cc-page:has(.cc-layout.con-hoja) .cc-resumen { display: none; }
+  .cc-buscador-top { margin: 10px 12px 0; }
+  .cc-buscador-top input { font-size: 16px; }
+  .cc-page:has(.cc-layout.con-hoja) .cc-buscador-top { display: none; }
   .cc-cajas { padding: 0 12px 12px; }
   .cc-caja-mov { flex-basis: 100%; }
   .cc-caja-mov select { flex: 1; min-width: 0; }

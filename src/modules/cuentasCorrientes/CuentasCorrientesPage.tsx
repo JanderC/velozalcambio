@@ -17,6 +17,17 @@ const TIPOS: { valor: string; etiqueta: string }[] = [
   { valor: "AMIGO", etiqueta: "Amigos" },
 ];
 
+// En Confirmaciones los filtros son los bancos o medios por donde llega la plata, en este orden
+const BANCOS_CONFIRMACIONES = ["BOLIVARES", "BANCOLOMBIA", "NEQUI", "USDT", "WESTERN_UNION", "ZELLE"];
+const ETIQUETA_BANCO: Record<string, string> = {
+  BOLIVARES: "Bolívares",
+  BANCOLOMBIA: "Bancolombia",
+  NEQUI: "Nequi",
+  USDT: "USDT",
+  WESTERN_UNION: "Western Union",
+  ZELLE: "Zelle",
+};
+
 // En Cuentas por Cobrar se filtra por quién le debe a quién
 const SENTIDOS: { valor: string; etiqueta: string }[] = [
   { valor: "", etiqueta: "Todos" },
@@ -101,10 +112,25 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   const chips = enCobrar ? SENTIDOS : TIPOS;
   const chipActivo = enCobrar ? sentido : tipo;
   const elegirChip = enCobrar ? setSentido : setTipo;
+  // En Confirmaciones se filtra por dónde llega la plata, no por tipo de persona
+  const enConfirmaciones = modo === "cajas";
+  const bancosConfirmaciones = BANCOS_CONFIRMACIONES.flatMap((nombre) => canales.filter((c) => c.nombre === nombre));
 
   return (
     <div className="cc-page">
       <Header />
+      {enConfirmaciones && (
+        <div className="cc-buscador-top">
+          <Search size={20} />
+          <input
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            placeholder="Buscar cliente por nombre, teléfono o cédula"
+            aria-label="Buscar cliente por nombre, teléfono o cédula"
+            autoFocus
+          />
+        </div>
+      )}
       <div className="cc-header">
         <div>
           <h1>{enCobrar ? "Cuentas por Cobrar / Pagar" : modo === "cajas" ? "Confirmaciones" : "Cuentas Corrientes"}</h1>
@@ -143,28 +169,45 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
 
       <div className={`cc-layout ${seleccionada ? "con-hoja" : ""}`}>
         <aside className="cc-lista" aria-label="Cuentas">
-          <div className="cc-buscar">
-            <Search size={15} />
-            <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre" aria-label="Buscar cuenta" />
-          </div>
-          <div className="cc-filtros">
-            <div className="cc-chips" role="tablist">
-              {chips.map((t) => (
-                <button key={t.valor} role="tab" aria-selected={chipActivo === t.valor} className={chipActivo === t.valor ? "activo" : ""} onClick={() => elegirChip(t.valor)}>
-                  {t.etiqueta}
-                </button>
-              ))}
+          {!enConfirmaciones && (
+            <div className="cc-buscar">
+              <Search size={15} />
+              <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre" aria-label="Buscar cuenta" />
             </div>
-            <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? setPersonalizando(true) : setCanalId(e.target.value ? Number(e.target.value) : ""))} aria-label="Canal">
-              <option value="">Todos los canales</option>
-              {canales.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre.replace(/_/g, " ")}
-                </option>
-              ))}
-              {puedeCrear && <option value="personalizar">Personalizar…</option>}
-            </select>
-          </div>
+          )}
+          {enConfirmaciones ? (
+            <div className="cc-filtros cc-filtros-bancos">
+              <div className="cc-chips" role="tablist">
+                <button role="tab" aria-selected={canalId === ""} className={canalId === "" ? "activo" : ""} onClick={() => setCanalId("")}>
+                  Todos
+                </button>
+                {bancosConfirmaciones.map((c) => (
+                  <button key={c.id} role="tab" aria-selected={canalId === c.id} className={canalId === c.id ? "activo" : ""} onClick={() => setCanalId(c.id)}>
+                    {ETIQUETA_BANCO[c.nombre] ?? c.nombre.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="cc-filtros">
+              <div className="cc-chips" role="tablist">
+                {chips.map((t) => (
+                  <button key={t.valor} role="tab" aria-selected={chipActivo === t.valor} className={chipActivo === t.valor ? "activo" : ""} onClick={() => elegirChip(t.valor)}>
+                    {t.etiqueta}
+                  </button>
+                ))}
+              </div>
+              <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? setPersonalizando(true) : setCanalId(e.target.value ? Number(e.target.value) : ""))} aria-label="Canal">
+                <option value="">Todos los canales</option>
+                {canales.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre.replace(/_/g, " ")}
+                  </option>
+                ))}
+                {puedeCrear && <option value="personalizar">Personalizar…</option>}
+              </select>
+            </div>
+          )}
 
           {error && <p className="cc-form-error cc-pad">{error}</p>}
           {cargando && <p className="cc-lista-aviso">Cargando…</p>}
@@ -192,6 +235,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   <span className="cc-cuenta-detalle">
                     {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : c.tercero_tipo === "AMIGO" ? "Amigo" : "Mixto"}
                     {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
+                    {enConfirmaciones && c.tercero_telefono ? ` · ${c.tercero_telefono}` : ""}
+                    {enConfirmaciones && c.tercero_identificacion ? ` · CC ${c.tercero_identificacion}` : ""}
                     {c.referencia ? ` · ${c.referencia}` : ""}
                     {conSaldo(c) ? (yoDebo(c) ? " · yo le debo" : " · me debe") : ""}
                   </span>
