@@ -284,7 +284,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   // "retiro" = el cliente nos pagó (entra a nuestra caja). El saldo se dice desde el lado del cliente.
   const montoAviso = abonoParaAvisar ? `${simbolo}${formatearMonto(abonoParaAvisar.monto)}${sufijo}` : "";
   const saldoParaCliente =
-    lecturaSaldo === "Yo le debo" ? `Tienes ${saldoSinSigno} a tu favor.` : lecturaSaldo === "Me debe" ? `Tu saldo por pagar es de ${saldoSinSigno}.` : "Quedas al día, sin saldo pendiente.";
+    lecturaSaldo === "Yo le debo" ? `Saldo a su favor: ${saldoSinSigno}` : lecturaSaldo === "Me debe" ? `Saldo por pagar: ${saldoSinSigno}` : "Sin saldo pendiente";
   // Western Union: el MTCN va anotado en la referencia del movimiento
   // La referencia de la transferencia va anotada en el movimiento, después del " · ": el MTCN o el número que se cargó
   const refAviso = (() => {
@@ -294,26 +294,20 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     const anotado = (abonoParaAvisar.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
     return codigoDeReferencia(anotado);
   })();
-  const conMtcn = refAviso ? ` (referencia ${refAviso})` : "";
-  // Operación confirmada: el texto que se le manda al cliente, tal cual lo usa el negocio
-  const mensajeConfirmada = `Estimado(a), le informamos que la operación ha sido confirmada.\n\nRef: ${refAviso ?? "—"}\nRecibe: ${montoAviso}\nDisponible para recoger`;
+  // Todos los avisos al cliente llevan el mismo formato: la frase, y debajo la referencia, el monto y el estado
+  const lineaRef = `Ref: ${refAviso ?? "—"}`;
+  const aviso = (frase: string, ...lineas: string[]) => `Estimado(a), le informamos que ${frase}\n\n${lineas.join("\n")}`;
   const mensajeAbono = !abonoParaAvisar
     ? ""
     : abonoParaAvisar.sentido === "proceso"
-      ? `Hola ${cuenta.tercero_nombre}, su transferencia recibida por ${montoAviso}${conMtcn} está en proceso de confirmación. Le avisamos apenas quede confirmada.`
-      : abonoParaAvisar.sentido === "confirmada"
-        ? mensajeConfirmada
-    : abonoParaAvisar.sentido === "recibe"
-      ? `Hola ${cuenta.tercero_nombre}, te entregamos ${montoAviso}. ${saldoParaCliente}`
-      : abonoParaAvisar.sentido === "retiro"
+      ? aviso("la operación está en proceso de confirmación.", lineaRef, `Monto: ${montoAviso}`, "Le avisaremos apenas sea confirmada")
+      : abonoParaAvisar.sentido === "confirmada" || abonoParaAvisar.sentido === "retiro"
         ? // en Confirmaciones un Retiro que no quedó pendiente entra ya confirmado
-          mensajeConfirmada
-        : `Hola ${cuenta.tercero_nombre}, he recibido ${montoAviso} (${abonoParaAvisar.descripcion}). ` +
-          (lecturaSaldo === "Yo le debo"
-            ? `Tu saldo a favor queda en ${saldoSinSigno}.`
-            : lecturaSaldo === "Me debe"
-              ? `Tu saldo pendiente queda en ${saldoSinSigno}.`
-              : "Quedas al día, sin saldo pendiente.");
+          aviso("la operación ha sido confirmada.", lineaRef, `Recibe: ${montoAviso}`, "Disponible para recoger")
+        : abonoParaAvisar.sentido === "recibe"
+          ? aviso("la operación ha sido entregada.", lineaRef, `Entregado: ${montoAviso}`, saldoParaCliente)
+          : // abono en Cuentas Corrientes o Cuentas por Cobrar
+            aviso("hemos recibido su abono.", lineaRef, `Monto: ${montoAviso}`, saldoParaCliente);
 
   async function avisarConElSistema() {
     setEstadoAviso("enviando");
