@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { CheckCircle2, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { anularOperacionTaquilla, confirmarOperacionTaquilla, crearOperacionTaquilla, type OperacionTaquilla, type Taquilla } from "../../api/taquilla.api";
+import { DolaresPorBillete } from "./DolaresPorBillete";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
 // Las monedas que se compran, se venden o se convierten en la ventanilla
@@ -58,7 +59,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
   const [formula, setFormula] = useState<Formula>("tasa");
   const [medio, setMedio] = useState<"EFECTIVO" | "BANCOLOMBIA">("EFECTIVO");
   // qué lado mueve la caja: se elige solo (el que sea efectivo de la caja) y se puede cambiar
-  const [ladoElegido, setLadoElegido] = useState<"MONTO" | "RESULTADO" | null>(null);
+  const [ladoElegido, setLadoElegido] = useState<"MONTO" | "RESULTADO" | "AMBOS" | null>(null);
   const [monto, setMonto] = useState("");
   const [valor, setValor] = useState(""); // la tasa o el % de comisión
   const [descripcion, setDescripcion] = useState("");
@@ -90,12 +91,14 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           : multiplicarDecimales(nMonto, sumarDecimales("1", `-${multiplicarDecimales(nValor!, "0.01", 8)}`), decimales);
 
   // La caja se mueve por el lado que es efectivo suyo: el resultado si está en pesos/dólares/euros; si no, lo que trae el cliente
-  const ladoAuto: "MONTO" | "RESULTADO" = DE_LA_CAJA.includes(monedaResultado) ? "RESULTADO" : "MONTO";
-  const lado = ladoElegido ?? ladoAuto;
-  const monedaCaja = lado === "MONTO" ? monedaMonto : monedaResultado;
-  const montoCaja = lado === "MONTO" ? (nMonto ? multiplicarDecimales(nMonto, "1", decimalesDe(monedaMonto)) : null) : resultado;
-  const cajaPuede = DE_LA_CAJA.includes(monedaCaja);
+  // Si los dos lados son efectivo de la caja (dólares por pesos), se mueven los dos: entra uno y sale el otro
   const ambosDeLaCaja = DE_LA_CAJA.includes(monedaMonto) && DE_LA_CAJA.includes(monedaResultado) && monedaMonto !== monedaResultado;
+  const ladoAuto: "MONTO" | "RESULTADO" | "AMBOS" = ambosDeLaCaja ? "AMBOS" : DE_LA_CAJA.includes(monedaResultado) ? "RESULTADO" : "MONTO";
+  const lado = ladoElegido ?? ladoAuto;
+  const montoRedondeado = nMonto ? multiplicarDecimales(nMonto, "1", decimalesDe(monedaMonto)) : null;
+  const monedaCaja = lado === "RESULTADO" ? monedaResultado : monedaMonto;
+  const montoCaja = lado === "RESULTADO" ? resultado : montoRedondeado;
+  const cajaPuede = lado === "AMBOS" ? ambosDeLaCaja : DE_LA_CAJA.includes(monedaCaja);
 
   const pendientes = taquilla.operaciones.filter((o) => o.estado === "PENDIENTE").length;
   // con la caja cerrada solo se puede lo que no la toca: una transferencia, o un ingreso que queda pendiente
@@ -180,9 +183,10 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
 
   return (
     <section className="tq-operaciones" aria-label="Ingreso o egreso de caja">
+      <div className="tq-dos-cards">
       <form className="tq-operacion" onSubmit={registrar}>
         <div className="tq-operacion-cabeza">
-          <h2>Ingreso / egreso de caja</h2>
+          <h2>Conversión · ingreso / egreso</h2>
           <div className="cc-segmento" role="group" aria-label="Ingreso o egreso">
             <button type="button" className={tipo === "INGRESO" ? "activo" : ""} onClick={() => setTipo("INGRESO")} aria-pressed={tipo === "INGRESO"}>
               Ingreso (suma)
@@ -248,18 +252,25 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
             <span>Por Bancolombia es una transferencia: queda registrado, pero no suma ni resta de la caja.</span>
           ) : !cajaPuede ? (
             <span>La caja no tiene efectivo en {nombreDe(monedaCaja).toLowerCase()}: elegí qué lado la mueve, o Bancolombia.</span>
+          ) : lado === "AMBOS" ? (
+            <span>
+              {tipo === "INGRESO" ? "Se suman" : "Se restan"} <strong>{montoRedondeado ? dinero(montoRedondeado, monedaMonto) : "—"}</strong> {tipo === "INGRESO" ? "a la caja y se restan" : "de la caja y se suman"}{" "}
+              <strong>{resultado ? dinero(resultado, monedaResultado) : "—"}</strong>
+              {tipo === "INGRESO" && !confirmada ? " (cuando se confirme)" : ""}
+            </span>
           ) : (
             <span>
-              {tipo === "INGRESO" ? "Suma a la caja" : "Resta de la caja"}:{" "}
-              <strong>
-                {tipo === "INGRESO" ? "+ " : "− "}
-                {montoCaja ? dinero(montoCaja, monedaCaja) : "—"}
-              </strong>
+              {tipo === "INGRESO" ? "Se suman" : "Se restan"} <strong>{montoCaja ? dinero(montoCaja, monedaCaja) : "—"}</strong> {tipo === "INGRESO" ? "a la caja" : "de la caja"}
               {tipo === "INGRESO" && !confirmada ? " (cuando se confirme)" : ""}
             </span>
           )}
           {!porBanco && (ambosDeLaCaja || !cajaPuede) && (
             <span className="cc-segmento tq-lado" role="group" aria-label="Qué mueve la caja">
+              {ambosDeLaCaja && (
+                <button type="button" className={lado === "AMBOS" ? "activo" : ""} onClick={() => setLadoElegido("AMBOS")} aria-pressed={lado === "AMBOS"}>
+                  Los dos
+                </button>
+              )}
               <button type="button" className={lado === "MONTO" ? "activo" : ""} onClick={() => setLadoElegido("MONTO")} aria-pressed={lado === "MONTO"}>
                 El monto ({nombreDe(monedaMonto)})
               </button>
@@ -305,6 +316,14 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
         </div>
         {error && <p className="cc-form-error">{error}</p>}
       </form>
+      <DolaresPorBillete
+        abierta={abierta}
+        onCambio={(t) => {
+          onCambio(t);
+          setVerMovimientos(true);
+        }}
+      />
+      </div>
 
       <button type="button" className="tq-ver-movimientos" onClick={() => setVerMovimientos((v) => !v)} aria-expanded={verMovimientos}>
         {verMovimientos ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -336,6 +355,12 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
                 <strong className="tq-movimiento-total" title="Lo que mueve la caja">
                   {o.tipo === "EGRESO" ? "− " : "+ "}
                   {dinero(o.total, o.moneda_codigo)}
+                  {o.caja_lado === "AMBOS" && o.resultado && (
+                    <span className="tq-otro-lado">
+                      {o.tipo === "EGRESO" ? "+ " : "− "}
+                      {dinero(o.resultado, o.moneda_resultado)}
+                    </span>
+                  )}
                 </strong>
                 <span className="tq-movimiento-acciones">
                   {o.estado !== "ANULADA" && (

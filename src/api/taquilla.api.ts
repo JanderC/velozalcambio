@@ -67,7 +67,7 @@ export interface OperacionTaquilla {
   moneda_codigo: string;
   resultado: string | null; // lo que sale de la cuenta, en moneda_resultado
   moneda_resultado: string | null;
-  caja_lado: "MONTO" | "RESULTADO";
+  caja_lado: "MONTO" | "RESULTADO" | "AMBOS"; // AMBOS: efectivo por efectivo, entra un lado y sale el otro
   usuario_nombre: string;
   confirmado_por_nombre: string | null;
 }
@@ -117,7 +117,8 @@ export interface NuevaOperacionTaquilla {
   dividir?: boolean;
   comisionPct?: string;
   monedaResultado: string;
-  cajaLado: "MONTO" | "RESULTADO";
+  cajaLado: "MONTO" | "RESULTADO" | "AMBOS";
+  resultado?: string; // ya calculado, cuando no es una sola tasa (dólares por billete)
   medio?: "EFECTIVO" | "BANCOLOMBIA";
   descripcion?: string;
   clienteNombre?: string;

@@ -218,3 +218,26 @@
   .tq-operacion-cuenta label:last-of-type { grid-column: 1 / -1; }
   .tq-lado { flex-basis: 100%; }
 }
+
+/* Dos tarjetas: la conversión y los dólares por tipo de billete */
+.tq-dos-cards { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.tq-billetes table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.tq-billetes th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; padding: 0 6px 6px 0; white-space: nowrap; }
+.tq-billetes td { padding: 4px 6px 4px 0; vertical-align: middle; }
+.tq-billetes td:first-child { font-weight: 600; color: #374151; }
+.tq-billetes td input { text-align: right; font-variant-numeric: tabular-nums; }
+.tq-billetes td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--color-navy-dark); white-space: nowrap; }
+.tq-billetes tr.deteriorado td:first-child { color: #a8531f; }
+.tq-billetes tfoot td { border-top: 1px solid #e5e7eb; padding-top: 8px; font-weight: 700; }
+.tq-operacion label.tq-entrega { flex-direction: row; align-items: center; gap: 8px; font-size: 0.86rem; font-weight: 600; color: #374151; cursor: pointer; }
+.tq-operacion label.tq-entrega input { width: 18px; height: 18px; padding: 0; flex: 0 0 auto; }
+.tq-operacion-datos.dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tq-otro-lado { display: block; font-size: 0.86rem; color: #c0392b; }
+.tq-movimiento.egreso .tq-otro-lado { color: #1a7f37; }
+@media (max-width: 1100px) {
+  .tq-dos-cards { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .tq-billetes table { font-size: 0.82rem; }
+  .tq-billetes td:first-child { max-width: 110px; }
+}
