@@ -100,6 +100,8 @@ export function NuevaCuentaModal({
   // La confirmación es parte del movimiento: marcada entra confirmada; sin marcar, queda pendiente
   const [movConfirmada, setMovConfirmada] = useState(false);
   const esWestern = medio?.nombre === "WESTERN_UNION";
+  // Western Union y Zelle tardan en verificarse: sus compras pueden quedar pendientes de confirmar
+  const puedeQuedarPendiente = esWestern || (medio?.nombre === "ZELLE" && !movResta);
   const nMovMtcn = esWestern ? movMtcn.replace(/\D/g, "") : "";
   const movPersonaCompleta = [movPersona.trim(), nMovMtcn ? `MTCN ${nMovMtcn}` : ""].filter(Boolean).join(" ");
   const etiquetaMedio = medio ? (ETIQUETA_MEDIO[medio.nombre] ?? medio.nombre.replace(/_/g, " ")) : null;
@@ -228,8 +230,8 @@ export function NuevaCuentaModal({
               `${movResta ? "Venta" : "Compra"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
               // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
               (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
-            // solo Western puede quedar pendiente (tarda en verificar); las demás compras entran confirmadas y pasan a Taquilla
-            ...(esWestern
+            // Western y Zelle pueden quedar pendientes (tardan en verificarse); las demás compras entran confirmadas y pasan a Taquilla
+            ...(puedeQuedarPendiente
               ? { estadoConfirmacion: movConfirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) }
               : !movResta
                 ? { estadoConfirmacion: "CONFIRMADA" as const }
@@ -498,11 +500,11 @@ export function NuevaCuentaModal({
                 <input value={movMtcn} onChange={(e) => setMovMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
               </label>
             )}
-            {esWestern && (
+            {puedeQuedarPendiente && (
               <label className={`cc-check cc-confirmada ${movConfirmada ? "si" : ""}`}>
                 <input type="checkbox" checked={movConfirmada} onChange={(e) => setMovConfirmada(e.target.checked)} />
-                Western ya confirmó la transferencia
-                <small>{movConfirmada ? "Entra ya confirmada y pasa a Taquilla para pagarse." : "Sin marcar, queda pendiente hasta que Western la confirme; se confirma desde la hoja del cliente."}</small>
+                La transferencia ya está confirmada
+                <small>{movConfirmada ? "Entra ya confirmada y pasa a Taquilla para pagarse." : "Sin marcar, queda pendiente: se confirma después, desde la hoja del cliente o en Taquilla."}</small>
               </label>
             )}
           </fieldset>

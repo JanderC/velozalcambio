@@ -846,10 +846,11 @@ function FilaNueva({
   const esWestern = /western/i.test(referencia) || cuenta.canal_nombre === "WESTERN_UNION";
   const nMtcn = esWestern ? mtcn.replace(/\D/g, "") : "";
   // quién envió + el MTCN: así queda en la referencia del movimiento y entra en la revisión de números repetidos
-  // Solo Western Union puede quedar pendiente (tarda en verificar): ahí se elige si ya está confirmada
-  const llevaConfirmacion = esWestern;
+  // Western Union y Zelle tardan en verificarse: pueden quedar pendientes, y ahí se elige si ya están confirmadas
+  const esZelle = /zelle/i.test(referencia) || cuenta.canal_nombre === "ZELLE";
+  const llevaConfirmacion = esWestern || (enConfirmaciones && !resta && esZelle);
   // en Confirmaciones, una Compra que no es por Western entra confirmada de una vez: pasa directo a Taquilla
-  const confirmadaDirecto = enConfirmaciones && !resta && !esWestern;
+  const confirmadaDirecto = enConfirmaciones && !resta && !llevaConfirmacion;
   const personaCompleta = [persona.trim(), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
   const numeroMovimiento = nMtcn.length >= 4 ? nMtcn : pidePersona ? codigoDeReferencia(persona) : null;
   const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
@@ -1240,8 +1241,8 @@ function FilaNueva({
       {llevaConfirmacion && (
         <label className={`cc-check cc-confirmada ${confirmada ? "si" : ""}`}>
           <input type="checkbox" checked={confirmada} onChange={(e) => setConfirmada(e.target.checked)} />
-          Western ya confirmó la transferencia
-          <small>{confirmada ? "Entra ya confirmada y pasa a Taquilla para pagarse." : "Sin marcar, queda pendiente hasta que Western la confirme."}</small>
+          La transferencia ya está confirmada
+          <small>{confirmada ? "Entra ya confirmada y pasa a Taquilla para pagarse." : "Sin marcar, queda pendiente: se confirma después, acá o en Taquilla."}</small>
         </label>
       )}
       <div className="cc-nueva-pie">
