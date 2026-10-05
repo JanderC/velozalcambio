@@ -257,7 +257,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                       {montoTexto(c.movimiento_coincide.monto.replace(/^-/, ""), c.moneda_codigo)}
                     </span>
                   )}
-                  {c.valor_moneda && (
+                  {c.valor_moneda && c.modulo !== "CAJA" && (
                     <span className="cc-cuenta-hoy">
                       1 {c.moneda_codigo} = ${formatearMonto(c.valor_moneda)}
                       {conSaldo(c) && (

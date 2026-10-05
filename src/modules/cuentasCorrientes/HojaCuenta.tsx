@@ -252,6 +252,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const saldoActual = estado?.cuenta.saldo_actual ?? cuenta.saldo_actual;
   // Si se le cobra en otra moneda: el saldo convertido con la tasa manual de la cuenta
   const actual = estado?.cuenta ?? cuenta;
+  const esConfirmaciones = cuenta.modulo === "CAJA";
   const cobro =
     actual.moneda_cobro_codigo && actual.tasa_cobro
       ? {
@@ -259,53 +260,57 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           tasa: actual.tasa_cobro,
           equivalente: multiplicarDecimales(saldoActual.replace(/^-/, ""), actual.tasa_cobro, Number(actual.moneda_cobro_decimales ?? 0)),
         }
-      : actual.valor_moneda
-        ? // sin moneda de cobro configurada: el valor de su moneda en pesos, a la última tasa usada
+      : actual.valor_moneda && !esConfirmaciones
+        ? // sin moneda de cobro configurada: el valor de su moneda en pesos, a la última tasa usada.
+          // En Confirmaciones no se muestra: esa tasa sale de movimientos de otros clientes y confunde.
           { codigo: "COP", tasa: actual.valor_moneda, equivalente: multiplicarDecimales(saldoActual.replace(/^-/, ""), actual.valor_moneda, 0) }
         : null;
   const equivalenteTexto = cobro ? (cobro.codigo === "COP" ? `$${formatearMonto(cobro.equivalente)} COP` : `${formatearMonto(cobro.equivalente)} ${cobro.codigo}`) : "";
-  // Igual que el Excel: en negativo es lo que yo le debo
+  // Igual que el Excel: en negativo es lo que yo le debo.
   // En Confirmaciones el saldo se lee al revés: lo que le compramos al cliente (en positivo) es plata que nosotros le debemos
-  const esConfirmaciones = cuenta.modulo === "CAJA";
   const lecturaSaldo = !/[1-9]/.test(saldoActual) ? "Saldo" : saldoActual.startsWith("-") !== esConfirmaciones ? "Yo le debo" : "Me debe";
-  // Enlace a WhatsApp (sin API): abre el chat del cliente con el saldo ya escrito, listo para enviar
+  // Enlace a WhatsApp (sin API): abre el chat del cliente con el mensaje ya escrito, listo para enviar
   const telefono = telefonoWhatsApp(estado?.cuenta.tercero_telefono ?? cuenta.tercero_telefono);
   const saldoSinSigno = `${simbolo}${formatearMonto(saldoActual.replace(/^-/, ""))}${sufijo}`;
-  // Enviar saldo: el mismo formato de los demás avisos al cliente
-  const mensajeSaldo =
-    `Estimado(a), le informamos su saldo al ${fechaCorta(new Date().toISOString())}.\n\n` +
-    (lecturaSaldo === "Yo le debo" ? `Saldo a su favor: ${saldoSinSigno}` : lecturaSaldo === "Me debe" ? `Saldo por pagar: ${saldoSinSigno}` : "Sin saldo pendiente") +
-    (cobro && lecturaSaldo !== "Saldo" ? `\nEquivale a: ${equivalenteTexto} (tasa ${formatearMonto(cobro.tasa)})` : "");
-  // Confirmación de un abono: "he recibido tanto" y cómo queda el saldo
-  // En Confirmaciones el mensaje depende de qué pasó: "recibe" = se le entregó plata al cliente (sale de nuestra caja);
-  // "retiro" = el cliente nos pagó (entra a nuestra caja). El saldo se dice desde el lado del cliente.
-  const montoAviso = abonoParaAvisar ? `${simbolo}${formatearMonto(abonoParaAvisar.monto)}${sufijo}` : "";
   const saldoParaCliente =
     lecturaSaldo === "Yo le debo" ? `Saldo a su favor: ${saldoSinSigno}` : lecturaSaldo === "Me debe" ? `Saldo por pagar: ${saldoSinSigno}` : "Sin saldo pendiente";
-  // Western Union: el MTCN va anotado en la referencia del movimiento
-  // La referencia de la transferencia va anotada en el movimiento, después del " · ": el MTCN o el número que se cargó
-  const refAviso = (() => {
-    if (!abonoParaAvisar) return null;
-    const mtcn = /MTCN\s*(\d+)/i.exec(abonoParaAvisar.descripcion)?.[1];
-    if (mtcn) return `MTCN ${mtcn}`;
-    const anotado = (abonoParaAvisar.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
-    return codigoDeReferencia(anotado);
-  })();
-  // Todos los avisos al cliente llevan el mismo formato: la frase, y debajo la referencia, el monto y el estado
-  const lineaRef = `Ref: ${refAviso ?? "—"}`;
-  const aviso = (frase: string, ...lineas: string[]) => `Estimado(a), le informamos que ${frase}\n\n${lineas.join("\n")}`;
-  const mensajeAbono = !abonoParaAvisar
-    ? ""
-    : abonoParaAvisar.sentido === "proceso"
-      ? aviso("la operación está en proceso de confirmación.", lineaRef, `Monto: ${montoAviso}`, "Le avisaremos apenas sea confirmada")
-      : abonoParaAvisar.sentido === "confirmada" || abonoParaAvisar.sentido === "retiro"
-        ? // en Confirmaciones una Compra que no quedó pendiente entra ya confirmada
-          aviso("la operación ha sido confirmada.", lineaRef, `Recibe: ${montoAviso}`, "Disponible para recoger")
-        : abonoParaAvisar.sentido === "recibe"
-          ? // Venta: le vendimos al cliente
-            aviso("su compra ha sido registrada.", lineaRef, `Monto: ${montoAviso}`, saldoParaCliente)
-          : // abono en Cuentas Corrientes o Cuentas por Cobrar
-            aviso("hemos recibido su abono.", lineaRef, `Monto: ${montoAviso}`, saldoParaCliente);
+
+  // Todos los avisos al cliente llevan el mismo formato: la frase, y debajo la referencia, el monto y el estado.
+  type Aviso = NonNullable<typeof abonoParaAvisar>;
+  function construirAviso(a: Aviso) {
+    const monto = `${simbolo}${formatearMonto(a.monto)}${sufijo}`;
+    // La referencia va anotada en el movimiento después del " · ": el MTCN, o el código que se cargó. Solo eso, sin "Compra Zelle".
+    const mtcn = /MTCN\s*(\d+)/i.exec(a.descripcion)?.[1];
+    const anotado = (a.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
+    const lineaRef = `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigoDeReferencia(anotado) ?? "—")}`;
+    const aviso = (frase: string, ...lineas: string[]) => `Estimado(a), le informamos que ${frase}\n\n${lineas.join("\n")}`;
+    if (a.sentido === "proceso") return aviso("la operación está en proceso de confirmación.", lineaRef, `Monto: ${monto}`, "En breves minutos estará disponible");
+    // en Confirmaciones una Compra que no quedó pendiente entra ya confirmada
+    if (a.sentido === "confirmada" || a.sentido === "retiro") return aviso("la operación ha sido confirmada.", lineaRef, `Recibe: ${monto}`, "Disponible para recoger");
+    // Venta: le vendimos al cliente
+    if (a.sentido === "recibe") return aviso("su compra ha sido registrada.", lineaRef, `Monto: ${monto}`, saldoParaCliente);
+    // abono en Cuentas Corrientes o Cuentas por Cobrar
+    return aviso("hemos recibido su abono.", lineaRef, `Monto: ${monto}`, saldoParaCliente);
+  }
+  // Qué se le dice al cliente de un movimiento: según su estado de confirmación y, en Confirmaciones, si fue compra o venta
+  const avisoDeMovimiento = (m: { monto: string; descripcion: string | null; tipo: string; estado_confirmacion: string | null }): Aviso => ({
+    monto: m.monto.replace(/^-/, ""),
+    descripcion: m.descripcion ?? m.tipo,
+    ...(m.estado_confirmacion === "EN_PROCESO"
+      ? { sentido: "proceso" as const }
+      : m.estado_confirmacion === "CONFIRMADA"
+        ? { sentido: "confirmada" as const }
+        : esConfirmaciones
+          ? { sentido: m.monto.startsWith("-") ? ("recibe" as const) : ("retiro" as const) }
+          : {}),
+  });
+  const mensajeAbono = abonoParaAvisar ? construirAviso(abonoParaAvisar) : "";
+
+  // Botón de arriba. En Confirmaciones se envía la última operación hecha (con su referencia), no el saldo global.
+  const ultimaOperacion = esConfirmaciones ? [...(estado?.movimientos ?? [])].reverse().find((m) => !m.anulado) : undefined;
+  const mensajeSaldo = ultimaOperacion
+    ? construirAviso(avisoDeMovimiento(ultimaOperacion))
+    : `Estimado(a), le informamos su saldo al ${fechaCorta(new Date().toISOString())}.\n\n${saldoParaCliente}`;
 
   async function avisarConElSistema() {
     setEstadoAviso("enviando");
@@ -417,8 +422,8 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           <Lock size={14} /> {cerrando ? "Cerrando…" : estado?.cierre ? "Volver a cerrar y enviar" : "Cerrar día y enviar"}
         </button>
         {telefono && (
-          <a className="cc-whatsapp" href={`https://wa.me/${telefono}?text=${encodeURIComponent(mensajeSaldo)}`} target="_blank" rel="noreferrer" title="Abrir WhatsApp con el saldo listo para enviar">
-            <MessageCircle size={14} /> Enviar saldo
+          <a className="cc-whatsapp" href={`https://wa.me/${telefono}?text=${encodeURIComponent(mensajeSaldo)}`} target="_blank" rel="noreferrer" title={ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
+            <MessageCircle size={14} /> {esConfirmaciones ? (ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
           </a>
         )}
         <button className="cc-descargar cc-compartir" onClick={compartir} disabled={!estado} title="Compartir una imagen con los movimientos">
@@ -554,18 +559,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                       className="cc-avisar"
                       onClick={() => {
                         setEstadoAviso("");
-                        setAbonoParaAvisar({
-                          monto: m.monto.replace(/^-/, ""),
-                          descripcion: m.descripcion ?? m.tipo,
-                          // lo que está en proceso se avisa como tal; lo demás, según el módulo
-                          ...(m.estado_confirmacion === "EN_PROCESO"
-                            ? { sentido: "proceso" as const }
-                            : m.estado_confirmacion === "CONFIRMADA"
-                              ? { sentido: "confirmada" as const }
-                              : cuenta.modulo === "CAJA"
-                                ? { sentido: m.monto.startsWith("-") ? ("recibe" as const) : ("retiro" as const) }
-                                : {}),
-                        });
+                        setAbonoParaAvisar(avisoDeMovimiento(m));
                       }}
                       aria-label="Enviarle la confirmación al cliente"
                       title="Enviarle la confirmación al cliente"
