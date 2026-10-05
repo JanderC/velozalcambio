@@ -394,17 +394,16 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         <div className="cc-aviso-abono">
           <p>{mensajeAbono}</p>
           <div className="cc-aviso-abono-acciones">
+            {/* Desde el WhatsApp personal, con el enlace de WhatsApp: siempre está. Sin teléfono registrado, se elige el contacto allá. */}
+            <a className="cc-whatsapp" href={`https://wa.me/${telefono ?? ""}?text=${encodeURIComponent(mensajeAbono)}`} target="_blank" rel="noreferrer">
+              <MessageCircle size={14} /> Enviar desde mi WhatsApp
+            </a>
             {telefono ? (
-              <>
-                <a className="cc-whatsapp" href={`https://wa.me/${telefono}?text=${encodeURIComponent(mensajeAbono)}`} target="_blank" rel="noreferrer">
-                  <MessageCircle size={14} /> Enviar por mi WhatsApp
-                </a>
-                <button type="button" className="cc-guardar" onClick={avisarConElSistema} disabled={estadoAviso !== ""}>
-                  {estadoAviso === "enviando" ? "Enviando…" : estadoAviso === "enviado" ? "Enviado por el sistema" : "Enviar por el sistema"}
-                </button>
-              </>
+              <button type="button" className="cc-guardar" onClick={avisarConElSistema} disabled={estadoAviso !== ""}>
+                {estadoAviso === "enviando" ? "Enviando…" : estadoAviso === "enviado" ? "Enviado por el sistema" : "Enviar por el sistema"}
+              </button>
             ) : (
-              <span>Este cliente no tiene teléfono registrado: no se le puede avisar.</span>
+              <span>Sin teléfono registrado: al abrir WhatsApp eliges el contacto.</span>
             )}
             <button type="button" className="cc-btn-secundario" onClick={() => setAbonoParaAvisar(null)}>
               Cerrar
