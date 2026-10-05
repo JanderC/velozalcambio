@@ -52,6 +52,9 @@ export interface OperacionTaquilla {
   cantidad: string;
   tasa: string | null;
   comision_pct: string | null;
+  divide: boolean; // cantidad ÷ tasa en vez de ×
+  moneda_operacion: string | null; // qué se compró o vendió
+  medio: "EFECTIVO" | "BANCOLOMBIA"; // por Bancolombia no mueve la caja
   total: string;
   descripcion: string | null;
   cliente_nombre: string | null;
@@ -106,8 +109,11 @@ export interface NuevaOperacionTaquilla {
   tipo: "INGRESO" | "EGRESO";
   monedaCodigo: CodigoTaquilla;
   cantidad: string;
+  monedaOperacion?: string;
   tasa?: string;
+  dividir?: boolean;
   comisionPct?: string;
+  medio?: "EFECTIVO" | "BANCOLOMBIA";
   descripcion?: string;
   clienteNombre?: string;
   clienteTelefono?: string;

@@ -184,3 +184,19 @@
   .tq-movimiento-acciones { grid-column: 1 / -1; }
   .tq-movimiento-acciones .tq-pagar { flex: 1; justify-content: center; }
 }
+
+/* Ingreso / egreso: moneda que se compra o vende, la cuenta (tasa, dividir, comisión) y por dónde se mueve */
+.tq-operacion-opciones { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr); gap: 10px; align-items: end; }
+.tq-operacion-grupo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tq-operacion-grupo > span { font-size: 0.76rem; font-weight: 600; color: #4b5563; }
+.tq-operacion-grupo .cc-segmento button { padding: 8px 6px; font-size: 0.84rem; white-space: nowrap; }
+.tq-operacion-cuenta { grid-template-columns: minmax(0, 1.3fr) auto minmax(0, 0.9fr) auto minmax(0, 1fr) minmax(0, 1.3fr); }
+.tq-operacion-total.banco { background: #eaf1f8; color: var(--color-navy); }
+.tq-mov-estado.banco { background: #eaf1f8; color: var(--color-navy) !important; }
+.tq-movimiento-acciones .cc-whatsapp { margin-left: 0; padding: 8px 12px; font-size: 0.84rem; }
+@media (max-width: 860px) {
+  .tq-operacion-opciones { grid-template-columns: minmax(0, 1fr); }
+  .tq-operacion-cuenta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tq-movimiento-acciones { flex-wrap: wrap; }
+  .tq-movimiento-acciones .cc-whatsapp { flex: 1; justify-content: center; padding: 11px; }
+}
