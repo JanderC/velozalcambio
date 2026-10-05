@@ -49,13 +49,16 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
   // si se le entrega efectivo sale de la caja; si la divisa es un pago, solo entra
   const [seEntrega, setSeEntrega] = useState(true);
+  // false: se compra la divisa (suma a la caja). true: se vende (resta de la caja)
+  const [venta, setVenta] = useState(false);
   const [cliente, setCliente] = useState("");
   const [telefono, setTelefono] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const decimales = entrega === "COP" ? 0 : 2;
-  const clavePrecio = (clase: string) => `${divisa}>${entrega}:${clase}`;
+  // los precios de venta se guardan aparte de los de compra
+  const clavePrecio = (clase: string) => `${venta ? "venta:" : ""}${divisa}>${entrega}:${clase}`;
   const filas = CLASES[divisa].map((c) => {
     const escrito = cantidades[`${divisa}:${c.clave}`] ?? "";
     const cantidad = escrito.trim() ? leerNumero(escrito)?.replace(/^-/, "") ?? null : null;
@@ -81,10 +84,11 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
     try {
       // El detalle queda en la descripción: es lo que se ve en los movimientos y lo que se le envía al cliente
       const detalle = conCantidad.map((f) => `${formatearMonto(f.cantidad!)} ${divisa} ${f.corto} × ${formatearMonto(f.precio!)} = ${dinero(f.subtotal!, entrega)}`).join(" + ");
-      const descripcion = `${NOMBRE[divisa]}: ${detalle}. Total ${formatearMonto(totalDivisa)} ${divisa} = ${dinero(totalEntrega, entrega)}`;
+      const descripcion = `${venta ? "Venta de" : "Compra de"} ${NOMBRE[divisa].toLowerCase()}: ${detalle}. Total ${formatearMonto(totalDivisa)} ${divisa} = ${dinero(totalEntrega, entrega)}`;
       onCambio(
         await crearOperacionTaquilla({
-          tipo: "INGRESO",
+          // ingreso: compramos la divisa (entra). egreso: la vendemos (sale, y entra lo que paga)
+          tipo: venta ? "EGRESO" : "INGRESO",
           cantidad: totalDivisa,
           monedaOperacion: divisa,
           monedaResultado: entrega,
@@ -116,11 +120,20 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
     <form className="tq-operacion tq-billetes" onSubmit={registrar}>
       <div className="tq-operacion-cabeza">
         <h2>Billetes por tipo</h2>
+        {/* Compra: la divisa entra a la caja (suma). Venta: sale de la caja (resta). */}
+        <div className="cc-segmento" role="group" aria-label="Compra o venta de la divisa">
+          <button type="button" className={!venta ? "activo" : ""} onClick={() => setVenta(false)} aria-pressed={!venta}>
+            Ingreso (suma)
+          </button>
+          <button type="button" className={venta ? "activo" : ""} onClick={() => setVenta(true)} aria-pressed={venta}>
+            Egreso (resta)
+          </button>
+        </div>
       </div>
       {/* Cambio rápido: qué se desglosa y en qué se entrega */}
       <div className="tq-billetes-selectores">
         <div className="tq-operacion-grupo">
-          <span>Trae</span>
+          <span>{venta ? "Se le venden" : "Trae"}</span>
           <div className="cc-segmento" role="group" aria-label="Qué billetes trae">
             {(["USD", "EUR"] as Divisa[]).map((d) => (
               <button key={d} type="button" className={divisa === d ? "activo" : ""} onClick={() => setDivisa(d)} aria-pressed={divisa === d}>
@@ -130,7 +143,7 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
           </div>
         </div>
         <div className="tq-operacion-grupo">
-          <span>Se le entrega en</span>
+          <span>{venta ? "Paga en" : "Se le entrega en"}</span>
           <div className="cc-segmento" role="group" aria-label="En qué se le entrega">
             {(["COP", "USD", "EUR"] as Entrega[])
               .filter((m) => m !== divisa)
@@ -192,16 +205,18 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
 
       <label className="cc-check tq-entrega">
         <input type="checkbox" checked={seEntrega} onChange={(e) => setSeEntrega(e.target.checked)} />
-        Se le entregan los {NOMBRE[entrega].toLowerCase()} en efectivo
+        {venta ? `Paga los ${NOMBRE[entrega].toLowerCase()} en efectivo` : `Se le entregan los ${NOMBRE[entrega].toLowerCase()} en efectivo`}
       </label>
-      <div className="tq-operacion-caja">
+      <div className={`tq-operacion-caja ${venta ? "egreso" : ""}`}>
         <span>
-          Se suman <strong>{hayAlgo ? dinero(totalDivisa, divisa) : "—"}</strong> a la caja
+          {venta ? "Se restan" : "Se suman"} <strong>{hayAlgo ? dinero(totalDivisa, divisa) : "—"}</strong> {venta ? "de la caja" : "a la caja"}
           {seEntrega ? (
             <>
               {" "}
-              y se restan <strong>{hayAlgo ? dinero(totalEntrega, entrega) : "—"}</strong>
+              y se {venta ? "suman" : "restan"} <strong>{hayAlgo ? dinero(totalEntrega, entrega) : "—"}</strong>
             </>
+          ) : venta ? (
+            ` (no entra efectivo: paga por otro medio)`
           ) : (
             ` (no sale nada: los ${NOMBRE[divisa].toLowerCase()} son un pago)`
           )}
