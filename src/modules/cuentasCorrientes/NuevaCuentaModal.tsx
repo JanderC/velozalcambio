@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
 import { buscarMovimientoPorNumero, crearCuentaCorriente, leerComprobante, registrarMovimientoCC, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
@@ -135,6 +135,14 @@ export function NuevaCuentaModal({
   const monedaCobro = monedaCobroId !== monedaId ? monedas.find((m) => m.id === monedaCobroId) : undefined;
   const nTasaCobro = tasaCobro.trim() ? leerNumero(tasaCobro) : null;
 
+  // Pegar una captura (Ctrl+V) en cualquier parte del formulario la lee como comprobante
+  function alPegar(e: ClipboardEvent<HTMLFormElement>) {
+    const imagen = [...e.clipboardData.files].find((f) => f.type.startsWith("image/"));
+    if (!imagen || leyendo) return;
+    e.preventDefault();
+    void cargarComprobante(imagen);
+  }
+
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -221,7 +229,7 @@ export function NuevaCuentaModal({
   }
 
   const formulario = (
-      <form className="cc-modal" onSubmit={guardar}>
+      <form className="cc-modal" onSubmit={guardar} onPaste={enLinea ? alPegar : undefined}>
         {!enLinea && (
           <div className="cc-segmento" role="tablist">
             <button type="button" role="tab" aria-selected={modo === "nuevo"} className={modo === "nuevo" ? "activo" : ""} onClick={() => setModo("nuevo")}>
@@ -371,6 +379,7 @@ export function NuevaCuentaModal({
                 }}
               />
             </label>
+            <small className="cc-primer-mov-nota">O pegá la captura con Ctrl+V en cualquier parte de este formulario.</small>
             {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
             <div className="cc-primer-mov-opciones">
               <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Suma o abono">
