@@ -185,7 +185,8 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-primer-mov legend { padding: 0 6px; font-size: 0.82rem; font-weight: 700; color: var(--color-navy-dark); }
 .cc-primer-mov-signo { margin-top: 0; align-self: flex-start; }
 .cc-primer-mov-opciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.cc-primer-mov-formula { flex: 0 1 260px; }
+.cc-primer-mov-formula { flex: 0 1 340px; }
+.cc-modal label.cc-primer-mov-destino { flex-direction: row; align-items: center; gap: 8px; }
 .cc-primer-mov-medio { margin: 0; font-size: 0.86rem; color: #374151; }
 .cc-primer-mov-medio.falta { color: #a8531f; font-weight: 600; }
 .cc-primer-mov-cuenta { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.7fr) auto minmax(0, 1fr); gap: 6px; align-items: end; }

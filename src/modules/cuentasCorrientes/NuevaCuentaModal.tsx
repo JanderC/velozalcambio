@@ -5,7 +5,7 @@ import { buscarMovimientoPorNumero, crearCuentaCorriente, leerComprobante, regis
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
-import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
 const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
@@ -85,9 +85,11 @@ export function NuevaCuentaModal({
 
   // Movimiento con el que llega el cliente (solo en la página). Dos fórmulas:
   //   tasa:     cantidad × tasa = total en pesos
+  //   dividir:  pesos que se llevan a dólares o USDT: cantidad ÷ tasa (82.500 ÷ 3.280 = 25,15)
   //   comisión: al monto se le descuenta la comisión (1.000 − 4% = 960), en la moneda del medio
   // La que se use queda guardada para los próximos movimientos de ese cliente.
-  const [movFormula, setMovFormula] = useState<"tasa" | "comision">("tasa");
+  const [movFormula, setMovFormula] = useState<"tasa" | "dividir" | "comision">("tasa");
+  const [movDestino, setMovDestino] = useState<"USD" | "USDT">("USD"); // a qué se llevan los pesos al dividir
   const [movResta, setMovResta] = useState(false);
   const [movCantidad, setMovCantidad] = useState("");
   const [movValor, setMovValor] = useState(""); // la tasa o el % de comisión
@@ -97,10 +99,18 @@ export function NuevaCuentaModal({
   const nMovCantidad = movCantidad.trim() ? leerNumero(movCantidad)?.replace(/^-/, "") ?? null : null;
   const nMovValor = movValor.trim() ? leerNumero(movValor.replace(/%/g, "")) : null;
   // lo que multiplica a la cantidad: la tasa, o lo que queda tras la comisión (4% -> 0.96)
-  const movFactor = !nMovValor ? null : movFormula === "comision" ? sumarDecimales("1", `-${multiplicarDecimales(nMovValor, "0.01", 8)}`) : nMovValor;
+  const movFactor = !nMovValor || movFormula === "dividir" ? null : movFormula === "comision" ? sumarDecimales("1", `-${multiplicarDecimales(nMovValor, "0.01", 8)}`) : nMovValor;
   // por tasa la cuenta queda en pesos; con comisión (o sin tasa) queda en la moneda del medio
-  const codigoCuenta = movFormula === "tasa" && movFactor ? "COP" : codigoMedio;
-  const movMonto = !nMovCantidad ? null : movFactor ? multiplicarDecimales(nMovCantidad, movFactor, codigoCuenta === "COP" ? 0 : 2) : nMovCantidad;
+  const codigoCuenta = movFormula === "dividir" ? movDestino : movFormula === "tasa" && movFactor ? "COP" : codigoMedio;
+  const movMonto = !nMovCantidad
+    ? null
+    : movFormula === "dividir"
+      ? nMovValor && /[1-9]/.test(nMovValor)
+        ? dividirDecimales(nMovCantidad, nMovValor, 2)
+        : null
+      : movFactor
+        ? multiplicarDecimales(nMovCantidad, movFactor, codigoCuenta === "COP" ? 0 : 2)
+        : nMovCantidad;
   const hayMovimiento = movCantidad.trim() !== "";
 
   // Leer la imagen del comprobante: pone el monto en la cantidad y la referencia (con quien envía) en su casillero
@@ -159,6 +169,8 @@ export function NuevaCuentaModal({
       if (movValor.trim() && (!nMovValor || !/[1-9]/.test(nMovValor) || nMovValor.startsWith("-"))) return setError(movFormula === "comision" ? "La comisión no es un número válido." : "La tasa no es un número válido.");
       if (movFormula === "comision" && nMovValor && Number(nMovValor) >= 100) return setError("La comisión tiene que ser menor al 100%.");
       if (movFormula === "tasa" && !movFactor && codigoMedio !== "COP") return setError(`Escribí la tasa para pasar ${codigoMedio} a pesos, o usá comisión.`);
+      if (movFormula === "dividir" && !nMovValor) return setError(`Escribí la tasa para dividir y llevar ${codigoMedio} a ${movDestino}.`);
+      if (movFormula === "dividir" && codigoMedio === movDestino) return setError(`El medio elegido ya se mueve en ${movDestino}: no hay nada que dividir.`);
       if (!movMonto || !/[1-9]/.test(movMonto)) return setError("El monto del movimiento da cero: revisá la cantidad.");
       if (medio.nombre === "ZELLE" && movPersona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
     }
@@ -179,6 +191,8 @@ export function NuevaCuentaModal({
         modulo,
         referencia: referencia.trim() || undefined,
         ...(monedaCobro ? { monedaCobroId: monedaCobro.id, tasaCobro: nTasaCobro! } : {}),
+        // al dividir, la cuenta queda en USD o USDT y se le cobra en la moneda del medio a esa tasa: la hoja ya abre dividiendo
+        ...(conMovimiento && movFormula === "dividir" ? { monedaCobroId: monedas.find((m) => m.codigo === codigoMedio)?.id, tasaCobro: nMovValor! } : {}),
         monedaId: monedaCuentaId as number,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
       });
@@ -193,7 +207,10 @@ export function NuevaCuentaModal({
             monedaId: cuenta.moneda_id,
             tipo: movResta ? "ABONO" : "CARGO",
             // la referencia sale del medio: "Venta de Zelle" o "Abono Zelle"
-            descripcion: `${movResta ? "Abono" : "Venta de"} ${etiquetaMedio}${movPersona.trim() ? ` · ${movPersona.trim()}` : ""}`,
+            descripcion:
+              `${movResta ? "Abono" : "Venta de"} ${etiquetaMedio}${movPersona.trim() ? ` · ${movPersona.trim()}` : ""}` +
+              // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
+              (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
             ...(movFactor
               ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true } : {}) }
               : { monto: `${signo}${movMonto!}` }),
@@ -394,17 +411,29 @@ export function NuevaCuentaModal({
                 <button type="button" className={movFormula === "tasa" ? "activo" : ""} onClick={() => setMovFormula("tasa")} aria-pressed={movFormula === "tasa"}>
                   Tasa
                 </button>
+                <button type="button" className={movFormula === "dividir" ? "activo" : ""} onClick={() => setMovFormula("dividir")} aria-pressed={movFormula === "dividir"}>
+                  Dividir ÷
+                </button>
                 <button type="button" className={movFormula === "comision" ? "activo" : ""} onClick={() => setMovFormula("comision")} aria-pressed={movFormula === "comision"}>
                   Comisión %
                 </button>
               </div>
+              {movFormula === "dividir" && (
+                <label className="cc-primer-mov-destino">
+                  Llevar a
+                  <select value={movDestino} onChange={(e) => setMovDestino(e.target.value as "USD" | "USDT")}>
+                    <option value="USD">Dólares (USD)</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </label>
+              )}
             </div>
             <div className="cc-primer-mov-cuenta">
               <label>
                 Cantidad ({codigoMedio})
                 <input value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} inputMode="decimal" placeholder="1.000" autoComplete="off" />
               </label>
-              <span aria-hidden="true">{movFormula === "comision" ? "−" : "×"}</span>
+              <span aria-hidden="true">{movFormula === "comision" ? "−" : movFormula === "dividir" ? "÷" : "×"}</span>
               <label>
                 {movFormula === "comision" ? "Comisión %" : "Tasa"}
                 <input value={movValor} onChange={(e) => setMovValor(e.target.value)} inputMode="decimal" placeholder={movFormula === "comision" ? "4" : "3.200"} autoComplete="off" />
@@ -420,7 +449,11 @@ export function NuevaCuentaModal({
                 ? nMovCantidad && nMovValor && movMonto
                   ? `${formatearMonto(nMovCantidad)} − ${formatearMonto(nMovValor)}% de comisión = ${formatearMonto(movMonto)} ${codigoCuenta}. Esta comisión queda guardada para los próximos movimientos del cliente.`
                   : "A la cantidad se le descuenta la comisión: 1.000 − 4% = 960. Queda guardada para los próximos movimientos del cliente."
-                : "Cantidad × tasa = total en pesos. La tasa queda guardada para los próximos movimientos del cliente."}
+                : movFormula === "dividir"
+                  ? nMovCantidad && nMovValor && movMonto
+                    ? `${formatearMonto(nMovCantidad)} ${codigoMedio} ÷ ${formatearMonto(nMovValor)} = ${formatearMonto(movMonto)} ${movDestino}. La cuenta del cliente queda en ${movDestino} y la tasa guardada para los próximos movimientos.`
+                    : `Lo que llega en ${codigoMedio} se divide por la tasa y queda en ${movDestino}: 82.500 ÷ 3.280 = 25,15.`
+                  : "Cantidad × tasa = total en pesos. La tasa queda guardada para los próximos movimientos del cliente."}
             </small>
             <label>
               Quién envió o número de la transferencia (opcional)

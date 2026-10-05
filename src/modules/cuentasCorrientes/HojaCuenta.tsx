@@ -597,10 +597,12 @@ function FilaNueva({
   // Cliente que se trabaja con comisión descontada: 1.000 - 4% = 960. El % de su primer movimiento ya viene puesto.
   const comisionDescuenta = cuenta.formula === "COMISION";
   const pctCuenta = comisionDescuenta && cuenta.comision_pct ? formatearMonto(cuenta.comision_pct) : "";
-  const [tasa, setTasa] = useState(pctCuenta);
+  // Cliente que se trabaja dividiendo (cuenta en USD o USDT, llega en pesos): el formulario abre en ese modo con su tasa
+  const iniciaEnCobro = !comisionDescuenta && !!cuenta.moneda_cobro_codigo && !!cuenta.tasa_cobro && cuenta.formula == null;
+  const [tasa, setTasa] = useState(iniciaEnCobro ? formatearMonto(cuenta.tasa_cobro!) : pctCuenta);
   const [esPorcentaje, setEsPorcentaje] = useState(comisionDescuenta); // comisión: cantidad x % (o cantidad - %) en vez de cantidad x tasa
   // Movimiento hecho en la moneda de cobro (ej. pagó en pesos una cuenta en dólares): cantidad ÷ tasa
-  const [enCobro, setEnCobro] = useState(false);
+  const [enCobro, setEnCobro] = useState(iniciaEnCobro);
   const [montoDirecto, setMontoDirecto] = useState("");
   const [masOpciones, setMasOpciones] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -823,7 +825,7 @@ function FilaNueva({
     // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
     const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
     const escrito = { referencia, persona, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
-    setEnCobro(false);
+    setEnCobro(iniciaEnCobro);
     setSentidoCaja("auto");
     if (conCaja && cajaId !== "") {
       try {
@@ -842,7 +844,8 @@ function FilaNueva({
     setCuentaDestino("");
     setCantidad("");
     // el cliente de comisión sigue en comisión, con su %
-    setTasa(comisionDescuenta ? pctCuenta || tasa : tasaSiguiente);
+    // el que se trabaja dividiendo sigue con la tasa que se acaba de usar
+    setTasa(comisionDescuenta ? pctCuenta || tasa : iniciaEnCobro && enCobro ? tasa : tasaSiguiente);
     setMontoDirecto("");
     setResta(restaPorReferencia(referenciaPuesta));
     setEsPorcentaje(comisionDescuenta);
