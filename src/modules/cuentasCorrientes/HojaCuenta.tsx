@@ -22,7 +22,7 @@ import {
   type EstadoCuenta,
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
-import { actualizarTercero } from "../../api/terceros.api";
+import { EditarClienteModal } from "./EditarClienteModal";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { Modal } from "../../components/common/Modal";
@@ -117,6 +117,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const [error, setError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
   const [configurandoCobro, setConfigurandoCobro] = useState(false);
+  const [editandoCliente, setEditandoCliente] = useState(false);
   // "Venta de <banco>" para cada banco o canal: ZELLE -> "Venta de Zelle"
   const [ventasPorBanco, setVentasPorBanco] = useState<string[]>([]);
 
@@ -181,17 +182,6 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     if (!window.confirm(pregunta)) return;
     try {
       await cambiarModuloCuentaCorriente(cuenta.id, destino);
-      onActualizar();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-
-  async function cambiarNombre() {
-    const nombre = window.prompt("Nombre", cuenta.tercero_nombre)?.trim();
-    if (!nombre || nombre === cuenta.tercero_nombre) return;
-    try {
-      await actualizarTercero(cuenta.tercero_id, { nombre });
       onActualizar();
     } catch (e) {
       setError((e as Error).message);
@@ -364,8 +354,8 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           )}
           {puedeAnular && (
             <span className="cc-acciones-cuenta">
-              <button type="button" className="cc-mover" onClick={cambiarNombre}>
-                Cambiar nombre
+              <button type="button" className="cc-mover" onClick={() => setEditandoCliente(true)}>
+                Editar datos (nombre, teléfono, cédula)
               </button>
               <button type="button" className="cc-mover cc-eliminar" onClick={eliminar}>
                 Eliminar
@@ -391,6 +381,17 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           )}
         </div>
       </div>
+      {editandoCliente && (
+        <EditarClienteModal
+          cuenta={actual}
+          onCerrar={() => setEditandoCliente(false)}
+          onGuardado={() => {
+            setEditandoCliente(false);
+            void cargar();
+            onActualizar();
+          }}
+        />
+      )}
       {configurandoCobro && (
         <CobroModal
           cuenta={actual}
