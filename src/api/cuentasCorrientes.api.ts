@@ -55,6 +55,8 @@ export interface FilaEstadoCuenta {
   tasa: string | null;
   tasa_es_porcentaje: boolean; // comisión en %: la tasa viene como fracción (3% = "0.03")
   cuenta_destino: string | null; // a qué cuenta del cliente se le pagó
+  // Movimientos que esperan verificación (Western Union): en proceso o ya confirmados. null = no aplica
+  estado_confirmacion: "EN_PROCESO" | "CONFIRMADA" | null;
   comision_descontada: boolean; // la tasa es el factor (0.96) de una comisión descontada: se muestra -4%
   monto: string;
   total: string;
@@ -200,6 +202,11 @@ export function eliminarCuentaCorriente(id: number) {
   return api.delete<void>(`/cuentas-corrientes/${id}`);
 }
 
+/** Marca como confirmado un movimiento que estaba en proceso de confirmación. */
+export function confirmarMovimientoCC(movimientoId: number) {
+  return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/confirmar`);
+}
+
 export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }
@@ -231,6 +238,7 @@ interface RegistrarMovimientoInput {
   monedaBaseId?: number;
   tasa?: string;
   tasaEsPorcentaje?: boolean;
+  estadoConfirmacion?: "EN_PROCESO"; // nace en proceso de confirmación (Western Union)
   comisionDescontada?: boolean; // cantidad - comisión %: la tasa va como factor (4% -> "0.96")
   cuentaDestino?: string;
   categoriaId?: number;

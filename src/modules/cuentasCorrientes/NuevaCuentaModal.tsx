@@ -95,6 +95,11 @@ export function NuevaCuentaModal({
   const [movCantidad, setMovCantidad] = useState("");
   const [movValor, setMovValor] = useState(""); // la tasa o el % de comisión
   const [movPersona, setMovPersona] = useState("");
+  // Western Union: se anota el MTCN y el movimiento nace en proceso de confirmación
+  const [movMtcn, setMovMtcn] = useState("");
+  const esWestern = medio?.nombre === "WESTERN_UNION";
+  const nMovMtcn = esWestern ? movMtcn.replace(/\D/g, "") : "";
+  const movPersonaCompleta = [movPersona.trim(), nMovMtcn ? `MTCN ${nMovMtcn}` : ""].filter(Boolean).join(" ");
   const etiquetaMedio = medio ? (ETIQUETA_MEDIO[medio.nombre] ?? medio.nombre.replace(/_/g, " ")) : null;
   const codigoMedio = medio ? (MONEDA_DEL_MEDIO[medio.nombre] ?? "COP") : "COP";
   const nMovCantidad = movCantidad.trim() ? leerNumero(movCantidad)?.replace(/^-/, "") ?? null : null;
@@ -173,6 +178,7 @@ export function NuevaCuentaModal({
       if (movFormula === "dividir" && !nMovValor) return setError(`Escribí la tasa para dividir y llevar ${codigoMedio} a ${movDestino}.`);
       if (movFormula === "dividir" && codigoMedio === movDestino) return setError(`El medio elegido ya se mueve en ${movDestino}: no hay nada que dividir.`);
       if (!movMonto || !/[1-9]/.test(movMonto)) return setError("El monto del movimiento da cero: revisá la cantidad.");
+      if (esWestern && nMovMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
       if (medio.nombre === "ZELLE" && movPersona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
     }
     // En la página no se eligen banco ni moneda: salen del medio de arriba y de la fórmula
@@ -181,7 +187,7 @@ export function NuevaCuentaModal({
     setEnviando(true);
     try {
       // Un número de transferencia no se registra dos veces
-      const numero = conMovimiento ? (movPersona.match(/\d{4,30}/)?.[0] ?? null) : null;
+      const numero = !conMovimiento ? null : nMovMtcn.length >= 4 ? nMovMtcn : (movPersona.match(/\d{4,30}/)?.[0] ?? null);
       if (numero) {
         const ya = await buscarMovimientoPorNumero(numero).catch(() => null);
         if (ya) return setError(`Ya hay un movimiento con el número ${numero}: "${ya.descripcion}" de ${ya.tercero_nombre}. No se puede registrar dos veces.`);
@@ -209,9 +215,10 @@ export function NuevaCuentaModal({
             tipo: movResta ? "ABONO" : "CARGO",
             // la referencia sale del medio: "Recibe Zelle" o "Retiro Zelle"
             descripcion:
-              `${movResta ? "Retiro" : "Recibe"} ${etiquetaMedio}${movPersona.trim() ? ` · ${movPersona.trim()}` : ""}` +
+              `${movResta ? "Retiro" : "Recibe"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
               // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
               (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
+            ...(esWestern ? { estadoConfirmacion: "EN_PROCESO" as const } : {}),
             ...(movFactor
               ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true } : {}) }
               : { monto: `${signo}${movMonto!}` }),
@@ -226,6 +233,7 @@ export function NuevaCuentaModal({
           setMovCantidad("");
           setMovValor("");
           setMovPersona("");
+          setMovMtcn("");
           setAvisoLectura(null);
         } else {
           setError(`El cliente se creó, pero el movimiento no se guardó (${errorMovimiento}). Cargalo desde su hoja.`);
@@ -464,6 +472,13 @@ export function NuevaCuentaModal({
               Quién envió o número de la transferencia (opcional)
               <input value={movPersona} onChange={(e) => setMovPersona(e.target.value)} placeholder="Nombre de quien envió, y el número si lo hay" autoComplete="off" />
             </label>
+            {esWestern && (
+              <label>
+                MTCN (referencia de Western Union)
+                <input value={movMtcn} onChange={(e) => setMovMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
+                <small>El movimiento queda en proceso de confirmación hasta que Western lo verifique. Desde la hoja del cliente se le avisa y después se marca como confirmada.</small>
+              </label>
+            )}
           </fieldset>
         )}
 

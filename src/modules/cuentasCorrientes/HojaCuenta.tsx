@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
-import { ArrowLeft, Camera, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
+  confirmarMovimientoCC,
   avisarClienteCuenta,
   buscarMovimientoPorNumero,
   eliminarCuentaCorriente,
@@ -95,7 +96,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
   const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
   // Abono recién cargado (o elegido en la tabla): se le puede confirmar al cliente por WhatsApp
-  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" } | null>(null);
+  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada" } | null>(null);
   const [estadoAviso, setEstadoAviso] = useState<"" | "enviando" | "enviado">("");
   const [copiado, setCopiado] = useState(false);
 
@@ -145,6 +146,18 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     setCargando(true);
     void cargar();
   }, [cargar]);
+
+  // Western ya verificó: el movimiento pasa a confirmado y queda listo el mensaje para el cliente
+  async function confirmar(m: { id: number; monto: string; descripcion: string | null; tipo: string }) {
+    try {
+      await confirmarMovimientoCC(m.id);
+      await cargar();
+      setEstadoAviso("");
+      setAbonoParaAvisar({ monto: m.monto.replace(/^-/, ""), descripcion: m.descripcion ?? m.tipo, sentido: "confirmada" });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   async function anular(id: number, referencia: string) {
     if (!window.confirm(`¿Anular "${referencia}"? Se registra el movimiento contrario y el total vuelve a como estaba.`)) return;
@@ -269,8 +282,15 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   const montoAviso = abonoParaAvisar ? `${simbolo}${formatearMonto(abonoParaAvisar.monto)}${sufijo}` : "";
   const saldoParaCliente =
     lecturaSaldo === "Yo le debo" ? `Tienes ${saldoSinSigno} a tu favor.` : lecturaSaldo === "Me debe" ? `Tu saldo por pagar es de ${saldoSinSigno}.` : "Quedas al día, sin saldo pendiente.";
+  // Western Union: el MTCN va anotado en la referencia del movimiento
+  const mtcnAviso = abonoParaAvisar ? (/MTCN\s*(\d+)/i.exec(abonoParaAvisar.descripcion)?.[1] ?? null) : null;
+  const conMtcn = mtcnAviso ? ` (MTCN ${mtcnAviso})` : "";
   const mensajeAbono = !abonoParaAvisar
     ? ""
+    : abonoParaAvisar.sentido === "proceso"
+      ? `Hola ${cuenta.tercero_nombre}, su transferencia recibida por ${montoAviso}${conMtcn} está en proceso de confirmación. Le avisamos apenas quede confirmada.`
+      : abonoParaAvisar.sentido === "confirmada"
+        ? `Hola ${cuenta.tercero_nombre}, su transferencia por ${montoAviso}${conMtcn} ya fue confirmada. ${saldoParaCliente}`
     : abonoParaAvisar.sentido === "recibe"
       ? `Hola ${cuenta.tercero_nombre}, te entregamos ${montoAviso}. ${saldoParaCliente}`
       : abonoParaAvisar.sentido === "retiro"
@@ -503,6 +523,11 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   {m.descripcion ?? m.tipo}
                   {m.anulado && !m.reverso_de_id && <em> (anulado)</em>}
                   {m.cuenta_destino && <span className="cc-cuenta-destino-chip">→ {m.cuenta_destino}</span>}
+                  {!m.anulado && m.estado_confirmacion && (
+                    <span className={`cc-estado-conf ${m.estado_confirmacion === "EN_PROCESO" ? "proceso" : "ok"}`}>
+                      {m.estado_confirmacion === "EN_PROCESO" ? "en proceso de confirmación" : "confirmada"}
+                    </span>
+                  )}
                   {m.movimiento_caja_id && <span className="cc-chip-caja">caja</span>}
                 </td>
                 <td className="num">{m.cantidad_base ? <Monto valor={m.cantidad_base} simbolo="" /> : ""}</td>
@@ -514,7 +539,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   <Monto valor={m.total} simbolo={simbolo} />
                 </td>
                 <td className="cc-acciones">
-                  {!m.anulado && (cuenta.modulo === "CAJA" || m.monto.startsWith("-") || /^\s*(abono|pago)/i.test(m.descripcion ?? "")) && (
+                  {!m.anulado && m.estado_confirmacion === "EN_PROCESO" && (
+                    <button className="cc-confirmar" onClick={() => confirmar(m)} aria-label="Marcar como confirmada" title="Ya fue verificada: marcar como confirmada">
+                      <CheckCircle2 size={15} />
+                    </button>
+                  )}
+                  {!m.anulado && (cuenta.modulo === "CAJA" || !!m.estado_confirmacion || m.monto.startsWith("-") || /^\s*(abono|pago)/i.test(m.descripcion ?? "")) && (
                     <button
                       className="cc-avisar"
                       onClick={() => {
@@ -522,7 +552,14 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                         setAbonoParaAvisar({
                           monto: m.monto.replace(/^-/, ""),
                           descripcion: m.descripcion ?? m.tipo,
-                          ...(cuenta.modulo === "CAJA" ? { sentido: m.monto.startsWith("-") ? ("retiro" as const) : ("recibe" as const) } : {}),
+                          // lo que está en proceso se avisa como tal; lo demás, según el módulo
+                          ...(m.estado_confirmacion === "EN_PROCESO"
+                            ? { sentido: "proceso" as const }
+                            : m.estado_confirmacion === "CONFIRMADA"
+                              ? { sentido: "confirmada" as const }
+                              : cuenta.modulo === "CAJA"
+                                ? { sentido: m.monto.startsWith("-") ? ("retiro" as const) : ("recibe" as const) }
+                                : {}),
                         });
                       }}
                       aria-label="Enviarle la confirmación al cliente"
@@ -599,12 +636,14 @@ function FilaNueva({
   saldo: string;
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
-  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" }) => void;
+  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada" }) => void;
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
   const [persona, setPersona] = useState("");
   const [cuentaDestino, setCuentaDestino] = useState(""); // a qué cuenta del cliente se le pagó (opcional)
+  // Western Union: se anota el MTCN y el movimiento nace en proceso de confirmación (Western tarda en verificar)
+  const [mtcn, setMtcn] = useState("");
   const [resta, setResta] = useState(false);
   const [cantidad, setCantidad] = useState("");
   // Cliente que se trabaja con comisión descontada: 1.000 - 4% = 960. El % de su primer movimiento ya viene puesto.
@@ -750,7 +789,11 @@ function FilaNueva({
   // Quién envió o el número de la transferencia: siempre se puede anotar; si entró por Zelle es obligatorio
   const pidePersona = !referencia.includes(SEPARADOR_PERSONA);
   // Si se anota un número de transferencia, no puede haber ya un movimiento con ese número
-  const numeroMovimiento = pidePersona ? (persona.match(/\d{4,30}/)?.[0] ?? null) : null;
+  const esWestern = /western/i.test(referencia) || cuenta.canal_nombre === "WESTERN_UNION";
+  const nMtcn = esWestern ? mtcn.replace(/\D/g, "") : "";
+  // quién envió + el MTCN: así queda en la referencia del movimiento y entra en la revisión de números repetidos
+  const personaCompleta = [persona.trim(), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
+  const numeroMovimiento = nMtcn.length >= 4 ? nMtcn : pidePersona ? (persona.match(/\d{4,30}/)?.[0] ?? null) : null;
   const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
   useEffect(() => {
     setRepetido(null);
@@ -813,6 +856,7 @@ function FilaNueva({
     setError(null);
     if (!referencia.trim()) return setError("Escribí la referencia (a quién o qué es).");
     if (personaObligatoria && persona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
+    if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
     if (conTasa && (!nTasa || !/[1-9]/.test(nTasa) || nTasa.startsWith("-"))) return setError(esPorcentaje ? "El porcentaje no es un número válido." : "La tasa no es un número válido.");
     if (conTasa && esPorcentaje && comisionDescuenta && Number(nEscrita) >= 100) return setError("La comisión tiene que ser menor al 100%.");
@@ -840,7 +884,7 @@ function FilaNueva({
     }
     // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
     const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
-    const escrito = { referencia, persona, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
+    const escrito = { referencia, persona, mtcn, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
     setEnCobro(iniciaEnCobro);
     setSentidoCaja("auto");
     if (conCaja && cajaId !== "") {
@@ -858,6 +902,7 @@ function FilaNueva({
     setReferencia(referenciaPuesta);
     setPersona("");
     setCuentaDestino("");
+    setMtcn("");
     setCantidad("");
     // el cliente de comisión sigue en comisión, con su %
     // el que se trabaja dividiendo sigue con la tasa que se acaba de usar
@@ -874,13 +919,14 @@ function FilaNueva({
       monedaId: cuenta.moneda_id,
       tipo: resta ? ("ABONO" as const) : ("CARGO" as const),
       descripcion:
-        (pidePersona && persona.trim() ? `${referencia.trim()}${SEPARADOR_PERSONA}${persona.trim()}` : referencia.trim()) +
+        (pidePersona && personaCompleta ? `${referencia.trim()}${SEPARADOR_PERSONA}${personaCompleta}` : referencia.trim()) +
         // lo que se movió de verdad en la moneda de cobro queda anotado en la referencia
         (enCobro && conTasa ? ` (${formatearMonto(sinSigno(nCantidad!))} ${cobroCodigo} a ${formatearMonto(nTasa!)})` : ""),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje, comisionDescontada: esPorcentaje && comisionDescuenta } : { monto: montoConSigno }),
       cuentaDestino: cuentaDestino.trim() || undefined,
+      ...(esWestern ? { estadoConfirmacion: "EN_PROCESO" as const } : {}),
       ...(conCaja && cajaId !== "" && movimientoCaja && monedaCaja
         ? { cajaId, monedaCajaId: monedaCaja.id, montoCaja: `${entraACaja ? "" : "-"}${movimientoCaja.cantidad}` }
         : {}),
@@ -896,7 +942,9 @@ function FilaNueva({
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       cargarRecientes();
       onGuardado(
-        enConfirmaciones
+        datos.estadoConfirmacion === "EN_PROCESO"
+          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso" }
+          : enConfirmaciones
           ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: datos.tipo === "ABONO" ? "retiro" : "recibe" }
           : datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion)
             ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion }
@@ -910,6 +958,7 @@ function FilaNueva({
         setReferencia(escrito.referencia);
         setPersona(escrito.persona);
         setCuentaDestino(escrito.cuentaDestino);
+        setMtcn(escrito.mtcn);
         setCantidad(escrito.cantidad);
         setTasa(escrito.tasa);
         setMontoDirecto(escrito.montoDirecto);
@@ -975,6 +1024,13 @@ function FilaNueva({
             Quién envió o número de la transferencia{personaObligatoria ? "" : " (opcional)"}
             <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Nombre de quien envió, y el número si lo hay" autoComplete="off" />
             {repetido && <small className="cc-repetido">{avisoRepetido(repetido)}</small>}
+          </label>
+        )}
+        {esWestern && (
+          <label className="cc-c-mtcn">
+            MTCN (referencia de Western Union)
+            <input value={mtcn} onChange={(e) => setMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
+            <small>Queda en proceso de confirmación hasta que Western lo verifique.</small>
           </label>
         )}
         <label className="cc-c-destino">
