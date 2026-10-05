@@ -45,7 +45,29 @@ export interface CierreTaquilla {
   monedas: { codigo: CodigoTaquilla; saldo_inicial: string; saldo_esperado: string; saldo_real: string; diferencia: string }[];
 }
 
+/** Un ingreso o egreso de ventanilla: total = cantidad x tasa, menos la comisión. */
+export interface OperacionTaquilla {
+  id: number;
+  tipo: "INGRESO" | "EGRESO";
+  cantidad: string;
+  tasa: string | null;
+  comision_pct: string | null;
+  total: string;
+  descripcion: string | null;
+  cliente_nombre: string | null;
+  cliente_telefono: string | null;
+  cliente_cedula: string | null;
+  estado: "PENDIENTE" | "CONFIRMADA" | "ANULADA";
+  created_at: string;
+  confirmado_en: string | null;
+  moneda_codigo: CodigoTaquilla;
+  usuario_nombre: string;
+  confirmado_por_nombre: string | null;
+}
+
 export interface Taquilla {
+  // Ingresos y egresos de ventanilla de esta caja (o de hoy), más los que sigan pendientes
+  operaciones: OperacionTaquilla[];
   // Pagos hechos por Bancolombia (de esta caja abierta, o de hoy si está cerrada): no tocan la caja
   pagosBancolombia: { cantidad: number; totales: { codigo: string; total: string }[] };
   caja: { id: number; nombre: string; saldos: SaldoTaquilla[] };
@@ -78,4 +100,29 @@ export function moverCajaTaquilla(monedaCodigo: CodigoTaquilla, monto: string) {
 
 export function pagarSolicitud(id: number, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
   return api.post<Taquilla>(`/taquilla/solicitudes/${id}/pagar`, { medio });
+}
+
+export interface NuevaOperacionTaquilla {
+  tipo: "INGRESO" | "EGRESO";
+  monedaCodigo: CodigoTaquilla;
+  cantidad: string;
+  tasa?: string;
+  comisionPct?: string;
+  descripcion?: string;
+  clienteNombre?: string;
+  clienteTelefono?: string;
+  clienteCedula?: string;
+  confirmada?: boolean;
+}
+
+export function crearOperacionTaquilla(datos: NuevaOperacionTaquilla) {
+  return api.post<Taquilla>("/taquilla/operaciones", datos);
+}
+
+export function confirmarOperacionTaquilla(id: number) {
+  return api.post<Taquilla>(`/taquilla/operaciones/${id}/confirmar`);
+}
+
+export function anularOperacionTaquilla(id: number) {
+  return api.post<Taquilla>(`/taquilla/operaciones/${id}/anular`);
 }

@@ -18,6 +18,7 @@ import {
 } from "../../api/taquilla.api";
 import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import "../cuentasCorrientes/cuentasCorrientes.css";
+import { OperacionesTaquilla } from "./OperacionesTaquilla";
 import "./taquilla.css";
 
 const NOMBRE_MONEDA: Record<string, string> = { COP: "Pesos", USD: "Dólares", EUR: "Euros" };
@@ -273,6 +274,9 @@ export function TaquillaPage() {
           </details>
         )}
       </section>
+
+      {/* Ingreso / egreso de ventanilla, debajo de la caja */}
+      {taquilla && <OperacionesTaquilla taquilla={taquilla} onCambio={setTaquilla} />}
 
       {error && <p className="cc-form-error tq-error">{error}</p>}
 
