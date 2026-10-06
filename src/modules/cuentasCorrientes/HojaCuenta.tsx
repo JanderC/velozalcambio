@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
@@ -904,13 +904,23 @@ function FilaNueva({
     if (/comisi[oó]n/i.test(valor) && !esPorcentaje) activarPorcentaje();
   }
 
-  // Pegar una captura (Ctrl+V) en cualquier parte del formulario la lee como comprobante
-  function alPegar(e: ClipboardEvent<HTMLFormElement>) {
-    const imagen = [...e.clipboardData.files].find((f) => f.type.startsWith("image/"));
-    if (!imagen || leyendo) return;
-    e.preventDefault();
-    void cargarComprobante(imagen);
-  }
+  // Pegar una captura (Ctrl+V) en cualquier parte de la pantalla la lee como comprobante,
+  // aunque el cursor no esté dentro del formulario
+  const pegarImagen = useRef<(imagen: File) => void>(() => {});
+  pegarImagen.current = (imagen) => {
+    if (!leyendo) void cargarComprobante(imagen);
+  };
+  useEffect(() => {
+
+    const alPegar = (e: globalThis.ClipboardEvent) => {
+      const imagen = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (!imagen) return; // texto u otra cosa: se pega normal
+      e.preventDefault();
+      pegarImagen.current(imagen);
+    };
+    document.addEventListener("paste", alPegar);
+    return () => document.removeEventListener("paste", alPegar);
+  }, []);
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -1059,14 +1069,14 @@ function FilaNueva({
       <Plus size={18} /> Nuevo movimiento
     </button>
     {abierta && <div className="cc-velo" onClick={() => setAbierta(false)} />}
-    <form className={`cc-nueva ${abierta ? "abierta" : ""}`} onSubmit={guardar} onPaste={alPegar}>
+    <form className={`cc-nueva ${abierta ? "abierta" : ""}`} onSubmit={guardar}>
       <div className="cc-nueva-titulo">
         Nuevo movimiento
         <label className={`cc-leer-comprobante ${leyendo ? "leyendo" : ""}`}>
           <Camera size={15} /> {leyendo ? "Leyendo la imagen…" : "Cargar o pegar comprobante"}
           <input
             type="file"
-            title="Elegí la imagen, o pegala con Ctrl+V en el formulario"
+            title="Elegí la imagen, o pegala con Ctrl+V en cualquier parte de la pantalla"
             accept="image/jpeg,image/png,image/webp"
             disabled={leyendo}
             onChange={(e) => {
