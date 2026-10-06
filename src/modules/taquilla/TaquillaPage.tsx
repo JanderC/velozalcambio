@@ -182,6 +182,101 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
       </span>
     );
 
+  // Al buscar (una referencia, un nombre…) los resultados salen pegados al buscador, no al final de la pantalla
+  const buscando = buscar.trim() !== "";
+  const listas = (
+    <>
+      {/* Lo buscado ya se retiró: se avisa dónde y cuándo, arriba de todo */}
+      {yaPagadas.length > 0 && (
+        <section className="tq-lista tq-ya-pagadas" aria-label="Ya retiradas">
+          <h2>
+            Ya se pagó: no se puede retirar otra vez <span>{yaPagadas.length}</span>
+          </h2>
+          <ul>
+            {yaPagadas.map((s) => (
+              <li key={s.id} className="tq-solicitud" onClick={() => setDetalle(s)} title="Ver todos los datos y el comprobante">
+                <div className="tq-solicitud-datos">
+                  <strong>{s.cliente_nombre}</strong>
+                  <span>
+                    Ref: <b>{referenciaDe(s) || "—"}</b>
+                  </span>
+                  <span className="tq-ya-pagada-donde">
+                    Pagada en {s.pagado_caja_nombre ?? "taquilla"}
+                    {s.pagado_medio === "BANCOLOMBIA" ? " por Bancolombia" : " en efectivo"}
+                    {s.pagado_en ? ` el ${fechaHora(s.pagado_en)}` : ""}
+                    {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
+                  </span>
+                </div>
+                <div className="tq-solicitud-monto">
+                  <span>Recibió</span>
+                  <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="tq-lista" aria-label="Solicitudes por pagar">
+        <h2>
+          Por pagar <span>{pendientes.length}</span>
+        </h2>
+        {!taquilla && !error && <p className="cc-lista-aviso">Cargando…</p>}
+        {taquilla && pendientes.length === 0 && <p className="cc-lista-aviso">{buscar ? "Ninguna solicitud coincide." : "No hay solicitudes por pagar."}</p>}
+        <ul>
+          {pendientes.map((s) => (
+            <li key={s.id} className={`tq-solicitud ${porConfirmar(s) ? "sin-confirmar" : ""}`} onClick={() => setDetalle(s)} title="Ver todos los datos y el comprobante">
+              <div className="tq-solicitud-datos">
+                <strong>
+                  {s.cliente_nombre}
+                  {s.tiene_comprobante && <IconoImagen size={15} aria-label="Tiene imagen del comprobante" />}
+                </strong>
+                <span>{[s.cliente_cedula ? `CC ${s.cliente_cedula}` : null, s.cliente_telefono].filter(Boolean).join(" · ") || "sin cédula ni teléfono"}</span>
+                <span>
+                  Ref: <b>{referenciaDe(s) || "—"}</b> · {fechaHora(s.fecha)}
+                </span>
+              </div>
+              <div className="tq-solicitud-monto">
+                <span>Recibe</span>
+                <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
+              </div>
+              {botonPagar(s)}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {pagadas.length > 0 && (
+        <section className="tq-lista tq-pagadas" aria-label="Pagadas">
+          <h2>
+            {abierta ? "Pagadas en esta caja" : "Pagadas hoy"} <span>{pagadas.length}</span>
+          </h2>
+          <ul>
+            {pagadas.map((s) => (
+              <li key={s.id} className="tq-solicitud" onClick={() => setDetalle(s)} title="Ver todos los datos y el comprobante">
+                <div className="tq-solicitud-datos">
+                  <strong>{s.cliente_nombre}</strong>
+                  <span>
+                    Ref: <b>{referenciaDe(s) || "—"}</b>
+                  </span>
+                  <span>
+                    Pagada {s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia " : "en efectivo "}
+                    {s.pagado_en ? fechaHora(s.pagado_en) : ""}
+                    {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
+                  </span>
+                </div>
+                <div className="tq-solicitud-monto">
+                  <span>Recibió</span>
+                  <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+
   return (
     <div className="cc-page">
       <Header />
@@ -190,6 +285,8 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
         <Search size={20} />
         <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre, teléfono, cédula o referencia" aria-label="Buscar solicitud" autoFocus />
       </div>
+
+      {buscando && listas}
 
       {/* La caja, en chico: cuánto hay en cada moneda y abrir o cerrar */}
       <section className="tq-caja" aria-label="Caja de taquilla">
@@ -303,94 +400,8 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
 
       {error && <p className="cc-form-error tq-error">{error}</p>}
 
-      {/* Lo buscado ya se retiró: se avisa dónde y cuándo, arriba de todo */}
-      {yaPagadas.length > 0 && (
-        <section className="tq-lista tq-ya-pagadas" aria-label="Ya retiradas">
-          <h2>
-            Ya se pagó: no se puede retirar otra vez <span>{yaPagadas.length}</span>
-          </h2>
-          <ul>
-            {yaPagadas.map((s) => (
-              <li key={s.id} className="tq-solicitud" onClick={() => setDetalle(s)} title="Ver todos los datos y el comprobante">
-                <div className="tq-solicitud-datos">
-                  <strong>{s.cliente_nombre}</strong>
-                  <span>
-                    Ref: <b>{referenciaDe(s) || "—"}</b>
-                  </span>
-                  <span className="tq-ya-pagada-donde">
-                    Pagada en {s.pagado_caja_nombre ?? "taquilla"}
-                    {s.pagado_medio === "BANCOLOMBIA" ? " por Bancolombia" : " en efectivo"}
-                    {s.pagado_en ? ` el ${fechaHora(s.pagado_en)}` : ""}
-                    {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
-                  </span>
-                </div>
-                <div className="tq-solicitud-monto">
-                  <span>Recibió</span>
-                  <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="tq-lista" aria-label="Solicitudes por pagar">
-        <h2>
-          Por pagar <span>{pendientes.length}</span>
-        </h2>
-        {!taquilla && !error && <p className="cc-lista-aviso">Cargando…</p>}
-        {taquilla && pendientes.length === 0 && <p className="cc-lista-aviso">{buscar ? "Ninguna solicitud coincide." : "No hay solicitudes por pagar."}</p>}
-        <ul>
-          {pendientes.map((s) => (
-            <li key={s.id} className={`tq-solicitud ${porConfirmar(s) ? "sin-confirmar" : ""}`} onClick={() => setDetalle(s)} title="Ver todos los datos y el comprobante">
-              <div className="tq-solicitud-datos">
-                <strong>
-                  {s.cliente_nombre}
-                  {s.tiene_comprobante && <IconoImagen size={15} aria-label="Tiene imagen del comprobante" />}
-                </strong>
-                <span>{[s.cliente_cedula ? `CC ${s.cliente_cedula}` : null, s.cliente_telefono].filter(Boolean).join(" · ") || "sin cédula ni teléfono"}</span>
-                <span>
-                  Ref: <b>{referenciaDe(s) || "—"}</b> · {fechaHora(s.fecha)}
-                </span>
-              </div>
-              <div className="tq-solicitud-monto">
-                <span>Recibe</span>
-                <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
-              </div>
-              {botonPagar(s)}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {pagadas.length > 0 && (
-        <section className="tq-lista tq-pagadas" aria-label="Pagadas">
-          <h2>
-            {abierta ? "Pagadas en esta caja" : "Pagadas hoy"} <span>{pagadas.length}</span>
-          </h2>
-          <ul>
-            {pagadas.map((s) => (
-              <li key={s.id} className="tq-solicitud" onClick={() => setDetalle(s)} title="Ver todos los datos y el comprobante">
-                <div className="tq-solicitud-datos">
-                  <strong>{s.cliente_nombre}</strong>
-                  <span>
-                    Ref: <b>{referenciaDe(s) || "—"}</b>
-                  </span>
-                  <span>
-                    Pagada {s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia " : "en efectivo "}
-                    {s.pagado_en ? fechaHora(s.pagado_en) : ""}
-                    {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
-                  </span>
-                </div>
-                <div className="tq-solicitud-monto">
-                  <span>Recibió</span>
-                  <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* Sin buscar, las solicitudes van abajo de todo */}
+      {!buscando && listas}
 
       {detalle && <DetalleSolicitud solicitud={detalle} accion={detalle.pagado_en ? null : botonPagar(detalle)} onCerrar={() => setDetalle(null)} />}
 
