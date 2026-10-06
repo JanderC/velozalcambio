@@ -738,8 +738,9 @@ function FilaNueva({
   const refInput = useRef<HTMLInputElement>(null);
   // Últimas tasas y comisiones usadas: se aplican con un toque, sin escribirlas
   const [recientes, setRecientes] = useState<TasasRecientes>({ tasas: [], porcentajes: [], tasaHabitual: null, referenciaFrecuente: null });
-  // Si se cambia la tasa que venía puesta: ¿queda esta para los próximos movimientos?
-  const [mantenerTasa, setMantenerTasa] = useState(false);
+  // Si se cambia la tasa que venía puesta, queda esa para los próximos movimientos (la última usada).
+  // Se puede desmarcar cuando es una tasa de una sola vez.
+  const [mantenerTasa, setMantenerTasa] = useState(true);
   // Leer la imagen del comprobante: llena el número de referencia, el monto y la fecha
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
@@ -987,7 +988,7 @@ function FilaNueva({
     const tasaQueQueda = tasaModificada ? (mantenerTasa ? nEscrita! : recientes.tasaHabitual) : null;
     const tasaSiguiente = tasaModificada && mantenerTasa ? formatearMonto(nEscrita!) : tasaPuesta;
     setRecientes((r) => (tasaModificada && mantenerTasa ? { ...r, tasaHabitual: nEscrita! } : r));
-    setMantenerTasa(false);
+    setMantenerTasa(true);
     setReferencia(referenciaPuesta);
     setPersona("");
     setCuentaDestino("");
@@ -1031,6 +1032,8 @@ function FilaNueva({
     cola.current = turno.catch(() => {});
     try {
       const creado = await turno;
+      // la tasa queda guardada apenas se registra el movimiento, sin esperar a que suba la imagen
+      if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
       if (adjunta) {
         await subirComprobanteMovimiento(creado.movimiento.id, adjunta).catch((e) =>
@@ -1039,7 +1042,6 @@ function FilaNueva({
       }
       // si no tiene permiso para cambiarla, la tasa de la cuenta queda como estaba
       if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
-      if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       cargarRecientes();
       // operación con comisión descontada: el aviso lleva lo que el cliente envió en total y el %
       const envio = esPorcentaje && comisionDescuenta && nCantidad && nEscrita ? { enviado: sinSigno(nCantidad), comision: nEscrita } : {};
@@ -1238,7 +1240,7 @@ function FilaNueva({
         <label className="cc-check cc-mantener-tasa">
           <input type="checkbox" checked={mantenerTasa} onChange={(e) => setMantenerTasa(e.target.checked)} />
           Mantener {formatearMonto(nEscrita!)} como la tasa de esta cuenta
-          {tasaPuesta && !mantenerTasa && <small>Si no, después de este movimiento vuelve a {tasaPuesta}.</small>}
+          {tasaPuesta && <small>{mantenerTasa ? `Desmarcalo si es solo por esta vez (volvería a ${tasaPuesta}).` : `Después de este movimiento vuelve a ${tasaPuesta}.`}</small>}
         </label>
       )}
       {(() => {
