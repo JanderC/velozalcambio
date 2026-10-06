@@ -259,3 +259,10 @@
 @media (max-width: 860px) {
   .tq-operacion textarea { font-size: 16px; }
 }
+
+/* Cargar o pegar la imagen del comprobante en el ingreso / egreso */
+.tq-operacion label.tq-leer { flex-direction: row; align-items: center; gap: 6px; margin-left: 0; padding: 7px 12px; border: 1px solid var(--color-navy); border-radius: 6px; background: white; color: var(--color-navy); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.tq-operacion label.tq-leer.leyendo { opacity: 0.6; cursor: default; }
+.tq-operacion label.tq-leer input { display: none; }
+.tq-operacion .cc-aviso-lectura, .tq-operacion .cc-imagen-adjunta { margin: 0; }
+.tq-movimiento-datos .cc-ver-comprobante { margin-left: 0; }

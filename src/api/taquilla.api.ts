@@ -63,6 +63,7 @@ export interface OperacionTaquilla {
   estado: "PENDIENTE" | "CONFIRMADA" | "ANULADA";
   created_at: string;
   confirmado_en: string | null;
+  tiene_comprobante: boolean; // tiene guardada la imagen del comprobante
   // lo que mueve la caja (total) va en moneda_codigo; puede ser lo que trajo el cliente o el resultado de la cuenta
   moneda_codigo: string;
   resultado: string | null; // lo que sale de la cuenta, en moneda_resultado
@@ -128,7 +129,8 @@ export interface NuevaOperacionTaquilla {
 }
 
 export function crearOperacionTaquilla(datos: NuevaOperacionTaquilla) {
-  return api.post<Taquilla>("/taquilla/operaciones", datos);
+  // operacionId: la que se acaba de crear, para guardarle la imagen del comprobante
+  return api.post<Taquilla & { operacionId: number }>("/taquilla/operaciones", datos);
 }
 
 export function confirmarOperacionTaquilla(id: number) {
@@ -137,4 +139,16 @@ export function confirmarOperacionTaquilla(id: number) {
 
 export function anularOperacionTaquilla(id: number) {
   return api.post<Taquilla>(`/taquilla/operaciones/${id}/anular`);
+}
+
+/** Guarda la imagen del comprobante con el ingreso o egreso ya creado. */
+export function subirComprobanteOperacion(id: number, imagen: File) {
+  const formData = new FormData();
+  formData.append("imagen", imagen);
+  return api.postForm<Taquilla>(`/taquilla/operaciones/${id}/comprobante`, formData);
+}
+
+/** Enlace temporal para ver la imagen del comprobante de un ingreso o egreso. */
+export async function getUrlComprobanteOperacion(id: number) {
+  return (await api.get<{ url: string }>(`/taquilla/operaciones/${id}/comprobante`)).url;
 }

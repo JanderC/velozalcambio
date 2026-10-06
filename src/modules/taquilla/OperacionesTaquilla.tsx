@@ -1,7 +1,17 @@
-import { useState, type FormEvent } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Camera, CheckCircle2, ChevronDown, ChevronUp, Image as IconoImagen, MessageCircle } from "lucide-react";
+import { Modal } from "../../components/common/Modal";
+import { leerComprobante } from "../cuentasCorrientes/ocrComprobante";
 import { ApiError } from "../../api/client";
-import { anularOperacionTaquilla, confirmarOperacionTaquilla, crearOperacionTaquilla, type OperacionTaquilla, type Taquilla } from "../../api/taquilla.api";
+import {
+  anularOperacionTaquilla,
+  confirmarOperacionTaquilla,
+  crearOperacionTaquilla,
+  getUrlComprobanteOperacion,
+  subirComprobanteOperacion,
+  type OperacionTaquilla,
+  type Taquilla,
+} from "../../api/taquilla.api";
 import { DolaresPorBillete } from "./DolaresPorBillete";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
@@ -73,6 +83,66 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
   const [verMovimientos, setVerMovimientos] = useState(false);
   const [ocupado, setOcupado] = useState<number | "nueva" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // La imagen del comprobante: se carga o se pega (Ctrl+V), se lee para llenar el monto y se guarda con el movimiento
+  const [imagenAdjunta, setImagenAdjunta] = useState<File | null>(null);
+  const [leyendo, setLeyendo] = useState(false);
+  const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
+  const [imagenVista, setImagenVista] = useState<string | null>(null);
+
+  async function cargarComprobante(archivo: File | undefined) {
+    if (!archivo) return;
+    setImagenAdjunta(archivo);
+    setError(null);
+    setAvisoLectura(null);
+    setLeyendo(true);
+    try {
+      const d = await leerComprobante(archivo);
+      const partes: string[] = [];
+      if (d.monto) {
+        setMonto(formatearMonto(d.monto));
+        // el monto del comprobante está en su moneda: si se reconoce, queda elegida
+        if (d.moneda && MONEDAS.some((m) => m.codigo === d.moneda)) {
+          setMonedaMonto(d.moneda);
+          setLadoElegido(null);
+        }
+        partes.push(`monto ${formatearMonto(d.monto)}${d.moneda ? ` ${d.moneda}` : ""}`);
+      }
+      if (d.referencia) {
+        // la referencia va a la descripción, en su propio renglón
+        setDescripcion((actual) => (actual.includes(d.referencia!) ? actual : `${actual.trim() ? `${actual.replace(/\s+$/, "")}\n` : ""}Referencia: ${d.referencia}`));
+        partes.push(`referencia ${d.referencia}`);
+      }
+      setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de registrar.` : "La imagen queda adjunta, pero no encontré monto ni referencia en ella.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo leer la imagen.");
+    } finally {
+      setLeyendo(false);
+    }
+  }
+
+  // Pegar una captura (Ctrl+V) en cualquier parte de la pantalla la toma como comprobante
+  const pegarImagen = useRef<(imagen: File) => void>(() => {});
+  pegarImagen.current = (imagen) => {
+    if (!leyendo) void cargarComprobante(imagen);
+  };
+  useEffect(() => {
+    const alPegar = (e: globalThis.ClipboardEvent) => {
+      const imagen = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (!imagen) return; // texto u otra cosa: se pega normal
+      e.preventDefault();
+      pegarImagen.current(imagen);
+    };
+    document.addEventListener("paste", alPegar);
+    return () => document.removeEventListener("paste", alPegar);
+  }, []);
+
+  async function verComprobante(id: number) {
+    try {
+      setImagenVista(await getUrlComprobanteOperacion(id));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo abrir la imagen.");
+    }
+  }
 
   const abierta = taquilla.sesion.abierta;
   const porBanco = medio === "BANCOLOMBIA";
@@ -118,8 +188,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
     if (!porBanco && !cajaPuede) return setError(`La caja solo tiene pesos, dólares y euros: no puede moverse en ${nombreDe(monedaCaja).toLowerCase()}. Elegí Bancolombia o cambiá las monedas.`);
     setOcupado("nueva");
     try {
-      onCambio(
-        await crearOperacionTaquilla({
+      const creada = await crearOperacionTaquilla({
           tipo,
           cantidad: nMonto,
           monedaOperacion: monedaMonto,
@@ -132,8 +201,16 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           clienteTelefono: telefono.trim() || undefined,
           clienteCedula: cedula.trim() || undefined,
           confirmada: tipo === "INGRESO" ? confirmada : undefined,
-        })
-      );
+        });
+      onCambio(creada);
+      // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
+      if (imagenAdjunta) {
+        await subirComprobanteOperacion(creada.operacionId, imagenAdjunta)
+          .then(onCambio)
+          .catch((e) => setError(`El movimiento se registró, pero la imagen no se guardó: ${(e as Error).message}`));
+      }
+      setImagenAdjunta(null);
+      setAvisoLectura(null);
       setMonto("");
       setValor("");
       setDescripcion("");
@@ -190,6 +267,18 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
       <form className="tq-operacion" onSubmit={registrar}>
         <div className="tq-operacion-cabeza">
           <h2>Conversión · ingreso / egreso</h2>
+          <label className={`cc-leer-comprobante tq-leer ${leyendo ? "leyendo" : ""}`} title="Elegí la imagen, o pegala con Ctrl+V en cualquier parte de la pantalla">
+            <Camera size={15} /> {leyendo ? "Leyendo la imagen…" : "Cargar o pegar imagen"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={leyendo}
+              onChange={(e) => {
+                void cargarComprobante(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
           <div className="cc-segmento" role="group" aria-label="Ingreso o egreso">
             <button type="button" className={tipo === "INGRESO" ? "activo" : ""} onClick={() => setTipo("INGRESO")} aria-pressed={tipo === "INGRESO"}>
               Ingreso (suma)
@@ -200,6 +289,15 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           </div>
         </div>
 
+        {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
+        {imagenAdjunta && (
+          <p className="cc-imagen-adjunta">
+            <IconoImagen size={14} /> Imagen del comprobante lista: se guarda con el movimiento.
+            <button type="button" onClick={() => setImagenAdjunta(null)}>
+              Quitar
+            </button>
+          </p>
+        )}
         <div className="tq-operacion-opciones">
           <div className="tq-operacion-grupo">
             <span>Cuenta</span>
@@ -365,6 +463,13 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
                   </strong>
                   <span>{cuentaDe(o)}</span>
                   {o.descripcion && <span className="tq-mov-descripcion">{o.descripcion}</span>}
+                  {o.tiene_comprobante && (
+                    <span>
+                      <button type="button" className="cc-ver-comprobante" onClick={() => verComprobante(o.id)} title="Ver la imagen del comprobante">
+                        <IconoImagen size={13} /> comprobante
+                      </button>
+                    </span>
+                  )}
                   <span>
                     {[o.cliente_nombre, o.cliente_cedula ? `CC ${o.cliente_cedula}` : null, o.cliente_telefono].filter(Boolean).join(" · ") || "sin datos del cliente"} · {hora(o.created_at)} · {o.usuario_nombre}
                   </span>
@@ -411,6 +516,13 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
             );
           })}
         </ul>
+      )}
+      {imagenVista && (
+        <Modal titulo="Comprobante" ancho="ancho" onCerrar={() => setImagenVista(null)}>
+          <div className="cc-reporte">
+            <img src={imagenVista} alt="Imagen del comprobante" />
+          </div>
+        </Modal>
       )}
     </section>
   );
