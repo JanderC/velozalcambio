@@ -74,6 +74,8 @@ export interface OperacionTaquilla {
 }
 
 export interface Taquilla {
+  // La Caja Fuerte: alimenta a la taquilla y recibe lo contado al cerrar
+  cajaFuerte: { id: number; nombre: string; saldos: { codigo: CodigoTaquilla; monto: string }[] };
   // Ingresos y egresos de ventanilla de esta caja (o de hoy), más los que sigan pendientes
   operaciones: OperacionTaquilla[];
   // Pagos hechos por Bancolombia (de esta caja abierta, o de hoy si está cerrada): no tocan la caja
@@ -92,8 +94,14 @@ export function getTaquilla() {
 }
 
 /** Abre la caja: con cuánto efectivo arranca en cada moneda. */
-export function abrirCajaTaquilla(montos: MontosPorMoneda) {
-  return api.post<Taquilla>("/taquilla/sesion/abrir", { montos });
+/** desdeCajaFuerte: el efectivo con que arranca sale de la Caja Fuerte. */
+export function abrirCajaTaquilla(montos: MontosPorMoneda, desdeCajaFuerte: boolean) {
+  return api.post<Taquilla>("/taquilla/sesion/abrir", { montos, desdeCajaFuerte });
+}
+
+/** Traer efectivo de la Caja Fuerte a la taquilla, o enviárselo. */
+export function moverConCajaFuerte(monedaCodigo: CodigoTaquilla, monto: string, sentido: "TRAER" | "ENVIAR") {
+  return api.post<Taquilla>("/taquilla/caja-fuerte", { monedaCodigo, monto, sentido });
 }
 
 /** Cierra y cuadra: lo que se contó en cada moneda. */

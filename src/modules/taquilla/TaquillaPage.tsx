@@ -9,6 +9,7 @@ import {
   cerrarCajaTaquilla,
   getTaquilla,
   moverCajaTaquilla,
+  moverConCajaFuerte,
   pagarSolicitud,
   type CodigoTaquilla,
   type MontosPorMoneda,
@@ -343,6 +344,7 @@ export function TaquillaPage() {
       {moviendo && (
         <MoverCajaModal
           saldo={moviendo}
+          enCajaFuerte={taquilla?.cajaFuerte.saldos.find((s) => s.codigo === moviendo.codigo)?.monto ?? "0"}
           onCerrar={() => setMoviendo(null)}
           onHecho={(nueva) => {
             setTaquilla(nueva);
@@ -355,6 +357,7 @@ export function TaquillaPage() {
         <SesionModal
           modo="abrir"
           saldos={taquilla.caja.saldos}
+          cajaFuerte={taquilla.cajaFuerte.saldos}
           onCerrar={() => setAbriendo(false)}
           onHecho={(nueva) => {
             setTaquilla(nueva);
@@ -367,6 +370,7 @@ export function TaquillaPage() {
         <SesionModal
           modo="cerrar"
           saldos={taquilla.caja.saldos}
+          cajaFuerte={taquilla.cajaFuerte.saldos}
           onCerrar={() => setCerrando(false)}
           onHecho={(nueva) => {
             setTaquilla(nueva);
@@ -439,8 +443,23 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
 }
 
 /** Abrir la caja (con cuánto arranca) o cerrarla (cuánto se contó), en pesos, dólares y euros. */
-function SesionModal({ modo, saldos, onHecho, onCerrar }: { modo: "abrir" | "cerrar"; saldos: SaldoTaquilla[]; onHecho: (t: Taquilla) => void; onCerrar: () => void }) {
+function SesionModal({
+  modo,
+  saldos,
+  cajaFuerte,
+  onHecho,
+  onCerrar,
+}: {
+  modo: "abrir" | "cerrar";
+  saldos: SaldoTaquilla[];
+  cajaFuerte: Taquilla["cajaFuerte"]["saldos"];
+  onHecho: (t: Taquilla) => void;
+  onCerrar: () => void;
+}) {
   const [montos, setMontos] = useState<Record<string, string>>({});
+  // Al abrir: el efectivo sale de la Caja Fuerte (marcado de entrada si la Caja Fuerte tiene algo)
+  const [desdeFuerte, setDesdeFuerte] = useState(() => cajaFuerte.some((s) => /[1-9]/.test(s.monto) && !s.monto.startsWith("-")));
+  const enFuerte = (codigo: string) => cajaFuerte.find((s) => s.codigo === codigo)?.monto ?? "0";
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -458,7 +477,7 @@ function SesionModal({ modo, saldos, onHecho, onCerrar }: { modo: "abrir" | "cer
     }
     setEnviando(true);
     try {
-      onHecho(modo === "abrir" ? await abrirCajaTaquilla(valores) : await cerrarCajaTaquilla(valores));
+      onHecho(modo === "abrir" ? await abrirCajaTaquilla(valores, desdeFuerte) : await cerrarCajaTaquilla(valores));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar.");
     } finally {
@@ -472,15 +491,21 @@ function SesionModal({ modo, saldos, onHecho, onCerrar }: { modo: "abrir" | "cer
         <p className="cc-modal-nota">
           {modo === "abrir"
             ? "Escribí con cuánto efectivo arranca la caja en cada moneda. Desde ahí se va sumando y descontando todo."
-            : "Contá el efectivo de cada moneda y escribilo. Se compara con lo que debía haber y queda guardado el cuadre."}
+            : "Contá el efectivo de cada moneda y escribilo. Se compara con lo que debía haber, queda guardado el cuadre y lo contado pasa a la Caja Fuerte: la taquilla queda en cero."}
         </p>
+        {modo === "abrir" && (
+          <label className="tq-check">
+            <input type="checkbox" checked={desdeFuerte} onChange={(e) => setDesdeFuerte(e.target.checked)} />
+            Ese efectivo sale de la Caja Fuerte
+          </label>
+        )}
         {saldos.map((s, i) => {
           const n = leido(s.codigo);
           const diferencia = modo === "cerrar" && n !== null ? sumarDecimales(n, s.monto.startsWith("-") ? s.monto.slice(1) : `-${s.monto}`) : null;
           return (
             <label key={s.codigo}>
               {NOMBRE_MONEDA[s.codigo] ?? s.codigo}
-              {modo === "cerrar" ? ` · debía haber ${dinero(s.monto, s.codigo)}` : ""}
+              {modo === "cerrar" ? ` · debía haber ${dinero(s.monto, s.codigo)}` : desdeFuerte ? ` · en Caja Fuerte hay ${dinero(enFuerte(s.codigo), s.codigo)}` : ""}
               <input
                 value={montos[s.codigo] ?? ""}
                 onChange={(e) => setMontos((m) => ({ ...m, [s.codigo]: e.target.value }))}
@@ -511,8 +536,18 @@ function SesionModal({ modo, saldos, onHecho, onCerrar }: { modo: "abrir" | "cer
 }
 
 /** Sumar o descontar efectivo de la caja de taquilla en una moneda, con la caja abierta (reponer, retirar). */
-function MoverCajaModal({ saldo, onHecho, onCerrar }: { saldo: SaldoTaquilla; onHecho: (t: Taquilla) => void; onCerrar: () => void }) {
-  const [descuenta, setDescuenta] = useState(false);
+const MODOS_MOVER = [
+  { id: "TRAER", etiqueta: "Traer de Caja Fuerte", boton: "Traer", descuenta: false },
+  { id: "ENVIAR", etiqueta: "Enviar a Caja Fuerte", boton: "Enviar", descuenta: true },
+  { id: "SUMAR", etiqueta: "Sumar (ajuste)", boton: "Sumar", descuenta: false },
+  { id: "DESCONTAR", etiqueta: "Descontar (ajuste)", boton: "Descontar", descuenta: true },
+] as const;
+
+function MoverCajaModal({ saldo, enCajaFuerte, onHecho, onCerrar }: { saldo: SaldoTaquilla; enCajaFuerte: string; onHecho: (t: Taquilla) => void; onCerrar: () => void }) {
+  const [modo, setModo] = useState<(typeof MODOS_MOVER)[number]["id"]>("TRAER");
+  const elegido = MODOS_MOVER.find((m) => m.id === modo)!;
+  const descuenta = elegido.descuenta;
+  const conFuerte = modo === "TRAER" || modo === "ENVIAR";
   const [monto, setMonto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -524,7 +559,7 @@ function MoverCajaModal({ saldo, onHecho, onCerrar }: { saldo: SaldoTaquilla; on
     if (!nMonto || !/[1-9]/.test(nMonto)) return setError("Escribí el monto.");
     setEnviando(true);
     try {
-      onHecho(await moverCajaTaquilla(saldo.codigo, `${descuenta ? "-" : ""}${nMonto}`));
+      onHecho(conFuerte ? await moverConCajaFuerte(saldo.codigo as CodigoTaquilla, nMonto, modo) : await moverCajaTaquilla(saldo.codigo, `${descuenta ? "-" : ""}${nMonto}`));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo mover la caja.");
     } finally {
@@ -536,20 +571,25 @@ function MoverCajaModal({ saldo, onHecho, onCerrar }: { saldo: SaldoTaquilla; on
     <Modal titulo={`Caja de taquilla · ${NOMBRE_MONEDA[saldo.codigo] ?? saldo.codigo}`} onCerrar={onCerrar}>
       <form className="cc-modal" onSubmit={guardar}>
         <p className="cc-modal-nota">
-          Hay <strong>{dinero(saldo.monto, saldo.codigo)}</strong> en la caja.
+          Hay <strong>{dinero(saldo.monto, saldo.codigo)}</strong> en la taquilla y <strong>{dinero(enCajaFuerte, saldo.codigo)}</strong> en la Caja Fuerte.
         </p>
-        <div className="cc-segmento" role="group" aria-label="Sumar o descontar">
-          <button type="button" className={!descuenta ? "activo" : ""} onClick={() => setDescuenta(false)} aria-pressed={!descuenta}>
-            Sumar a la caja
-          </button>
-          <button type="button" className={descuenta ? "activo" : ""} onClick={() => setDescuenta(true)} aria-pressed={descuenta}>
-            Descontar de la caja
-          </button>
+        <div className="cc-segmento tq-mover-modos" role="group" aria-label="Qué movimiento es">
+          {MODOS_MOVER.map((m) => (
+            <button key={m.id} type="button" className={modo === m.id ? "activo" : ""} onClick={() => setModo(m.id)} aria-pressed={modo === m.id}>
+              {m.etiqueta}
+            </button>
+          ))}
         </div>
         <label>
           Monto en {NOMBRE_MONEDA[saldo.codigo]?.toLowerCase() ?? saldo.codigo}
           <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="ej. 2.000.000" autoFocus />
-          <small>{nMonto ? `${descuenta ? "Se descuentan" : "Se suman"} ${dinero(nMonto, saldo.codigo)}` : "Queda anotado en la caja y entra en el cuadre del cierre."}</small>
+          <small>
+            {nMonto
+              ? `${descuenta ? "Se descuentan" : "Se suman"} ${dinero(nMonto, saldo.codigo)} ${descuenta ? "de" : "a"} la taquilla${conFuerte ? (descuenta ? " y entran a la Caja Fuerte" : " y salen de la Caja Fuerte") : ""}`
+              : conFuerte
+                ? "Queda como transferencia entre la Caja Fuerte y la taquilla."
+                : "Ajuste sin contrapartida: queda anotado en la caja y entra en el cuadre del cierre."}
+          </small>
         </label>
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">
@@ -557,7 +597,7 @@ function MoverCajaModal({ saldo, onHecho, onCerrar }: { saldo: SaldoTaquilla; on
             Cancelar
           </button>
           <button type="submit" className="cc-guardar" disabled={enviando}>
-            {enviando ? "Guardando…" : descuenta ? "Descontar" : "Sumar"}
+            {enviando ? "Guardando…" : elegido.boton}
           </button>
         </div>
       </form>

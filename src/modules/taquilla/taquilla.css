@@ -56,6 +56,10 @@
 .tq-ultimo-cierre td { padding: 5px 8px 5px 0; border-top: 1px solid #f1f2f4; white-space: nowrap; }
 .tq-ultimo-cierre td.falta, .tq-falta { color: #c0392b !important; font-weight: 700 !important; }
 .tq-ultimo-cierre td.sobra, .tq-sobra { color: #a8531f !important; font-weight: 700 !important; }
+.tq-mover-modos { flex-wrap: wrap; }
+.tq-mover-modos button { flex: 1 1 50%; }
+.tq-check { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 0.88rem; }
+.tq-check input { width: auto; }
 .tq-cuadra { color: #1a7f37 !important; font-weight: 700 !important; }
 
 /* Cada solicitud se abre para ver todos sus datos y el comprobante */

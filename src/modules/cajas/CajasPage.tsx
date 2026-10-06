@@ -95,7 +95,9 @@ export function CajasPage() {
     async (silencioso = false) => {
       if (!silencioso) setCargando(true);
       try {
-        const [tablero, movs] = await Promise.all([getTableroCajas(mostrarInactivas), getMovimientosInternos()]);
+        const [todas, movs] = await Promise.all([getTableroCajas(mostrarInactivas), getMovimientosInternos()]);
+        // Acá solo van las cajas de efectivo (Taquilla, Caja Fuerte, Caja 1, 2 y 3): las cuentas de banco no se fondean desde esta pantalla
+        const tablero = todas.filter((c) => c.tipo !== "BANCO");
 
         // Qué saldos cambiaron desde la última lectura (para resaltarlos)
         const actuales = new Map<string, string>();
