@@ -209,10 +209,11 @@ export interface DatosComprobante {
   fecha: string | null; // AAAA-MM-DD
   banco: string | null;
   remitente: string | null;
+  destinatario?: string | null; // a quién se le envió (lo trae la lectura con IA)
 }
 
-/** Lee la imagen de un comprobante: referencia, monto y fecha de la transacción. */
-export function leerComprobante(imagen: File) {
+/** Lee la imagen de un comprobante con la IA del servidor: referencia, monto y fecha. Responde 501 si no está configurada. */
+export function leerComprobanteConIA(imagen: File) {
   const formData = new FormData();
   formData.append("imagen", imagen);
   return api.postForm<DatosComprobante>("/cuentas-corrientes/leer-comprobante", formData);
