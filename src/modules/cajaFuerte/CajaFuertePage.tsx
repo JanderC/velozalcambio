@@ -42,7 +42,7 @@ function paginasVisibles(actual: number, total: number): (number | null)[] {
 }
 
 /**
- * Caja Fuerte: cuánto hay guardado en dólares, pesos y euros, ingresar o egresar dinero con su concepto,
+ * Caja Fuerte: cuánto hay guardado en dólares, pesos y euros, ingresar o egresar dinero con su referencia,
  * y todos los movimientos con cómo quedó cada saldo después de cada uno.
  */
 export function CajaFuertePage() {
@@ -92,7 +92,7 @@ export function CajaFuertePage() {
     e.preventDefault();
     setErrorForm(null);
     if (!montoValido) return setErrorForm("Escribí el monto.");
-    if (concepto.trim().length < 3) return setErrorForm("Escribí el concepto: de dónde viene o a dónde va el dinero.");
+    if (concepto.trim().length < 3) return setErrorForm("Escribí la referencia: de dónde viene o a dónde va el dinero.");
     if (noAlcanza) return setErrorForm(`La Caja Fuerte no tiene tanto en ${MONEDAS.find((m) => m.codigo === moneda)!.corto.toLowerCase()}.`);
     if (!window.confirm(`¿${tipo === "INGRESO" ? "Ingresar" : "Egresar"} ${dinero(nMonto!, moneda)} ${tipo === "INGRESO" ? "a" : "de"} la Caja Fuerte?\n\n${concepto.trim()}`)) return;
     setEnviando(true);
@@ -199,7 +199,7 @@ export function CajaFuertePage() {
             </label>
 
             <label>
-              <span className="cf-etiqueta">Concepto</span>
+              <span className="cf-etiqueta">Referencia</span>
               <textarea value={concepto} onChange={(e) => setConcepto(e.target.value)} rows={2} maxLength={300} placeholder={tipo === "INGRESO" ? "De dónde viene: ej. capital, cobro a proveedor…" : "A dónde va: ej. pago a proveedor, retiro…"} />
             </label>
 
@@ -270,7 +270,7 @@ export function CajaFuertePage() {
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Concepto</th>
+                  <th>Referencia</th>
                   <th className="cf-num">Saldo en dólares</th>
                   <th className="cf-num">Saldo en pesos colombianos</th>
                   <th className="cf-num">Saldo en euros</th>
