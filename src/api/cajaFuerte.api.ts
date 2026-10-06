@@ -25,8 +25,21 @@ export interface MovimientoCajaFuerte {
   saldoEur: string | null;
 }
 
+/** Una caja creada con sus saldos en dólares, pesos y euros. */
+export interface SaldosDeCaja {
+  id: number;
+  nombre: string;
+  tipo: string;
+  esFuerte: boolean;
+  usd: string;
+  cop: string;
+  eur: string;
+}
+
 export interface CajaFuerte {
   caja: { id: number; nombre: string };
+  cajaMovimientos: { id: number; nombre: string }; // la caja de la que se listan los movimientos
+  cajas: SaldosDeCaja[]; // todas las cajas creadas
   saldos: SaldoCajaFuerte[];
   movimientos: MovimientoCajaFuerte[];
   paginacion: { pagina: number; porPagina: number; total: number; paginas: number };
@@ -37,12 +50,14 @@ export interface FiltrosCajaFuerte {
   porPagina: number;
   moneda?: MonedaCajaFuerte | "";
   tipo?: "INGRESO" | "EGRESO" | "";
+  cajaId?: number | null; // ver los movimientos de otra caja
 }
 
 export function getCajaFuerte(f: FiltrosCajaFuerte) {
   const q = new URLSearchParams({ pagina: String(f.pagina), porPagina: String(f.porPagina) });
   if (f.moneda) q.set("moneda", f.moneda);
   if (f.tipo) q.set("tipo", f.tipo);
+  if (f.cajaId) q.set("cajaId", String(f.cajaId));
   return api.get<CajaFuerte>(`/caja-fuerte?${q.toString()}`);
 }
 

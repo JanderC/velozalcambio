@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Vault } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Vault } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
@@ -55,6 +55,13 @@ export function CajaFuertePage() {
   const [porPagina, setPorPagina] = useState(10);
   const [filtroMoneda, setFiltroMoneda] = useState<MonedaCajaFuerte | "">("");
   const [filtroTipo, setFiltroTipo] = useState<"INGRESO" | "EGRESO" | "">("");
+  // Saldos por caja: desplegable con todas las cajas; tocar una muestra sus movimientos (null = la Caja Fuerte)
+  const [cajasAbierto, setCajasAbierto] = useState(false);
+  const [cajaVista, setCajaVista] = useState<number | null>(null);
+  // En vivo: la pantalla se refresca sola y los movimientos que van llegando se resaltan
+  const [actualizado, setActualizado] = useState<Date | null>(null);
+  const [llegados, setLlegados] = useState<Set<number>>(new Set());
+  const vistos = useRef<{ clave: string; maximo: number } | null>(null);
 
   // formulario
   const [tipo, setTipo] = useState<"INGRESO" | "EGRESO">("INGRESO");
@@ -66,20 +73,50 @@ export function CajaFuertePage() {
   const [recienCargado, setRecienCargado] = useState<number | null>(null);
   const refMonto = useRef<HTMLInputElement>(null);
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
-    try {
-      setDatos(await getCajaFuerte({ pagina, porPagina, moneda: filtroMoneda, tipo: filtroTipo }));
-      setError(null);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo cargar la Caja Fuerte.");
-    } finally {
-      setCargando(false);
-    }
-  }, [pagina, porPagina, filtroMoneda, filtroTipo]);
+  const cargar = useCallback(
+    async (silencioso = false) => {
+      if (!silencioso) setCargando(true);
+      try {
+        const nuevos = await getCajaFuerte({ pagina, porPagina, moneda: filtroMoneda, tipo: filtroTipo, cajaId: cajaVista });
+        // lo que llegó desde la última lectura de esta misma vista se resalta
+        const clave = `${cajaVista}|${filtroMoneda}|${filtroTipo}`;
+        const maximo = Math.max(0, ...nuevos.movimientos.map((m) => m.id));
+        const previo = vistos.current;
+        if (silencioso && previo && previo.clave === clave && pagina === 1) {
+          const recien = nuevos.movimientos.filter((m) => m.id > previo.maximo).map((m) => m.id);
+          if (recien.length) setLlegados(new Set(recien));
+        }
+        vistos.current = { clave, maximo: Math.max(maximo, previo && previo.clave === clave ? previo.maximo : 0) };
+        setDatos(nuevos);
+        setActualizado(new Date());
+        setError(null);
+      } catch (e) {
+        // en un refresco silencioso un corte de red no tapa la pantalla: se reintenta solo
+        if (!silencioso) setError(e instanceof ApiError ? e.message : "No se pudo cargar la Caja Fuerte.");
+      } finally {
+        if (!silencioso) setCargando(false);
+      }
+    },
+    [pagina, porPagina, filtroMoneda, filtroTipo, cajaVista]
+  );
   useEffect(() => {
     void cargar();
+    // tiempo real: se vuelve a leer cada pocos segundos (y al volver a la pestaña)
+    const reloj = setInterval(() => document.visibilityState === "visible" && void cargar(true), 6000);
+    const alVolver = () => document.visibilityState === "visible" && void cargar(true);
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      clearInterval(reloj);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
   }, [cargar]);
+
+  function verCaja(id: number | null) {
+    setCajaVista(id);
+    setPagina(1);
+  }
+  const totalDe = (campo: "usd" | "cop" | "eur") => (datos?.cajas ?? []).reduce((suma, c) => sumarDecimales(suma, c[campo]), "0");
+  const viendoOtra = !!datos && datos.cajaMovimientos.id !== datos.caja.id;
 
   const saldoDe = (codigo: MonedaCajaFuerte) => datos?.saldos.find((s) => s.codigo === codigo);
   const nMonto = monto.trim() ? (leerNumero(monto)?.replace(/^-/, "") ?? null) : null;
@@ -102,6 +139,7 @@ export function CajaFuertePage() {
       setFiltroMoneda("");
       setFiltroTipo("");
       setPagina(1);
+      setCajaVista(null);
       setDatos(nueva);
       setRecienCargado(nueva.movimientos[0]?.id ?? null);
       setMonto("");
@@ -163,6 +201,60 @@ export function CajaFuertePage() {
               </article>
             );
           })}
+        </div>
+
+        {/* Los mismos saldos, caja por caja */}
+        <div className={`cf-cajas ${cajasAbierto ? "abierto" : ""}`}>
+          <button type="button" className="cf-cajas-boton" onClick={() => setCajasAbierto((a) => !a)} aria-expanded={cajasAbierto}>
+            <span>
+              <ChevronDown size={17} /> Saldos por caja {datos && <b>{datos.cajas.length}</b>}
+            </span>
+            <span className="cf-vivo" title="Se actualiza solo cada pocos segundos">
+              <i /> En vivo{actualizado ? ` · ${actualizado.toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", second: "2-digit" })}` : ""}
+            </span>
+          </button>
+          {cajasAbierto && datos && (
+            <div className="cf-cajas-tabla">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Caja</th>
+                    <th>Saldo en dólares</th>
+                    <th>Saldo en pesos colombianos</th>
+                    <th>Saldo en euros</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos.cajas.map((c) => (
+                    <tr
+                      key={c.id}
+                      className={c.id === datos.cajaMovimientos.id ? "elegida" : ""}
+                      onClick={() => verCaja(c.esFuerte ? null : c.id)}
+                      title={`Ver los movimientos de ${c.nombre}`}
+                    >
+                      <td>
+                        {c.nombre}
+                        {c.esFuerte && <em>esta caja</em>}
+                        {c.tipo === "BANCO" && <em>banco</em>}
+                      </td>
+                      <td>{dinero(c.usd, "USD")}</td>
+                      <td>{dinero(c.cop, "COP")}</td>
+                      <td>{dinero(c.eur, "EUR")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td>Total en todas las cajas</td>
+                    <td>{dinero(totalDe("usd"), "USD")}</td>
+                    <td>{dinero(totalDe("cop"), "COP")}</td>
+                    <td>{dinero(totalDe("eur"), "EUR")}</td>
+                  </tr>
+                </tfoot>
+              </table>
+              <p>Tocá una caja para ver sus movimientos abajo.</p>
+            </div>
+          )}
         </div>
       </header>
 
@@ -232,7 +324,12 @@ export function CajaFuertePage() {
         <section className="cf-movimientos" aria-label="Movimientos de la Caja Fuerte">
           <div className="cf-mov-cabeza">
             <h2>
-              Movimientos {pag && <span>{pag.total}</span>}
+              Movimientos{viendoOtra ? ` de ${datos!.cajaMovimientos.nombre}` : ""} {pag && <span>{pag.total}</span>}
+              {viendoOtra && (
+                <button type="button" className="cf-volver" onClick={() => verCaja(null)}>
+                  Volver a Caja Fuerte
+                </button>
+              )}
             </h2>
             <div className="cf-filtros">
               <select
@@ -280,7 +377,7 @@ export function CajaFuertePage() {
                 {(datos?.movimientos ?? []).map((m) => {
                   const f = fechaHora(m.fecha);
                   return (
-                    <tr key={m.id} className={m.id === recienCargado ? "cf-nuevo" : ""}>
+                    <tr key={m.id} className={m.id === recienCargado || llegados.has(m.id) ? "cf-nuevo" : ""}>
                       <td className="cf-fecha">
                         {f.dia}
                         <small>{f.hora}</small>
@@ -302,7 +399,7 @@ export function CajaFuertePage() {
                 {datos && datos.movimientos.length === 0 && (
                   <tr>
                     <td colSpan={5} className="cf-sin-datos">
-                      {filtroMoneda || filtroTipo ? "Ningún movimiento coincide con el filtro." : "Todavía no hay movimientos en la Caja Fuerte."}
+                      {filtroMoneda || filtroTipo ? "Ningún movimiento coincide con el filtro." : `Todavía no hay movimientos en ${datos.cajaMovimientos.nombre}.`}
                     </td>
                   </tr>
                 )}
