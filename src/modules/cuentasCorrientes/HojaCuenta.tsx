@@ -78,6 +78,12 @@ function moverDia(dia: string, cuanto: number) {
   return d.toISOString().slice(0, 10);
 }
 
+/** AAAA-MM-DD -> DD/MM/AAAA, sin pasar por husos horarios. */
+function fechaDelDia(dia: string) {
+  const [a, m, d] = dia.split("-");
+  return `${d}/${m}/${a}`;
+}
+
 function fechaCorta(fecha: string) {
   return new Date(fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "2-digit" });
 }
@@ -218,7 +224,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
   async function compartir() {
     if (!estado) return;
     try {
-      await entregarReporte(await generarImagenReporte(estado, simbolo), `cierre-${dia}.png`);
+      await entregarReporte(await generarImagenReporte(estado, simbolo, `Movimientos del día ${fechaDelDia(dia)}`), `movimientos-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -231,7 +237,8 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       const cerrado = await cerrarDiaCuenta(cuenta.id, dia);
       setEstado(cerrado);
       setError(null);
-      await entregarReporte(await generarImagenReporte(cerrado, simbolo), `cierre-${dia}.png`);
+      // el cierre sale con la fecha de su día, aunque se haga después (ej. el de ayer cerrado hoy)
+      await entregarReporte(await generarImagenReporte(cerrado, simbolo, `Cierre del día ${fechaDelDia(dia)}`), `cierre-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -524,7 +531,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       {estado?.cierre &&
         (estado.cierre.saldo_final === estado.saldoFinal ? (
           <p className="cc-cierre-aviso">
-            Día cerrado a las {new Date(estado.cierre.created_at).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" })} por{" "}
+            Día {fechaDelDia(dia)} cerrado
+            {/* si se cerró otro día (ej. el de ayer, hoy), se dice cuándo */}
+            {new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(estado.cierre.created_at)) === dia
+              ? " "
+              : ` el ${fechaCorta(estado.cierre.created_at)} `}
+            a las {new Date(estado.cierre.created_at).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" })} por{" "}
             {estado.cierre.usuario_nombre}.
           </p>
         ) : (

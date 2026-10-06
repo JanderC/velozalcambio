@@ -108,8 +108,11 @@ const negar = (v: string) => (v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ?
 /**
  * La hoja como imagen para mandarle al cliente: solo los movimientos y el saldo.
  * Sin nombre del cliente ni nada del sistema, y sin los movimientos anulados.
+ * titulo: una línea arriba de la tabla con el día del reporte (ej. "Cierre del día 05/10/2026"), para que
+ * un cierre hecho después siga saliendo con la fecha de su día.
  */
-export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Promise<Blob> {
+export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titulo?: string): Promise<Blob> {
+  const altoTitulo = titulo ? ALTO_FILA : 0;
   const vigentes = estado.movimientos.filter((m) => !m.anulado);
   const cuadro = lineasDelCuadro(estado);
   const filas = vigentes.slice(-MAX_FILAS);
@@ -120,7 +123,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Pro
   const lienzo = document.createElement("canvas");
   lienzo.width = ANCHO;
   const altoCuadro = cuadro.lineas.length ? SEPARACION_CUADRO + (cuadro.lineas.length + 1) * ALTO_FILA : 0;
-  lienzo.height = ALTO_CABEZA + (filas.length + (conSaldoAnterior ? 1 : 0) + 2) * ALTO_FILA + altoCuadro + 12;
+  lienzo.height = altoTitulo + ALTO_CABEZA + (filas.length + (conSaldoAnterior ? 1 : 0) + 2) * ALTO_FILA + altoCuadro + 12;
   const c = lienzo.getContext("2d")!;
   c.fillStyle = "#ffffff";
   c.fillRect(0, 0, lienzo.width, lienzo.height);
@@ -138,14 +141,22 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string): Pro
   }
   const colorMonto = (v: string) => (v.startsWith("-") ? "#c0392b" : "#111827");
 
-  // Encabezado
-  c.fillStyle = "#12305a";
-  c.fillRect(0, 0, ANCHO, ALTO_CABEZA);
-  for (const [columna, titulo] of [["fecha", "FECHA"], ["referencia", "REFERENCIA"], ["cantidad", "CANTIDAD"], ["tasa", "TASA"], ["monto", "MONTO"], ["total", "TOTAL"]] as const) {
-    texto(titulo, columna, ALTO_CABEZA / 2, "#ffffff", true);
+  // La fecha del día del reporte, arriba de todo
+  if (titulo) {
+    c.font = `700 24px ${FUENTE}`;
+    c.fillStyle = "#12305a";
+    c.textAlign = "left";
+    c.fillText(titulo, MARGEN, altoTitulo / 2);
   }
 
-  let y = ALTO_CABEZA;
+  // Encabezado
+  c.fillStyle = "#12305a";
+  c.fillRect(0, altoTitulo, ANCHO, ALTO_CABEZA);
+  for (const [columna, encabezado] of [["fecha", "FECHA"], ["referencia", "REFERENCIA"], ["cantidad", "CANTIDAD"], ["tasa", "TASA"], ["monto", "MONTO"], ["total", "TOTAL"]] as const) {
+    texto(encabezado, columna, altoTitulo + ALTO_CABEZA / 2, "#ffffff", true);
+  }
+
+  let y = altoTitulo + ALTO_CABEZA;
   function franja(etiqueta: string, saldo: string) {
     c.fillStyle = "#e6f7fb";
     c.fillRect(0, y, ANCHO, ALTO_FILA);
