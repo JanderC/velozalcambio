@@ -14,6 +14,7 @@ import {
   PencilLine,
   Wallet,
   Landmark,
+  Vault,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
 import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
@@ -162,6 +163,15 @@ export const MODULOS: ModuloConfig[] = [
     icono: CreditCard,
     ruta: "/taquilla-3",
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "caja-fuerte",
+    titulo: "Caja Fuerte",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: Vault,
+    ruta: "/caja-fuerte",
+    rolesPermitidos: ["ADMIN", "CAJERO"],
   },
   {
     id: "reportes",

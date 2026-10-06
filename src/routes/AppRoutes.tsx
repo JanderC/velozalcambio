@@ -11,6 +11,7 @@ import { TransaccionesPage } from "../modules/transacciones/TransaccionesPage";
 import { CuentasPorCobrarPagarPage } from "../modules/cuentasPorCobrarPagar/CuentasPorCobrarPagarPage";
 import { CuentasCorrientesPage } from "../modules/cuentasCorrientes/CuentasCorrientesPage";
 import { TaquillaPage } from "../modules/taquilla/TaquillaPage";
+import { CajaFuertePage } from "../modules/cajaFuerte/CajaFuertePage";
 import { TasasPage } from "../modules/tasas/TasasPage";
 import { RegistroTasasPage } from "../modules/tasas/RegistroTasasPage";
 import { ROLES_REGISTRO_TASAS } from "../modules/tasas/tasas.roles";
@@ -42,6 +43,7 @@ export function AppRoutes() {
         <Route path="/taquilla" element={<TaquillaPage key="taquilla-1" numero={1} />} />
         <Route path="/taquilla-2" element={<TaquillaPage key="taquilla-2" numero={2} />} />
         <Route path="/taquilla-3" element={<TaquillaPage key="taquilla-3" numero={3} />} />
+        <Route path="/caja-fuerte" element={<CajaFuertePage />} />
         <Route path="/reportes" element={<ReportesPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />
