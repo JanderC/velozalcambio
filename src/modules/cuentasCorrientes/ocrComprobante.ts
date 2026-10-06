@@ -93,7 +93,14 @@ function buscarReferencia(lineas: string[]): string | null {
   // un número escrito con guiones ("749-924-0661") queda solo con los dígitos
   const limpiar = (c: string) => (/^[\d-]+$/.test(c) ? c.replace(/-/g, "") : c.replace(/^-+|-+$/g, ""));
   const en = (donde: string) => {
-    const c = (donde.match(codigo) ?? []).find(valido);
+    // las fechas, las horas y los montos del renglón no son la referencia: se sacan antes de buscar el código
+    const sinRuido = donde
+      .replace(/\b\d{1,4}[/.-]\d{1,2}[/.-]\d{2,4}\b/g, " ")
+      .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, " ")
+      .replace(/(?:US\$|\$|€|Bs\.?)\s*\d[\d.,]*/gi, " ")
+      .replace(/\b\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?\b/g, " ")
+      .replace(/\b(?:19|20)\d{2}\b/g, " ");
+    const c = (sinRuido.match(codigo) ?? []).find(valido);
     return c ? limpiar(c) : null;
   };
   // La etiqueta partida en dos renglones, con el código al lado del primero:
@@ -106,16 +113,23 @@ function buscarReferencia(lineas: string[]): string | null {
     const encontrado = en(lineas[i]!.replace(inicioPartido, "")) ?? en(lineas[i + 1]!.replace(finPartido, ""));
     if (encontrado) return encontrado;
   }
-  for (let i = 0; i < lineas.length; i++) {
-    const partes = lineas[i]!.split(clave);
-    if (partes.length < 2) continue;
-    // lo que sigue a la etiqueta en la misma línea, o la línea de abajo
-    for (const donde of [partes[partes.length - 1] ?? "", lineas[i + 1] ?? ""]) {
-      const encontrado = en(donde);
-      if (encontrado) return encontrado;
+  const porEtiqueta = (etiqueta: RegExp, tambienArriba = false) => {
+    for (let i = 0; i < lineas.length; i++) {
+      const partes = lineas[i]!.split(etiqueta);
+      if (partes.length < 2) continue;
+      // lo que sigue a la etiqueta en la misma línea, o la línea de abajo; si se pide, también lo que quedó
+      // antes de la etiqueta y la línea de arriba (hay pantallas que ponen el código primero)
+      const lugares = [partes[partes.length - 1] ?? "", lineas[i + 1] ?? "", ...(tambienArriba ? [partes[0] ?? "", lineas[i - 1] ?? ""] : [])];
+      for (const donde of lugares) {
+        const encontrado = en(donde);
+        if (encontrado) return encontrado;
+      }
     }
-  }
-  return null;
+    return null;
+  };
+  // El número de confirmación (así lo llama Zelle) es la referencia: gana sobre cualquier otra etiqueta de la captura
+  const confirmacion = /(?:n[uú]mero|n[°ºo]\.?|c[oó]digo|#)?\s*(?:de\s+)?confirmaci[oó]n(?:\s*(?:n[°ºo]\.?|#|:))?|confirmation(?:\s*(?:number|code|no\.?|#|id))?|conf\.\s*(?:number|no\.?|#|n[°ºo]\.?)/i;
+  return porEtiqueta(confirmacion, true) ?? porEtiqueta(clave);
 }
 
 /** A quién se le envió: "A IRIS RAMIREZ", "Para ...", "Inscrito como ...". */
