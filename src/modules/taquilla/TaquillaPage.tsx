@@ -7,6 +7,7 @@ import { confirmarMovimientoCC, getUrlComprobante } from "../../api/cuentasCorri
 import {
   abrirCajaTaquilla,
   cerrarCajaTaquilla,
+  buscarSolicitudesPagadas,
   getTaquilla,
   moverCajaTaquilla,
   moverConCajaFuerte,
@@ -84,6 +85,23 @@ export function TaquillaPage({ numero = 1 }: { numero?: 1 | 2 }) {
   const pendientes = useMemo(() => (taquilla?.pendientes ?? []).filter(coincide), [taquilla, coincide]);
   const pagadas = useMemo(() => (taquilla?.pagadasHoy ?? []).filter(coincide), [taquilla, coincide]);
   const abierta = taquilla?.sesion.abierta ?? false;
+
+  // Protección entre taquillas: al buscar una referencia se mira también si ya se pagó, acá o en la otra taquilla
+  const [yaPagadas, setYaPagadas] = useState<SolicitudTaquilla[]>([]);
+  useEffect(() => {
+    const texto = buscar.trim();
+    if (texto.length < 3) return setYaPagadas([]);
+    let vigente = true;
+    const espera = setTimeout(() => {
+      buscarSolicitudesPagadas(texto)
+        .then((r) => vigente && setYaPagadas(r))
+        .catch(() => vigente && setYaPagadas([]));
+    }, 300);
+    return () => {
+      vigente = false;
+      clearTimeout(espera);
+    };
+  }, [buscar, taquilla]);
 
   // En efectivo descuenta de la caja; por Bancolombia no la toca (solo queda contado arriba)
   async function pagar(s: SolicitudTaquilla, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
@@ -284,6 +302,37 @@ export function TaquillaPage({ numero = 1 }: { numero?: 1 | 2 }) {
 
       {error && <p className="cc-form-error tq-error">{error}</p>}
 
+      {/* Lo buscado ya se retiró: se avisa dónde y cuándo, arriba de todo */}
+      {yaPagadas.length > 0 && (
+        <section className="tq-lista tq-ya-pagadas" aria-label="Ya retiradas">
+          <h2>
+            Ya se pagó: no se puede retirar otra vez <span>{yaPagadas.length}</span>
+          </h2>
+          <ul>
+            {yaPagadas.map((s) => (
+              <li key={s.id} className="tq-solicitud" onClick={() => setDetalle(s)} title="Ver todos los datos y el comprobante">
+                <div className="tq-solicitud-datos">
+                  <strong>{s.cliente_nombre}</strong>
+                  <span>
+                    Ref: <b>{referenciaDe(s) || "—"}</b>
+                  </span>
+                  <span className="tq-ya-pagada-donde">
+                    Pagada en {s.pagado_caja_nombre ?? "taquilla"}
+                    {s.pagado_medio === "BANCOLOMBIA" ? " por Bancolombia" : " en efectivo"}
+                    {s.pagado_en ? ` el ${fechaHora(s.pagado_en)}` : ""}
+                    {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
+                  </span>
+                </div>
+                <div className="tq-solicitud-monto">
+                  <span>Recibió</span>
+                  <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="tq-lista" aria-label="Solicitudes por pagar">
         <h2>
           Por pagar <span>{pendientes.length}</span>
@@ -413,7 +462,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
     [comision ? "Comisión" : "Tasa", comision ? `${formatearMonto(comision)}%` : s.tasa ? formatearMonto(s.tasa) : null],
     ["Recibe", dinero(s.monto, s.moneda_codigo)],
     ["Registrada", `${fechaHora(s.fecha)} por ${s.registrado_por_nombre}`],
-    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada ${s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia" : "en efectivo"} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
+    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada${s.pagado_caja_nombre ? ` en ${s.pagado_caja_nombre}` : ""} ${s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia" : "en efectivo"} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
   ];
 
   return (

@@ -34,6 +34,8 @@ export interface SolicitudTaquilla {
   tiene_comprobante: boolean;
   pagado_en: string | null;
   pagado_medio: "EFECTIVO" | "BANCOLOMBIA" | null; // por Bancolombia no descuenta de la caja
+  pagado_caja_id: number | null; // la taquilla que la pagó
+  pagado_caja_nombre: string | null;
   pagado_por_nombre: string | null;
   registrado_por_nombre: string;
   cuenta_id: number;
@@ -119,6 +121,11 @@ export function cerrarCajaTaquilla(contado: MontosPorMoneda) {
 /** monto con signo: + suma a la caja, - descuenta. */
 export function moverCajaTaquilla(monedaCodigo: CodigoTaquilla, monto: string) {
   return api.post<Taquilla>(`${base}/caja`, { monedaCodigo, monto });
+}
+
+/** Solicitudes ya pagadas que coinciden con lo buscado, en cualquiera de las dos taquillas y de cualquier día. */
+export function buscarSolicitudesPagadas(texto: string) {
+  return api.get<SolicitudTaquilla[]>(`${base}/solicitudes/pagadas?q=${encodeURIComponent(texto)}`);
 }
 
 export function pagarSolicitud(id: number, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
