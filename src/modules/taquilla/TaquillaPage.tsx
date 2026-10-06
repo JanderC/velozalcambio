@@ -286,6 +286,8 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
         <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre, teléfono, cédula o referencia" aria-label="Buscar solicitud" autoFocus />
       </div>
 
+      {/* al buscar, el aviso de error también va arriba, junto a los resultados */}
+      {buscando && error && <p className="cc-form-error tq-error">{error}</p>}
       {buscando && listas}
 
       {/* La caja, en chico: cuánto hay en cada moneda y abrir o cerrar */}
@@ -398,7 +400,7 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
       {/* Ingreso / egreso de ventanilla, debajo de la caja */}
       {taquilla && <OperacionesTaquilla taquilla={taquilla} onCambio={setTaquilla} />}
 
-      {error && <p className="cc-form-error tq-error">{error}</p>}
+      {!buscando && error && <p className="cc-form-error tq-error">{error}</p>}
 
       {/* Sin buscar, las solicitudes van abajo de todo */}
       {!buscando && listas}
