@@ -2,6 +2,13 @@ import { api } from "./client";
 
 export type CodigoTaquilla = "COP" | "USD" | "EUR";
 
+// Hay dos taquillas que trabajan igual, cada una con su caja: /taquilla (la 1) y /taquilla-2.
+// La pantalla dice cuál es al montarse y todas las llamadas de este archivo van a esa.
+let base = "/taquilla";
+export function usarTaquilla(numero: 1 | 2) {
+  base = numero === 2 ? "/taquilla-2" : "/taquilla";
+}
+
 export interface SaldoTaquilla {
   moneda_id: number;
   codigo: CodigoTaquilla;
@@ -90,32 +97,32 @@ export interface Taquilla {
 export type MontosPorMoneda = Partial<Record<CodigoTaquilla, string>>;
 
 export function getTaquilla() {
-  return api.get<Taquilla>("/taquilla");
+  return api.get<Taquilla>(base);
 }
 
 /** Abre la caja: con cuánto efectivo arranca en cada moneda. */
 /** desdeCajaFuerte: el efectivo con que arranca sale de la Caja Fuerte. */
 export function abrirCajaTaquilla(montos: MontosPorMoneda, desdeCajaFuerte: boolean) {
-  return api.post<Taquilla>("/taquilla/sesion/abrir", { montos, desdeCajaFuerte });
+  return api.post<Taquilla>(`${base}/sesion/abrir`, { montos, desdeCajaFuerte });
 }
 
 /** Traer efectivo de la Caja Fuerte a la taquilla, o enviárselo. */
 export function moverConCajaFuerte(monedaCodigo: CodigoTaquilla, monto: string, sentido: "TRAER" | "ENVIAR") {
-  return api.post<Taquilla>("/taquilla/caja-fuerte", { monedaCodigo, monto, sentido });
+  return api.post<Taquilla>(`${base}/caja-fuerte`, { monedaCodigo, monto, sentido });
 }
 
 /** Cierra y cuadra: lo que se contó en cada moneda. */
 export function cerrarCajaTaquilla(contado: MontosPorMoneda) {
-  return api.post<Taquilla>("/taquilla/sesion/cerrar", { contado });
+  return api.post<Taquilla>(`${base}/sesion/cerrar`, { contado });
 }
 
 /** monto con signo: + suma a la caja, - descuenta. */
 export function moverCajaTaquilla(monedaCodigo: CodigoTaquilla, monto: string) {
-  return api.post<Taquilla>("/taquilla/caja", { monedaCodigo, monto });
+  return api.post<Taquilla>(`${base}/caja`, { monedaCodigo, monto });
 }
 
 export function pagarSolicitud(id: number, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
-  return api.post<Taquilla>(`/taquilla/solicitudes/${id}/pagar`, { medio });
+  return api.post<Taquilla>(`${base}/solicitudes/${id}/pagar`, { medio });
 }
 
 export interface NuevaOperacionTaquilla {
@@ -138,25 +145,25 @@ export interface NuevaOperacionTaquilla {
 
 export function crearOperacionTaquilla(datos: NuevaOperacionTaquilla) {
   // operacionId: la que se acaba de crear, para guardarle la imagen del comprobante
-  return api.post<Taquilla & { operacionId: number }>("/taquilla/operaciones", datos);
+  return api.post<Taquilla & { operacionId: number }>(`${base}/operaciones`, datos);
 }
 
 export function confirmarOperacionTaquilla(id: number) {
-  return api.post<Taquilla>(`/taquilla/operaciones/${id}/confirmar`);
+  return api.post<Taquilla>(`${base}/operaciones/${id}/confirmar`);
 }
 
 export function anularOperacionTaquilla(id: number) {
-  return api.post<Taquilla>(`/taquilla/operaciones/${id}/anular`);
+  return api.post<Taquilla>(`${base}/operaciones/${id}/anular`);
 }
 
 /** Guarda la imagen del comprobante con el ingreso o egreso ya creado. */
 export function subirComprobanteOperacion(id: number, imagen: File) {
   const formData = new FormData();
   formData.append("imagen", imagen);
-  return api.postForm<Taquilla>(`/taquilla/operaciones/${id}/comprobante`, formData);
+  return api.postForm<Taquilla>(`${base}/operaciones/${id}/comprobante`, formData);
 }
 
 /** Enlace temporal para ver la imagen del comprobante de un ingreso o egreso. */
 export async function getUrlComprobanteOperacion(id: number) {
-  return (await api.get<{ url: string }>(`/taquilla/operaciones/${id}/comprobante`)).url;
+  return (await api.get<{ url: string }>(`${base}/operaciones/${id}/comprobante`)).url;
 }

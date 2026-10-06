@@ -138,11 +138,20 @@ export const MODULOS: ModuloConfig[] = [
   },
   {
     id: "taquilla",
-    titulo: "Taquilla",
+    titulo: "Taquilla 1",
     categoria: "Gestión financiera",
     acento: ACENTO_FINANCIERO,
     icono: CreditCard,
     ruta: "/taquilla",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
+    id: "taquilla-2",
+    titulo: "Taquilla 2",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: CreditCard,
+    ruta: "/taquilla-2",
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
   },
   {
