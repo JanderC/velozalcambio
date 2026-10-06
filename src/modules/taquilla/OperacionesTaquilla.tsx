@@ -115,7 +115,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
         setDescripcion((actual) => (actual.includes(d.referencia!) ? actual : `${actual.trim() ? `${actual.replace(/\s+$/, "")}\n` : ""}Referencia: ${d.referencia}`));
         partes.push(`referencia ${d.referencia}`);
       }
-      setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de registrar.` : "La imagen queda adjunta, pero no encontré monto ni referencia en ella.");
+      setAvisoLectura(partes.length ? `Leído de la imagen${d.fuente === "ia" ? " con IA" : ""}: ${partes.join(", ")}. Revisalo antes de registrar.` : "La imagen queda adjunta, pero no encontré monto ni referencia en ella.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo leer la imagen.");
     } finally {

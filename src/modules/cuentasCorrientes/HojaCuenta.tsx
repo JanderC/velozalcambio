@@ -799,7 +799,7 @@ function FilaNueva({
       }
       setAvisoLectura(
         (partes.length
-          ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}: ${partes.join(", ")}. Revisalo antes de agregar.`
+          ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}${l.conIA ? " con IA" : ""}: ${partes.join(", ")}. Revisalo antes de agregar.`
           : "No encontré referencia, monto ni fecha en esa imagen: quedó adjunta, escribí los datos a mano.") + yaEstaba
       );
       setAbierta(true);

@@ -187,7 +187,7 @@ export function NuevaCuentaModal({
       const otraMoneda = l.moneda && medio && l.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${l.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
       setAvisoLectura(
         (partes.length
-          ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}`
+          ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}${l.conIA ? " con IA" : ""}: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}`
           : "No encontré monto ni referencia en esa imagen: quedó adjunta, escribí los datos a mano.") + yaEstaba
       );
     } catch (err) {

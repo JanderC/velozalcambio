@@ -10,13 +10,14 @@ export interface LecturaCapturas {
   referencias: string[]; // la referencia de cada captura aceptada
   total: string | null; // la suma de los montos leídos
   moneda: string | null;
+  conIA: boolean; // todas las capturas aceptadas las leyó la IA del servidor
   repetidas: number; // capturas que ya estaban cargadas (misma referencia): no se suman dos veces
 }
 
 /** Lee las capturas una por una. yaEscrito: las referencias que ya están cargadas en el formulario. */
 export async function leerCapturas(archivos: File[], yaEscrito: string): Promise<LecturaCapturas> {
   const vistas = new Set(codigosDeReferencia(yaEscrito).map((c) => c.toLowerCase()));
-  const r: LecturaCapturas = { aceptadas: [], primera: null, referencias: [], total: null, moneda: null, repetidas: 0 };
+  const r: LecturaCapturas = { aceptadas: [], primera: null, referencias: [], total: null, moneda: null, conIA: true, repetidas: 0 };
   for (const archivo of archivos) {
     const d = await leerComprobante(archivo);
     const clave = d.referencia?.toLowerCase();
@@ -26,11 +27,13 @@ export async function leerCapturas(archivos: File[], yaEscrito: string): Promise
     }
     if (clave) vistas.add(clave);
     r.aceptadas.push(archivo);
+    if (d.fuente !== "ia") r.conIA = false;
     r.primera ??= d;
     if (d.referencia) r.referencias.push(d.referencia);
     if (d.monto) r.total = r.total ? sumarDecimales(r.total, d.monto) : d.monto;
     r.moneda ??= d.moneda;
   }
+  if (!r.aceptadas.length) r.conIA = false;
   return r;
 }
 
