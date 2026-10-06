@@ -75,6 +75,11 @@ export interface EstadoCuenta {
   cuenta: CuentaCorrienteResumen;
   // Cierre de ese día, si ya se cerró
   cierre: { saldo_final: string; created_at: string; usuario_nombre: string } | null;
+  // Lo que el cliente envió (la cantidad de cada compra, antes de tasa o comisión): en el día, en toda la cuenta
+  // y cuánto de eso todavía no se le pagó
+  enviado: string;
+  enviadoTotal: string;
+  enviadoPorPagar: string;
   saldoAnterior: string;
   movimientos: FilaEstadoCuenta[];
   sumas: string;

@@ -377,6 +377,12 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                 <Monto valor={estado.abonos.replace(/^-/, "")} simbolo={simbolo} />
                 {sufijo}
               </b>
+              {esConfirmaciones && /[1-9]/.test(estado.enviado) && (
+                <>
+                  {" "}
+                  · me envió <b>{formatearMonto(estado.enviado)}</b>
+                </>
+              )}
             </span>
           )}
           {cuenta.referencia && <span className="cc-hoy">Referencia: {cuenta.referencia}</span>}
@@ -406,6 +412,15 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             <small className="cc-equivalente">
               = {equivalenteTexto} · 1 {cuenta.moneda_codigo} = {formatearMonto(cobro.tasa)} {cobro.codigo}
             </small>
+          )}
+          {esConfirmaciones && estado && /[1-9]/.test(estado.enviadoTotal) && (
+            <div className="cc-enviado" title="Lo que el cliente envió, antes de tasa o comisión">
+              <span>Me ha enviado</span>
+              <strong>{formatearMonto(estado.enviadoPorPagar)}</strong>
+              <small>
+                por pagar · {formatearMonto(estado.enviado)} {dia === hoyBogota() ? "hoy" : "ese día"} · {formatearMonto(estado.enviadoTotal)} en total
+              </small>
+            </div>
           )}
           {referenciaEnvio && (
             <small className="cc-equivalente">
@@ -639,6 +654,15 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           </tbody>
           {estado && (
             <tfoot>
+              {esConfirmaciones && /[1-9]/.test(estado.enviado) && (
+                <tr>
+                  <td colSpan={2}>Enviado por el cliente en el día</td>
+                  <td className="num">
+                    <b>{formatearMonto(estado.enviado)}</b>
+                  </td>
+                  <td colSpan={4} />
+                </tr>
+              )}
               <tr>
                 <td colSpan={4}>Sumas del día</td>
                 <td className="num">
