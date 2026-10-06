@@ -41,6 +41,7 @@ export function AppRoutes() {
         <Route path="/cajas-confirmaciones" element={<CuentasCorrientesPage key="cajas" modo="cajas" />} />
         <Route path="/taquilla" element={<TaquillaPage key="taquilla-1" numero={1} />} />
         <Route path="/taquilla-2" element={<TaquillaPage key="taquilla-2" numero={2} />} />
+        <Route path="/taquilla-3" element={<TaquillaPage key="taquilla-3" numero={3} />} />
         <Route path="/reportes" element={<ReportesPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />

@@ -13,6 +13,7 @@ import {
   moverConCajaFuerte,
   pagarSolicitud,
   type CodigoTaquilla,
+  type NumeroTaquilla,
   usarTaquilla,
   type MontosPorMoneda,
   type SaldoTaquilla,
@@ -46,8 +47,8 @@ const porConfirmar = (s: SolicitudTaquilla) => s.estado_confirmacion === "EN_PRO
  * Se trabaja con sesión de caja: se abre con tanto en pesos, dólares y euros, cada "Se pagó" descuenta,
  * y al final del día se cierra contando el efectivo para cuadrar.
  */
-export function TaquillaPage({ numero = 1 }: { numero?: 1 | 2 }) {
-  // Taquilla 1 o Taquilla 2: misma pantalla, cada una con su caja
+export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
+  // Taquilla 1, 2 o 3: misma pantalla, cada una con su caja
   usarTaquilla(numero);
   const [taquilla, setTaquilla] = useState<Taquilla | null>(null);
   const [buscar, setBuscar] = useState("");

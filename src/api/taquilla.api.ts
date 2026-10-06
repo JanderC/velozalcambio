@@ -2,11 +2,12 @@ import { api } from "./client";
 
 export type CodigoTaquilla = "COP" | "USD" | "EUR";
 
-// Hay dos taquillas que trabajan igual, cada una con su caja: /taquilla (la 1) y /taquilla-2.
+// Hay varias taquillas que trabajan igual, cada una con su caja: /taquilla (la 1), /taquilla-2 y /taquilla-3.
 // La pantalla dice cuál es al montarse y todas las llamadas de este archivo van a esa.
 let base = "/taquilla";
-export function usarTaquilla(numero: 1 | 2) {
-  base = numero === 2 ? "/taquilla-2" : "/taquilla";
+export type NumeroTaquilla = 1 | 2 | 3;
+export function usarTaquilla(numero: NumeroTaquilla) {
+  base = numero === 1 ? "/taquilla" : `/taquilla-${numero}`;
 }
 
 export interface SaldoTaquilla {

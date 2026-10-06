@@ -155,6 +155,15 @@ export const MODULOS: ModuloConfig[] = [
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
   },
   {
+    id: "taquilla-3",
+    titulo: "Taquilla 3",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: CreditCard,
+    ruta: "/taquilla-3",
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+  },
+  {
     id: "reportes",
     titulo: "Reportes",
     categoria: "Administración general",
