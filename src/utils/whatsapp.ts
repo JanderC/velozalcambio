@@ -49,5 +49,24 @@ export function alAbrirWhatsApp(e: MouseEvent<HTMLAnchorElement>, telefono: stri
   const modo = e.altKey ? preguntarModo() : (modoGuardado() ?? preguntarModo());
   if (modo !== "app") return;
   e.preventDefault();
+  // Si la aplicación abre, esta ventana pierde el foco. Si en un momento no pasó nada, es que no está instalada:
+  // se abre en el navegador como siempre y este equipo vuelve a quedar en "navegador", para que el botón nunca quede muerto.
+  let abrio = false;
+  const alPerderFoco = () => {
+    abrio = true;
+  };
+  window.addEventListener("blur", alPerderFoco, { once: true });
+  document.addEventListener("visibilitychange", alPerderFoco, { once: true });
+  window.setTimeout(() => {
+    window.removeEventListener("blur", alPerderFoco);
+    document.removeEventListener("visibilitychange", alPerderFoco);
+    if (abrio || !document.hasFocus()) return;
+    try {
+      localStorage.setItem(CLAVE, "navegador");
+    } catch {
+      // sin almacenamiento: la próxima vez se vuelve a preguntar
+    }
+    window.open(enlaceWhatsApp(telefono, mensaje), "_blank", "noreferrer");
+  }, 1500);
   window.location.href = `whatsapp://send?${telefono ? `phone=${telefono}&` : ""}text=${encodeURIComponent(mensaje)}`;
 }

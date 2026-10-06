@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, codigoDeReferencia, crearCuentaCorriente, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarMovimientoPorNumero, codigosDeReferencia, crearCuentaCorriente, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
-import { leerComprobante } from "./ocrComprobante";
 import { ApiError } from "../../api/client";
-import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
+import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
 const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
@@ -129,28 +129,38 @@ export function NuevaCuentaModal({
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
   // La imagen se guarda con el movimiento, para verla después (en la hoja y en Taquilla)
-  const [imagenAdjunta, setImagenAdjunta] = useState<File | null>(null);
-  async function cargarComprobante(archivo: File | undefined) {
-    if (!archivo) return;
-    setImagenAdjunta(archivo);
+  // El cliente puede mandar el monto en varias transferencias: se cargan varias capturas, se suman y se guardan juntas
+  const [imagenesAdjuntas, setImagenesAdjuntas] = useState<File[]>([]);
+  async function cargarComprobantes(archivos: File[]) {
+    if (!archivos.length) return;
     setError(null);
     setAvisoLectura(null);
     setLeyendo(true);
     try {
-      const d = await leerComprobante(archivo);
+      const sumando = imagenesAdjuntas.length > 0;
+      const l = await leerCapturas(archivos, sumando ? movPersona : "");
+      const yaEstaba = l.repetidas ? ` ${l.repetidas === 1 ? "Una captura ya estaba cargada" : `${l.repetidas} capturas ya estaban cargadas`} (misma referencia): no se sumó otra vez.` : "";
+      if (!l.aceptadas.length) {
+        setAvisoLectura(yaEstaba.trim());
+        return;
+      }
+      setImagenesAdjuntas((lista) => [...lista, ...l.aceptadas]);
       const partes: string[] = [];
-      if (d.monto) {
-        setMovCantidad(formatearMonto(d.monto));
-        partes.push(`monto ${formatearMonto(d.monto)}${d.moneda ? ` ${d.moneda}` : ""}`);
+      if (l.total) {
+        // otra captura se suma a la cantidad que ya estaba
+        setMovCantidad((previa) => formatearMonto(sumando ? sumarDecimales(leerNumero(previa) ?? "0", l.total!) : l.total!));
+        partes.push(`monto ${formatearMonto(l.total)}${l.moneda ? ` ${l.moneda}` : ""}${l.aceptadas.length > 1 ? ` (suma de ${l.aceptadas.length} capturas)` : ""}`);
       }
-      const quien = [d.remitente, d.referencia].filter(Boolean).join(" ");
-      if (quien) {
-        setMovPersona(quien);
-        if (d.referencia) partes.push(`referencia ${d.referencia}`);
-      }
+      const quien = sumando ? [movPersona.trim(), ...l.referencias].filter(Boolean).join(" / ") : [l.primera?.remitente, l.referencias.join(" / ")].filter(Boolean).join(" ");
+      if (quien) setMovPersona(quien);
+      if (l.referencias.length) partes.push(`referencia ${l.referencias.join(" / ")}`);
       // si el comprobante está en otra moneda que la del medio elegido, se avisa: la cuenta no se cambia sola
-      const otraMoneda = d.moneda && medio && d.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${d.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
-      setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}` : "No encontré monto ni referencia en esa imagen.");
+      const otraMoneda = l.moneda && medio && l.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${l.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
+      setAvisoLectura(
+        (partes.length
+          ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}`
+          : "No encontré monto ni referencia en esa imagen: quedó adjunta, escribí los datos a mano.") + yaEstaba
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo leer la imagen.");
     } finally {
@@ -162,17 +172,17 @@ export function NuevaCuentaModal({
 
   // Pegar una captura (Ctrl+V) en cualquier parte de la pantalla la lee como comprobante,
   // aunque el cursor no esté dentro del formulario
-  const pegarImagen = useRef<(imagen: File) => void>(() => {});
-  pegarImagen.current = (imagen) => {
-    if (!leyendo) void cargarComprobante(imagen);
+  const pegarImagen = useRef<(imagenes: File[]) => void>(() => {});
+  pegarImagen.current = (imagenes) => {
+    if (!leyendo) void cargarComprobantes(imagenes);
   };
   useEffect(() => {
     if (!enLinea) return;
     const alPegar = (e: globalThis.ClipboardEvent) => {
-      const imagen = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
-      if (!imagen) return; // texto u otra cosa: se pega normal
+      const imagenes = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+      if (!imagenes.length) return; // texto u otra cosa: se pega normal
       e.preventDefault();
-      pegarImagen.current(imagen);
+      pegarImagen.current(imagenes);
     };
     document.addEventListener("paste", alPegar);
     return () => document.removeEventListener("paste", alPegar);
@@ -206,8 +216,9 @@ export function NuevaCuentaModal({
     setEnviando(true);
     try {
       // Un número de transferencia no se registra dos veces
-      const numero = !conMovimiento ? null : nMovMtcn.length >= 4 ? nMovMtcn : codigoDeReferencia(movPersona);
-      if (numero) {
+      // (con varias capturas hay varias referencias: se revisan todas)
+      const numeros = !conMovimiento ? [] : nMovMtcn.length >= 4 ? [nMovMtcn] : codigosDeReferencia(movPersona);
+      for (const numero of numeros) {
         const ya = await buscarMovimientoPorNumero(numero).catch(() => null);
         if (ya) {
           // referencia repetida: no se crea el cliente ni se genera el movimiento, y se avisa con una alerta
@@ -253,7 +264,11 @@ export function NuevaCuentaModal({
               : { monto: `${signo}${movMonto!}` }),
           });
           // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
-          if (imagenAdjunta) await subirComprobanteMovimiento(creado.movimiento.id, imagenAdjunta).catch(() => {});
+          if (imagenesAdjuntas.length) {
+            await unirImagenes(imagenesAdjuntas)
+              .then((imagen) => subirComprobanteMovimiento(creado.movimiento.id, imagen))
+              .catch(() => {});
+          }
         } catch (err) {
           errorMovimiento = err instanceof ApiError ? err.message : "no se pudo guardar";
         }
@@ -266,7 +281,7 @@ export function NuevaCuentaModal({
           setMovPersona("");
           setMovMtcn("");
           setMovConfirmada(false);
-          setImagenAdjunta(null);
+          setImagenesAdjuntas([]);
           setAvisoLectura(null);
         } else {
           setError(`El cliente se creó, pero el movimiento no se guardó (${errorMovimiento}). Cargalo desde su hoja.`);
@@ -431,16 +446,23 @@ export function NuevaCuentaModal({
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
+                multiple
                 disabled={leyendo}
                 onChange={(e) => {
-                  void cargarComprobante(e.target.files?.[0]);
+                  void cargarComprobantes([...(e.target.files ?? [])]);
                   e.target.value = "";
                 }}
               />
             </label>
             <small className="cc-primer-mov-nota">O pegá la captura con Ctrl+V en cualquier parte de la pantalla.</small>
             {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
-            {imagenAdjunta && <p className="cc-imagen-adjunta">Imagen del comprobante lista: se guarda con el movimiento.</p>}
+            {imagenesAdjuntas.length > 0 && (
+              <p className="cc-imagen-adjunta">
+                {imagenesAdjuntas.length === 1
+                  ? "Imagen del comprobante lista: se guarda con el movimiento. Si mandó el monto en varias transferencias, cargá o pegá las otras capturas y se suman."
+                  : `${imagenesAdjuntas.length} capturas cargadas: los montos están sumados y se guardan juntas con el movimiento.`}
+              </p>
+            )}
             <div className="cc-primer-mov-opciones">
               {/* Compra: le compramos al cliente lo que nos pasa (nos resta pesos o dólares). Venta: le vendemos bolívares o dólares (nos aumenta el saldo en pesos). */}
               <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Compra o venta">

@@ -182,8 +182,14 @@ export interface MovimientoConNumero {
  * o un código con letras y números de 5 caracteres o más, como "d1a1kat6i". null si no hay ninguno.
  */
 export function codigoDeReferencia(texto: string): string | null {
+  return codigosDeReferencia(texto)[0] ?? null;
+}
+
+/** Todos los códigos de referencia escritos: cuando el cliente mandó el monto en varias transferencias hay uno por cada una. */
+export function codigosDeReferencia(texto: string): string[] {
   const palabras = texto.match(/[A-Za-z0-9-]+/g) ?? [];
-  return palabras.map((p) => p.replace(/^-+|-+$/g, "")).find((p) => /^\d{4,}$/.test(p) || (/\d/.test(p) && /[A-Za-z]/.test(p) && p.length >= 5)) ?? null;
+  const codigos = palabras.map((p) => p.replace(/^-+|-+$/g, "")).filter((p) => /^\d{4,}$/.test(p) || (/\d/.test(p) && /[A-Za-z]/.test(p) && p.length >= 5));
+  return [...new Set(codigos)];
 }
 
 /** El movimiento ya registrado con ese número de transferencia, si lo hay. */

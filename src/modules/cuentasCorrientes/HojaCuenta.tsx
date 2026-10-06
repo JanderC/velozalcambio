@@ -5,7 +5,7 @@ import {
   confirmarMovimientoCC,
   avisarClienteCuenta,
   buscarMovimientoPorNumero,
-  codigoDeReferencia,
+  codigosDeReferencia,
   eliminarCuentaCorriente,
   type MovimientoConNumero,
   cerrarDiaCuenta,
@@ -33,8 +33,8 @@ import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, pctDeComision, sumarDecimales } from "../../utils/montos";
 import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
+import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { CobroModal } from "./CobroModal";
-import { leerComprobante } from "./ocrComprobante";
 
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
@@ -293,7 +293,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     // La referencia va anotada en el movimiento después del " · ": el MTCN, o el código que se cargó. Solo eso, sin "Compra Zelle".
     const mtcn = /MTCN\s*(\d+)/i.exec(a.descripcion)?.[1];
     const anotado = (a.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
-    const lineaRef = `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigoDeReferencia(anotado) ?? "—")}`;
+    const lineaRef = `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigosDeReferencia(anotado).join(" / ") || "—")}`;
     // Debajo de todo, como referencia: el total que mandó el cliente y la comisión con la que queda lo que recibe
     const pie = a.enviado
       ? `\n\nReferencia: envió ${simbolo}${formatearMonto(a.enviado)}${sufijo}${a.comision ? ` · comisión ${formatearMonto(a.comision)}%` : ""}`
@@ -464,8 +464,8 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
         <button className="cc-cerrar-dia" onClick={cerrarDia} disabled={!estado || cerrando} title="Cierra el día y comparte el reporte como imagen">
           <Lock size={14} /> {cerrando ? "Cerrando…" : estado?.cierre ? "Volver a cerrar y enviar" : "Cerrar día y enviar"}
         </button>
-        {telefono && (
-          <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeSaldo)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeSaldo)} target="_blank" rel="noreferrer" title={ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
+        {(telefono || esConfirmaciones) && (
+          <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeSaldo)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeSaldo)} target="_blank" rel="noreferrer" title={!telefono ? "Sin teléfono registrado: al abrir WhatsApp elegís el contacto" : ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
             <MessageCircle size={14} /> {esConfirmaciones ? (ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
           </a>
         )}
@@ -748,38 +748,60 @@ function FilaNueva({
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
   // La imagen se guarda con el movimiento al agregarlo, para verla después (en la hoja y en Taquilla)
-  const [imagenAdjunta, setImagenAdjunta] = useState<File | null>(null);
-  async function cargarComprobante(archivo: File | undefined) {
-    if (!archivo) return;
-    setImagenAdjunta(archivo);
+  // El cliente puede mandar el monto en varias transferencias: se cargan varias capturas, se suman y se guardan juntas
+  const [imagenesAdjuntas, setImagenesAdjuntas] = useState<File[]>([]);
+  async function cargarComprobantes(archivos: File[]) {
+    if (!archivos.length) return;
     setError(null);
     setAvisoLectura(null);
     setLeyendo(true);
     try {
-      const d = await leerComprobante(archivo);
+      // ya había capturas cargadas: las nuevas se suman a lo que está escrito
+      const sumando = imagenesAdjuntas.length > 0;
+      const l = await leerCapturas(archivos, sumando ? persona : "");
+      const yaEstaba = l.repetidas ? ` ${l.repetidas === 1 ? "Una captura ya estaba cargada" : `${l.repetidas} capturas ya estaban cargadas`} (misma referencia): no se sumó otra vez.` : "";
+      if (!l.aceptadas.length) {
+        setAvisoLectura(yaEstaba.trim());
+        return;
+      }
+      setImagenesAdjuntas((lista) => [...lista, ...l.aceptadas]);
       const partes: string[] = [];
-      const quien = [d.remitente, d.referencia].filter(Boolean).join(" ");
-      if (quien) {
-        setPersona(quien);
-        if (d.referencia) partes.push(`referencia ${d.referencia}`);
-      }
-      if (d.monto) {
-        // En la moneda de la cuenta es el monto directo; en otra, es la cantidad y se aplica la tasa
-        if (!d.moneda || d.moneda === cuenta.moneda_codigo) {
-          setTasa("");
-          setEsPorcentaje(false);
-          setEnCobro(false);
-          setMontoDirecto(formatearMonto(d.monto));
-        } else {
-          setCantidad(formatearMonto(d.monto));
+      if (l.referencias.length) partes.push(`referencia ${l.referencias.join(" / ")}`);
+      if (l.total) partes.push(`monto ${formatearMonto(l.total)}${l.moneda ? ` ${l.moneda}` : ""}${l.aceptadas.length > 1 ? ` (suma de ${l.aceptadas.length} capturas)` : ""}`);
+      if (sumando) {
+        if (l.referencias.length) setPersona([persona.trim(), ...l.referencias].filter(Boolean).join(" / "));
+        if (l.total) {
+          const sumar = (previo: string) => formatearMonto(sumarDecimales(leerNumero(previo) ?? "0", l.total!));
+          // se suma donde ya estaba el monto: en la cantidad (con tasa o comisión) o en el monto directo
+          if (cantidad.trim()) setCantidad(sumar);
+          else setMontoDirecto(sumar);
         }
-        partes.push(`monto ${formatearMonto(d.monto)}${d.moneda ? ` ${d.moneda}` : ""}`);
+      } else {
+        const quien = [l.primera?.remitente, l.referencias.join(" / ")].filter(Boolean).join(" ");
+        if (quien) setPersona(quien);
+        if (l.total) {
+          // En la moneda de la cuenta es el monto directo; en otra, es la cantidad y se aplica la tasa.
+          // El cliente que trabaja con comisión siempre va por la cantidad: a lo enviado se le aplica su %.
+          if ((!l.moneda || l.moneda === cuenta.moneda_codigo) && !comisionDescuenta) {
+            setTasa("");
+            setEsPorcentaje(false);
+            setEnCobro(false);
+            setMontoDirecto(formatearMonto(l.total));
+          } else {
+            setCantidad(formatearMonto(l.total));
+          }
+        }
+        const fechaLeida = l.primera?.fecha;
+        if (fechaLeida && fechaLeida <= hoyBogota()) {
+          setFecha(fechaLeida);
+          partes.push(`fecha ${fechaCorta(`${fechaLeida}T12:00:00-05:00`)}`);
+        }
       }
-      if (d.fecha && d.fecha <= hoyBogota()) {
-        setFecha(d.fecha);
-        partes.push(`fecha ${fechaCorta(`${d.fecha}T12:00:00-05:00`)}`);
-      }
-      setAvisoLectura(partes.length ? `Leído de la imagen: ${partes.join(", ")}. Revisalo antes de agregar.` : "No encontré referencia, monto ni fecha en esa imagen.");
+      setAvisoLectura(
+        (partes.length
+          ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}: ${partes.join(", ")}. Revisalo antes de agregar.`
+          : "No encontré referencia, monto ni fecha en esa imagen: quedó adjunta, escribí los datos a mano.") + yaEstaba
+      );
       setAbierta(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo leer la imagen.");
@@ -873,7 +895,9 @@ function FilaNueva({
   // en Confirmaciones, una Compra que no es por Western entra confirmada de una vez: pasa directo a Taquilla
   const confirmadaDirecto = enConfirmaciones && !resta && !llevaConfirmacion;
   const personaCompleta = [persona.trim(), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
-  const numeroMovimiento = nMtcn.length >= 4 ? nMtcn : pidePersona ? codigoDeReferencia(persona) : null;
+  // con varias capturas hay varias referencias: ninguna puede estar ya registrada
+  const numerosMovimiento = nMtcn.length >= 4 ? [nMtcn] : pidePersona ? codigosDeReferencia(persona) : [];
+  const numeroMovimiento = numerosMovimiento[0] ?? null;
   const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
   useEffect(() => {
     setRepetido(null);
@@ -885,8 +909,8 @@ function FilaNueva({
     }, 400);
     return () => clearTimeout(t);
   }, [numeroMovimiento]);
-  const avisoRepetido = (m: MovimientoConNumero) =>
-    `Ya hay un movimiento con la referencia ${numeroMovimiento}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
+  const avisoRepetido = (m: MovimientoConNumero, numero: string | null = numeroMovimiento) =>
+    `Ya hay un movimiento con la referencia ${numero}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   const sinSigno = (v: string) => v.replace(/^-/, "");
   // Se escribió una tasa distinta a la que venía puesta
@@ -927,17 +951,17 @@ function FilaNueva({
 
   // Pegar una captura (Ctrl+V) en cualquier parte de la pantalla la lee como comprobante,
   // aunque el cursor no esté dentro del formulario
-  const pegarImagen = useRef<(imagen: File) => void>(() => {});
-  pegarImagen.current = (imagen) => {
-    if (!leyendo) void cargarComprobante(imagen);
+  const pegarImagen = useRef<(imagenes: File[]) => void>(() => {});
+  pegarImagen.current = (imagenes) => {
+    if (!leyendo) void cargarComprobantes(imagenes);
   };
   useEffect(() => {
 
     const alPegar = (e: globalThis.ClipboardEvent) => {
-      const imagen = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
-      if (!imagen) return; // texto u otra cosa: se pega normal
+      const imagenes = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+      if (!imagenes.length) return; // texto u otra cosa: se pega normal
       e.preventDefault();
-      pegarImagen.current(imagen);
+      pegarImagen.current(imagenes);
     };
     document.addEventListener("paste", alPegar);
     return () => document.removeEventListener("paste", alPegar);
@@ -956,13 +980,13 @@ function FilaNueva({
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
     if (conCaja && cajaId === "") return setError(cajaObligatoria ? "Elegí qué caja alimenta este movimiento." : "Elegí la caja o banco que también se mueve.");
     if (conCaja && !monedaCaja) return setError(`No encuentro la moneda ${movimientoCaja?.codigo ?? ""} para mover la caja.`);
-    if (numeroMovimiento) {
+    for (const numero of numerosMovimiento) {
       // se vuelve a consultar al guardar: el aviso de arriba puede no haber llegado todavía
-      const ya = repetido ?? (await buscarMovimientoPorNumero(numeroMovimiento).catch(() => null));
+      const ya = (numero === numeroMovimiento ? repetido : null) ?? (await buscarMovimientoPorNumero(numero).catch(() => null));
       if (ya) {
-        setRepetido(ya);
+        if (numero === numeroMovimiento) setRepetido(ya);
         // referencia repetida: no se genera el movimiento y se avisa con una alerta
-        const aviso = `${avisoRepetido(ya)} No se puede registrar dos veces: el movimiento NO se generó.`;
+        const aviso = `${avisoRepetido(ya, numero)} No se puede registrar dos veces: el movimiento NO se generó.`;
         window.alert(`Referencia repetida\n\n${aviso}`);
         return setError(aviso);
       }
@@ -979,8 +1003,8 @@ function FilaNueva({
     }
     // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
     const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
-    const adjunta = imagenAdjunta;
-    setImagenAdjunta(null);
+    const adjuntas = imagenesAdjuntas;
+    setImagenesAdjuntas([]);
     setAvisoLectura(null);
     const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
     setEnCobro(iniciaEnCobro);
@@ -1044,10 +1068,13 @@ function FilaNueva({
       // la tasa queda guardada apenas se registra el movimiento, sin esperar a que suba la imagen
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
-      if (adjunta) {
-        await subirComprobanteMovimiento(creado.movimiento.id, adjunta).catch((e) =>
-          setError(`El movimiento se guardó, pero la imagen del comprobante no: ${(e as Error).message}`)
-        );
+      // (varias capturas quedan en una sola imagen, una debajo de la otra)
+      if (adjuntas.length) {
+        await unirImagenes(adjuntas)
+          .then((imagen) => subirComprobanteMovimiento(creado.movimiento.id, imagen))
+          .catch((e) =>
+            setError(`El movimiento se guardó, pero la imagen del comprobante no: ${(e as Error).message}`)
+          );
       }
       // si no tiene permiso para cambiarla, la tasa de la cuenta queda como estaba
       if (tasaCobroNueva) await configurarCobroCuenta(cuenta.id, tasaCobroNueva).catch(() => {});
@@ -1101,9 +1128,10 @@ function FilaNueva({
             type="file"
             title="Elegí la imagen, o pegala con Ctrl+V en cualquier parte de la pantalla"
             accept="image/jpeg,image/png,image/webp"
+            multiple
             disabled={leyendo}
             onChange={(e) => {
-              void cargarComprobante(e.target.files?.[0]);
+              void cargarComprobantes([...(e.target.files ?? [])]);
               e.target.value = "";
             }}
           />
@@ -1237,10 +1265,13 @@ function FilaNueva({
       </div>
 
       {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
-      {imagenAdjunta && (
+      {imagenesAdjuntas.length > 0 && (
         <p className="cc-imagen-adjunta">
-          <IconoImagen size={14} /> Imagen del comprobante lista: se guarda con el movimiento.
-          <button type="button" onClick={() => setImagenAdjunta(null)}>
+          <IconoImagen size={14} />{" "}
+          {imagenesAdjuntas.length === 1
+            ? "Imagen del comprobante lista: se guarda con el movimiento. Si mandó el monto en varias transferencias, cargá o pegá las otras capturas y se suman."
+            : `${imagenesAdjuntas.length} capturas cargadas: los montos están sumados y se guardan juntas con el movimiento.`}
+          <button type="button" onClick={() => setImagenesAdjuntas([])}>
             Quitar
           </button>
         </p>
