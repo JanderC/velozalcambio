@@ -9,6 +9,8 @@ import {
   crearOperacionTaquilla,
   getUrlComprobanteOperacion,
   subirComprobanteOperacion,
+  textoMedio,
+  type MedioTaquilla,
   type OperacionTaquilla,
   type Taquilla,
 } from "../../api/taquilla.api";
@@ -71,7 +73,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
   const [monedaMonto, setMonedaMonto] = useState("VES"); // en qué está lo que trae el cliente o se negocia
   const [monedaResultado, setMonedaResultado] = useState("COP"); // en qué queda la cuenta
   const [formula, setFormula] = useState<Formula>("tasa");
-  const [medio, setMedio] = useState<"EFECTIVO" | "BANCOLOMBIA">("EFECTIVO");
+  const [medio, setMedio] = useState<MedioTaquilla>("EFECTIVO");
   // qué lado mueve la caja: se elige solo (el que sea efectivo de la caja) y se puede cambiar
   const [ladoElegido, setLadoElegido] = useState<"MONTO" | "RESULTADO" | "AMBOS" | null>(null);
   const [monto, setMonto] = useState("");
@@ -146,7 +148,9 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
   }
 
   const abierta = taquilla.sesion.abierta;
-  const porBanco = medio === "BANCOLOMBIA";
+  // por Bancolombia o por otros métodos: no mueve la caja
+  const porBanco = medio !== "EFECTIVO";
+  const nombreMedio = medio === "OTROS" ? "otros métodos" : "Bancolombia";
   const nMonto = monto.trim() ? leerNumero(monto)?.replace(/^-/, "") ?? null : null;
   const nValor = valor.trim() ? leerNumero(valor.replace(/%/g, "")) : null;
   const valorValido = !!nValor && /[1-9]/.test(nValor) && !nValor.startsWith("-");
@@ -186,7 +190,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
     if (formula === "dividir" && !valorValido) return setError("Para dividir hace falta la tasa.");
     if (formula === "comision" && valorValido && Number(nValor) >= 100) return setError("La comisión tiene que ser menor al 100%.");
     if (!resultado || !/[1-9]/.test(resultado)) return setError("El resultado da cero: revisá el monto y la tasa o la comisión.");
-    if (!porBanco && !cajaPuede) return setError(`La caja solo tiene pesos, dólares y euros: no puede moverse en ${nombreDe(monedaCaja).toLowerCase()}. Elegí Bancolombia o cambiá las monedas.`);
+    if (!porBanco && !cajaPuede) return setError(`La caja solo tiene pesos, dólares y euros: no puede moverse en ${nombreDe(monedaCaja).toLowerCase()}. Elegí Bancolombia u otros métodos, o cambiá las monedas.`);
     setOcupado("nueva");
     try {
       const creada = await crearOperacionTaquilla({
@@ -231,7 +235,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
   async function accion(o: OperacionTaquilla, cual: "confirmar" | "anular") {
     const pregunta =
       cual === "confirmar"
-        ? `¿Confirmar el ingreso de ${dinero(o.total, o.moneda_codigo)}${o.cliente_nombre ? ` de ${o.cliente_nombre}` : ""}? ${o.medio === "BANCOLOMBIA" ? "Fue por Bancolombia: no toca la caja." : "Suma a la caja."}`
+        ? `¿Confirmar el ingreso de ${dinero(o.total, o.moneda_codigo)}${o.cliente_nombre ? ` de ${o.cliente_nombre}` : ""}? ${o.medio !== "EFECTIVO" ? `Fue ${textoMedio(o.medio)}: no toca la caja.` : "Suma a la caja."}`
         : `¿Anular este ingreso pendiente de ${dinero(o.total, o.moneda_codigo)}? No había tocado la caja.`;
     if (!window.confirm(pregunta)) return;
     setError(null);
@@ -318,12 +322,15 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           </div>
           <div className="tq-operacion-grupo">
             <span>Se mueve por</span>
-            <div className="cc-segmento" role="group" aria-label="Efectivo o Bancolombia">
+            <div className="cc-segmento" role="group" aria-label="Efectivo, Bancolombia u otros métodos">
               <button type="button" className={!porBanco ? "activo" : ""} onClick={() => setMedio("EFECTIVO")} aria-pressed={!porBanco}>
                 Efectivo
               </button>
-              <button type="button" className={porBanco ? "activo" : ""} onClick={() => setMedio("BANCOLOMBIA")} aria-pressed={porBanco}>
+              <button type="button" className={medio === "BANCOLOMBIA" ? "activo" : ""} onClick={() => setMedio("BANCOLOMBIA")} aria-pressed={medio === "BANCOLOMBIA"}>
                 Bancolombia
+              </button>
+              <button type="button" className={medio === "OTROS" ? "activo" : ""} onClick={() => setMedio("OTROS")} aria-pressed={medio === "OTROS"}>
+                Otros métodos
               </button>
             </div>
           </div>
@@ -351,9 +358,9 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
         {/* Lo que pasa con la caja, dicho claro */}
         <div className={`tq-operacion-caja ${porBanco ? "banco" : tipo === "EGRESO" ? "egreso" : ""}`}>
           {porBanco ? (
-            <span>Por Bancolombia es una transferencia: queda registrado, pero no suma ni resta de la caja.</span>
+            <span>Por {nombreMedio} no es efectivo de esta caja: queda registrado, pero no suma ni resta de la caja.</span>
           ) : !cajaPuede ? (
-            <span>La caja no tiene efectivo en {nombreDe(monedaCaja).toLowerCase()}: elegí qué lado la mueve, o Bancolombia.</span>
+            <span>La caja no tiene efectivo en {nombreDe(monedaCaja).toLowerCase()}: elegí qué lado la mueve, o Bancolombia u otros métodos.</span>
           ) : lado === "AMBOS" ? (
             <span>
               {tipo === "INGRESO" ? "Se suman" : "Se restan"} <strong>{montoRedondeado ? dinero(montoRedondeado, monedaMonto) : "—"}</strong> {tipo === "INGRESO" ? "a la caja y se restan" : "de la caja y se suman"}{" "}
@@ -460,7 +467,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
                   <strong>
                     {o.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
                     <span className={`tq-mov-estado ${o.estado.toLowerCase()}`}>{o.estado === "PENDIENTE" ? "por confirmar" : o.estado === "ANULADA" ? "anulado" : "confirmado"}</span>
-                    {o.medio === "BANCOLOMBIA" && <span className="tq-mov-estado banco">Bancolombia · no mueve la caja</span>}
+                    {o.medio !== "EFECTIVO" && <span className="tq-mov-estado banco">{o.medio === "OTROS" ? "Otros métodos" : "Bancolombia"} · no mueve la caja</span>}
                   </strong>
                   <span>{cuentaDe(o)}</span>
                   {o.descripcion && <span className="tq-mov-descripcion">{o.descripcion}</span>}

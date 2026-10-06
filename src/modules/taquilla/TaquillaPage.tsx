@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, Image as IconoImagen, Landmark, Lock, LockOpen, Search } from "lucide-react";
+import { CheckCircle2, Image as IconoImagen, Landmark, Lock, LockOpen, Search, Wallet } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
@@ -13,6 +13,8 @@ import {
   moverConCajaFuerte,
   pagarSolicitud,
   type CodigoTaquilla,
+  type MedioTaquilla,
+  textoMedio,
   type NumeroTaquilla,
   usarTaquilla,
   type MontosPorMoneda,
@@ -105,10 +107,10 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
   }, [buscar, taquilla]);
 
   // En efectivo descuenta de la caja; por Bancolombia no la toca (solo queda contado arriba)
-  async function pagar(s: SolicitudTaquilla, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
+  async function pagar(s: SolicitudTaquilla, medio: MedioTaquilla = "EFECTIVO") {
     const pregunta =
-      medio === "BANCOLOMBIA"
-        ? `¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} por Bancolombia? No se descuenta de la caja.`
+      medio !== "EFECTIVO"
+        ? `¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} ${textoMedio(medio)}? No se descuenta de la caja.`
         : `¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} en efectivo? Se descuenta de la caja de taquilla.`;
     if (!window.confirm(pregunta)) return;
     setPagando(s.id);
@@ -179,6 +181,17 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
         >
           <Landmark size={15} /> Por Bancolombia
         </button>
+        <button
+          className="tq-pagar-banco"
+          onClick={(e) => {
+            e.stopPropagation();
+            void pagar(s, "OTROS");
+          }}
+          disabled={pagando !== null}
+          title="Se le pagó por otro método (no en efectivo de esta caja): no descuenta de la caja"
+        >
+          <Wallet size={15} /> Otros métodos
+        </button>
       </span>
     );
 
@@ -202,7 +215,7 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
                   </span>
                   <span className="tq-ya-pagada-donde">
                     Pagada en {s.pagado_caja_nombre ?? "taquilla"}
-                    {s.pagado_medio === "BANCOLOMBIA" ? " por Bancolombia" : " en efectivo"}
+                    {` ${textoMedio(s.pagado_medio)}`}
                     {s.pagado_en ? ` el ${fechaHora(s.pagado_en)}` : ""}
                     {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
                   </span>
@@ -260,7 +273,7 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
                     Ref: <b>{referenciaDe(s) || "—"}</b>
                   </span>
                   <span>
-                    Pagada {s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia " : "en efectivo "}
+                    Pagada {textoMedio(s.pagado_medio)}{" "}
                     {s.pagado_en ? fechaHora(s.pagado_en) : ""}
                     {s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}
                   </span>
@@ -316,6 +329,16 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
               <strong>
                 {taquilla.pagosBancolombia.cantidad}
                 {taquilla.pagosBancolombia.totales.length > 0 && ` · ${taquilla.pagosBancolombia.totales.map((t) => dinero(t.total, t.codigo)).join(" + ")}`}
+              </strong>
+            </span>
+          )}
+          {taquilla && (
+            <span className="tq-banco-chip" title="Pagos hechos por otros métodos: no descuentan de la caja">
+              <Wallet size={13} />
+              <span>Otros métodos</span>
+              <strong>
+                {taquilla.pagosOtros.cantidad}
+                {taquilla.pagosOtros.totales.length > 0 && ` · ${taquilla.pagosOtros.totales.map((t) => dinero(t.total, t.codigo)).join(" + ")}`}
               </strong>
             </span>
           )}
@@ -476,7 +499,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
     [comision ? (s.comision_incluida ? "Comisión (ya sumada en lo enviado)" : "Comisión") : "Tasa", comision ? `${formatearMonto(comision)}%` : s.tasa ? formatearMonto(s.tasa) : null],
     ["Recibe", dinero(s.monto, s.moneda_codigo)],
     ["Registrada", `${fechaHora(s.fecha)} por ${s.registrado_por_nombre}`],
-    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada${s.pagado_caja_nombre ? ` en ${s.pagado_caja_nombre}` : ""} ${s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia" : "en efectivo"} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
+    ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada${s.pagado_caja_nombre ? ` en ${s.pagado_caja_nombre}` : ""} ${textoMedio(s.pagado_medio)} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
   ];
 
   return (

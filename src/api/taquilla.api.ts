@@ -1,6 +1,12 @@
 import { api } from "./client";
 
 export type CodigoTaquilla = "COP" | "USD" | "EUR";
+// Solo el efectivo mueve la caja: por Bancolombia o por otros métodos queda registrado y contado, sin tocarla
+export type MedioTaquilla = "EFECTIVO" | "BANCOLOMBIA" | "OTROS";
+/** "en efectivo", "por Bancolombia", "por otros métodos". */
+export function textoMedio(medio: MedioTaquilla | null) {
+  return medio === "BANCOLOMBIA" ? "por Bancolombia" : medio === "OTROS" ? "por otros métodos" : "en efectivo";
+}
 
 // Hay varias taquillas que trabajan igual, cada una con su caja: /taquilla (la 1), /taquilla-2 y /taquilla-3.
 // La pantalla dice cuál es al montarse y todas las llamadas de este archivo van a esa.
@@ -35,7 +41,7 @@ export interface SolicitudTaquilla {
   estado_confirmacion: "EN_PROCESO" | "CONFIRMADA" | null;
   tiene_comprobante: boolean;
   pagado_en: string | null;
-  pagado_medio: "EFECTIVO" | "BANCOLOMBIA" | null; // por Bancolombia no descuenta de la caja
+  pagado_medio: MedioTaquilla | null; // por Bancolombia o por otros métodos no descuenta de la caja
   pagado_caja_id: number | null; // la taquilla que la pagó
   pagado_caja_nombre: string | null;
   pagado_por_nombre: string | null;
@@ -65,7 +71,7 @@ export interface OperacionTaquilla {
   comision_pct: string | null;
   divide: boolean; // cantidad ÷ tasa en vez de ×
   moneda_operacion: string | null; // qué se compró o vendió
-  medio: "EFECTIVO" | "BANCOLOMBIA"; // por Bancolombia no mueve la caja
+  medio: MedioTaquilla; // por Bancolombia o por otros métodos no mueve la caja
   total: string;
   descripcion: string | null;
   cliente_nombre: string | null;
@@ -91,6 +97,8 @@ export interface Taquilla {
   operaciones: OperacionTaquilla[];
   // Pagos hechos por Bancolombia (de esta caja abierta, o de hoy si está cerrada): no tocan la caja
   pagosBancolombia: { cantidad: number; totales: { codigo: string; total: string }[] };
+  // Lo mismo, los pagados por otros métodos
+  pagosOtros: { cantidad: number; totales: { codigo: string; total: string }[] };
   caja: { id: number; nombre: string; saldos: SaldoTaquilla[] };
   sesion: { abierta: boolean; abierta_en: string | null; abierta_por: string | null };
   ultimoCierre: CierreTaquilla | null;
@@ -130,7 +138,7 @@ export function buscarSolicitudesPagadas(texto: string) {
   return api.get<SolicitudTaquilla[]>(`${base}/solicitudes/pagadas?q=${encodeURIComponent(texto)}`);
 }
 
-export function pagarSolicitud(id: number, medio: "EFECTIVO" | "BANCOLOMBIA" = "EFECTIVO") {
+export function pagarSolicitud(id: number, medio: MedioTaquilla = "EFECTIVO") {
   return api.post<Taquilla>(`${base}/solicitudes/${id}/pagar`, { medio });
 }
 
@@ -144,7 +152,7 @@ export interface NuevaOperacionTaquilla {
   monedaResultado: string;
   cajaLado: "MONTO" | "RESULTADO" | "AMBOS";
   resultado?: string; // ya calculado, cuando no es una sola tasa (dólares por billete)
-  medio?: "EFECTIVO" | "BANCOLOMBIA";
+  medio?: MedioTaquilla;
   descripcion?: string;
   clienteNombre?: string;
   clienteTelefono?: string;
