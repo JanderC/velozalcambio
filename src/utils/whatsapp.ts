@@ -1,56 +1,62 @@
 import type { MouseEvent } from "react";
 
-// En la computadora, cada enlace de WhatsApp abre una pestaña nueva de WhatsApp Web, y no hay forma de volver a usar
-// la misma: WhatsApp Web se aísla de la pestaña que lo abrió. La salida es abrir la aplicación de WhatsApp de la
-// computadora (whatsapp://), que siempre es la misma ventana. Se pregunta una vez por equipo y queda guardado.
-const CLAVE = "veloza.whatsapp.modo";
-type Modo = "app" | "navegador";
+// En la computadora los mensajes se abren en WhatsApp Web (web.whatsapp.com), directo: no hace falta tener instalada
+// la aplicación. Cada mensaje abre una pestaña, porque WhatsApp Web se aísla de la pestaña que lo abrió y no se
+// puede volver a usar la misma. El equipo que sí tenga la aplicación de WhatsApp puede elegir abrirlos ahí
+// (siempre la misma ventana) con Alt + clic en el botón; queda guardado en ese equipo.
+const CLAVE = "veloza.whatsapp.destino"; // clave nueva: la elección anterior se descarta y todos vuelven a WhatsApp Web
+type Modo = "app" | "web";
 
 const esTelefono = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-function modoGuardado(): Modo | null {
+function modoGuardado(): Modo {
   try {
-    const v = localStorage.getItem(CLAVE);
-    return v === "app" || v === "navegador" ? v : null;
+    return localStorage.getItem(CLAVE) === "app" ? "app" : "web";
   } catch {
-    return null;
+    return "web";
   }
 }
 
-function preguntarModo(): Modo {
-  const modo: Modo = window.confirm(
-    "¿Esta computadora tiene instalada la aplicación de WhatsApp?\n\n" +
-      "Aceptar: los mensajes se abren en la aplicación, siempre en la misma ventana (no abre pestañas).\n" +
-      "Cancelar: se abren en el navegador, una pestaña por mensaje.\n\n" +
-      "Para cambiarlo después: clic en el botón de WhatsApp con la tecla Alt apretada."
-  )
-    ? "app"
-    : "navegador";
+function guardarModo(modo: Modo) {
   try {
     localStorage.setItem(CLAVE, modo);
   } catch {
-    // sin almacenamiento: se vuelve a preguntar la próxima vez
+    // sin almacenamiento: queda en WhatsApp Web
   }
+}
+
+function elegirModo(): Modo {
+  const modo: Modo = window.confirm(
+    "¿Abrir los mensajes en la aplicación de WhatsApp instalada en esta computadora?\n\n" +
+      "Aceptar: en la aplicación, siempre en la misma ventana (tiene que estar instalada).\n" +
+      "Cancelar: en WhatsApp Web, en el navegador."
+  )
+    ? "app"
+    : "web";
+  guardarModo(modo);
   return modo;
 }
 
-/** El enlace normal de WhatsApp (en el teléfono abre la aplicación). Sin teléfono, allá se elige el contacto. */
+/**
+ * El enlace de WhatsApp con el mensaje ya escrito. En el teléfono abre la aplicación; en la computadora, WhatsApp Web.
+ * Sin teléfono, allá se elige el contacto.
+ */
 export function enlaceWhatsApp(telefono: string | null | undefined, mensaje: string) {
-  return `https://wa.me/${telefono ?? ""}?text=${encodeURIComponent(mensaje)}`;
+  const texto = encodeURIComponent(mensaje);
+  if (esTelefono()) return `https://wa.me/${telefono ?? ""}?text=${texto}`;
+  return `https://web.whatsapp.com/send?${telefono ? `phone=${telefono}&` : ""}text=${texto}`;
 }
 
 /**
- * Para el onClick de un enlace de WhatsApp: en la computadora, si se eligió la aplicación, abre el mensaje ahí
- * en vez de abrir otra pestaña. En el teléfono, o si se eligió el navegador, el enlace sigue como siempre.
+ * Para el onClick de un enlace de WhatsApp. Normalmente no hace nada: el enlace abre WhatsApp Web (o la app en el teléfono).
+ * Solo si en este equipo se eligió la aplicación (Alt + clic) abre el mensaje ahí; y si la aplicación no responde,
+ * abre WhatsApp Web y el equipo vuelve a quedar en WhatsApp Web.
  */
 export function alAbrirWhatsApp(e: MouseEvent<HTMLAnchorElement>, telefono: string | null | undefined, mensaje: string) {
   if (esTelefono()) return;
-  // Alt + clic: volver a elegir
-  const modo = e.altKey ? preguntarModo() : (modoGuardado() ?? preguntarModo());
+  const modo = e.altKey ? elegirModo() : modoGuardado();
   if (modo !== "app") return;
   e.preventDefault();
-  // Si la aplicación abre, esta ventana pierde el foco. Si en un momento no pasó nada, es que no está instalada:
-  // se abre en el navegador como siempre y este equipo vuelve a quedar en "navegador", para que el botón nunca quede muerto.
   let abrio = false;
   const alPerderFoco = () => {
     abrio = true;
@@ -61,12 +67,13 @@ export function alAbrirWhatsApp(e: MouseEvent<HTMLAnchorElement>, telefono: stri
     window.removeEventListener("blur", alPerderFoco);
     document.removeEventListener("visibilitychange", alPerderFoco);
     if (abrio || !document.hasFocus()) return;
-    try {
-      localStorage.setItem(CLAVE, "navegador");
-    } catch {
-      // sin almacenamiento: la próxima vez se vuelve a preguntar
-    }
+    guardarModo("web");
     window.open(enlaceWhatsApp(telefono, mensaje), "_blank", "noreferrer");
   }, 1500);
-  window.location.href = `whatsapp://send?${telefono ? `phone=${telefono}&` : ""}text=${encodeURIComponent(mensaje)}`;
+  // en un marco oculto: si la aplicación no existe, esta pantalla no se ve afectada
+  const marco = document.createElement("iframe");
+  marco.style.display = "none";
+  marco.src = `whatsapp://send?${telefono ? `phone=${telefono}&` : ""}text=${encodeURIComponent(mensaje)}`;
+  document.body.appendChild(marco);
+  window.setTimeout(() => marco.remove(), 3000);
 }
