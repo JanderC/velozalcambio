@@ -94,7 +94,7 @@ export function NuevaCuentaModal({
   const [movFormula, setMovFormula] = useState<"tasa" | "dividir" | "comision">("tasa");
   // Comisión: el % ya viene sumado en lo que envió (mandó 10.600 = 10.000 + 6%)
   const [movIncluida, setMovIncluida] = useState(false);
-  const [movDestino, setMovDestino] = useState<"USD" | "USDT">("USD"); // a qué se llevan los pesos al dividir
+  const [movDestino, setMovDestino] = useState("USD"); // a qué moneda se lleva lo que llega al dividir: cualquiera de las del sistema
   const [movResta, setMovResta] = useState(false);
   const [movCantidad, setMovCantidad] = useState("");
   const [movValor, setMovValor] = useState(""); // la tasa o el % de comisión
@@ -147,7 +147,7 @@ export function NuevaCuentaModal({
     ? null
     : movFormula === "dividir"
       ? nMovValor && /[1-9]/.test(nMovValor)
-        ? dividirDecimales(nMovCantidad, nMovValor, 2)
+        ? dividirDecimales(nMovCantidad, nMovValor, movDestino === "COP" ? 0 : 2)
         : null
       : movFactor
         ? multiplicarDecimales(nMovCantidad, movFactor, codigoCuenta === "COP" ? 0 : 2)
@@ -544,9 +544,16 @@ export function NuevaCuentaModal({
               {movFormula === "dividir" && (
                 <label className="cc-primer-mov-destino">
                   Llevar a
-                  <select value={movDestino} onChange={(e) => setMovDestino(e.target.value as "USD" | "USDT")}>
-                    <option value="USD">Dólares (USD)</option>
-                    <option value="USDT">USDT</option>
+                  <select value={movDestino} onChange={(e) => setMovDestino(e.target.value)}>
+                    {/* todas las monedas, menos la que ya trae el medio (no habría nada que dividir) */}
+                    {monedas
+                      .filter((m) => m.codigo !== codigoMedio || m.codigo === movDestino)
+                      .map((m) => (
+                        <option key={m.id} value={m.codigo}>
+                          {m.nombre} ({m.codigo})
+                        </option>
+                      ))}
+                    {monedas.length === 0 && <option value={movDestino}>{movDestino}</option>}
                   </select>
                 </label>
               )}
