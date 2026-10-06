@@ -98,6 +98,28 @@ export function NuevaCuentaModal({
   const [movResta, setMovResta] = useState(false);
   const [movCantidad, setMovCantidad] = useState("");
   const [movValor, setMovValor] = useState(""); // la tasa o el % de comisión
+  // La última comisión usada queda guardada en este equipo (la misma que recuerda la hoja del cliente)
+  const ultimaComision = () => {
+    try {
+      return localStorage.getItem("cc-ultima-comision-pct") ?? "";
+    } catch {
+      return "";
+    }
+  };
+  // Al pasar a comisión viene puesta la última usada; al salir de comisión, el % no sirve como tasa y se limpia
+  function cambiarFormula(formula: "tasa" | "dividir" | "comision") {
+    if (formula === movFormula) return;
+    if (formula === "comision") setMovValor(ultimaComision());
+    else if (movFormula === "comision") setMovValor("");
+    setMovFormula(formula);
+  }
+  // Bancolombia y Nequi se trabajan con comisión; el resto de los medios, con tasa
+  const nombreMedio = medio?.nombre;
+  useEffect(() => {
+    if (!nombreMedio) return;
+    cambiarFormula(nombreMedio === "BANCOLOMBIA" || nombreMedio === "NEQUI" ? "comision" : "tasa");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nombreMedio]);
   const [movPersona, setMovPersona] = useState("");
   // Western Union: se anota el MTCN y el movimiento nace en proceso de confirmación
   const [movMtcn, setMovMtcn] = useState("");
@@ -250,6 +272,14 @@ export function NuevaCuentaModal({
       if (conMovimiento) {
         const signo = movResta ? "-" : "";
         try {
+          // la comisión usada queda guardada para la próxima vez
+          if (movFormula === "comision" && nMovValor) {
+            try {
+              localStorage.setItem("cc-ultima-comision-pct", movValor.replace(/%/g, "").trim());
+            } catch {
+              // no es grave: solo no se recuerda
+            }
+          }
           const creado = await registrarMovimientoCC({
             terceroId: cuenta.tercero_id,
             canalId: cuenta.canal_id,
@@ -284,7 +314,7 @@ export function NuevaCuentaModal({
         if (!errorMovimiento) {
           setMovResta(false);
           setMovCantidad("");
-          setMovValor("");
+          setMovValor(movFormula === "comision" ? movValor.replace(/%/g, "").trim() : "");
           setMovPersona("");
           setMovMtcn("");
           setMovConfirmada(false);
@@ -501,13 +531,13 @@ export function NuevaCuentaModal({
                 </button>
               </div>
               <div className="cc-segmento cc-primer-mov-formula" role="group" aria-label="Tasa o comisión">
-                <button type="button" className={movFormula === "tasa" ? "activo" : ""} onClick={() => setMovFormula("tasa")} aria-pressed={movFormula === "tasa"}>
+                <button type="button" className={movFormula === "tasa" ? "activo" : ""} onClick={() => cambiarFormula("tasa")} aria-pressed={movFormula === "tasa"}>
                   Tasa
                 </button>
-                <button type="button" className={movFormula === "dividir" ? "activo" : ""} onClick={() => setMovFormula("dividir")} aria-pressed={movFormula === "dividir"}>
+                <button type="button" className={movFormula === "dividir" ? "activo" : ""} onClick={() => cambiarFormula("dividir")} aria-pressed={movFormula === "dividir"}>
                   Dividir ÷
                 </button>
-                <button type="button" className={movFormula === "comision" ? "activo" : ""} onClick={() => setMovFormula("comision")} aria-pressed={movFormula === "comision"}>
+                <button type="button" className={movFormula === "comision" ? "activo" : ""} onClick={() => cambiarFormula("comision")} aria-pressed={movFormula === "comision"}>
                   Comisión %
                 </button>
               </div>
