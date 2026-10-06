@@ -856,7 +856,7 @@ function FilaNueva({
   // Al pasar a "Comisión %" se propone el último porcentaje usado (queda guardado en este equipo)
   function activarPorcentaje() {
     setEsPorcentaje(true);
-    if (tasa.trim()) return;
+    if (tasa.trim() && !enCobro) return; // viniendo de dividir, lo escrito era una tasa: no sirve como %
     try {
       setTasa(pctCuenta || (recientes.porcentajes[0] ? formatearMonto(recientes.porcentajes[0]) : (localStorage.getItem(CLAVE_ULTIMA_COMISION) ?? "")));
     } catch {
@@ -864,10 +864,19 @@ function FilaNueva({
     }
   }
   const cobroCodigo = cuenta.moneda_cobro_codigo && cuenta.tasa_cobro ? cuenta.moneda_cobro_codigo : null;
+  // Dividir: lo que llega en otra moneda se divide por la tasa y queda en la moneda de la cuenta (82.500 COP ÷ 3.280 = 25,15 USD).
+  // Con moneda de cobro configurada es esa. En Confirmaciones se puede dividir siempre, como al crear el cliente:
+  // lo que llega es la moneda del medio; si es la misma de la cuenta, bolívares (o pesos si la cuenta no es en pesos).
+  const MONEDA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "USD", ZELLE: "USD" };
+  const delMedio = MONEDA_DEL_MEDIO[cuenta.canal_nombre];
+  const codigoDivision =
+    cobroCodigo ?? (enConfirmaciones ? (delMedio && delMedio !== cuenta.moneda_codigo ? delMedio : cuenta.moneda_codigo === "COP" ? "VES" : "COP") : null);
   function activarCobro() {
+    if (enCobro) return;
     setEnCobro(true);
     setEsPorcentaje(false);
-    if (cuenta.tasa_cobro) setTasa(formatearMonto(cuenta.tasa_cobro));
+    // viene la tasa de cobro de la cuenta; sin ella se escribe (lo que había era una tasa de multiplicar o un %)
+    setTasa(cuenta.tasa_cobro ? formatearMonto(cuenta.tasa_cobro) : "");
   }
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
@@ -1069,7 +1078,7 @@ function FilaNueva({
       descripcion:
         (pidePersona && personaCompleta ? `${referencia.trim()}${SEPARADOR_PERSONA}${personaCompleta}` : referencia.trim()) +
         // lo que se movió de verdad en la moneda de cobro queda anotado en la referencia
-        (enCobro && conTasa ? ` (${formatearMonto(sinSigno(nCantidad!))} ${cobroCodigo} a ${formatearMonto(nTasa!)})` : ""),
+        (enCobro && conTasa ? ` (${formatearMonto(sinSigno(nCantidad!))} ${codigoDivision} a ${formatearMonto(nTasa!)})` : ""),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
       ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje, comisionDescontada: esPorcentaje && comisionDescuenta, comisionIncluida: incluida } : { monto: montoConSigno }),
@@ -1223,7 +1232,7 @@ function FilaNueva({
           </button>
         </div>
         <label className="cc-c-num">
-          {enCobro ? `Cantidad en ${cobroCodigo}` : "Cantidad"}
+          {enCobro ? `Cantidad en ${codigoDivision}` : "Cantidad"}
           <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} inputMode="decimal" placeholder="700.000" autoComplete="off" />
           <small>{nCantidad ? formatearMonto(sinSigno(nCantidad)) : " "}</small>
         </label>
@@ -1255,9 +1264,15 @@ function FilaNueva({
             >
               Comisión %
             </button>
-            {cobroCodigo && (
-              <button type="button" className={enCobro ? "activo" : ""} onClick={activarCobro} aria-pressed={enCobro}>
-                En {cobroCodigo}
+            {codigoDivision && (
+              <button
+                type="button"
+                className={enCobro ? "activo" : ""}
+                onClick={activarCobro}
+                aria-pressed={enCobro}
+                title={`Lo que llega en ${codigoDivision} se divide por la tasa y queda en ${cuenta.moneda_codigo}`}
+              >
+                Dividir ÷
               </button>
             )}
           </div>
@@ -1382,7 +1397,7 @@ function FilaNueva({
         {enviando && <span className="cc-guardando">Guardando…</span>}
         {enCobro && monto && nCantidad && nEscrita && (
           <span className="cc-explica-comision">
-            {formatearMonto(sinSigno(nCantidad))} {cobroCodigo} ÷ {formatearMonto(nEscrita)} ={" "}
+            {formatearMonto(sinSigno(nCantidad))} {codigoDivision} ÷ {formatearMonto(nEscrita)} ={" "}
             <strong>
               {simbolo}
               {formatearMonto(monto)} {cuenta.moneda_codigo}
