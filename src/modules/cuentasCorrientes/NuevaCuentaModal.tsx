@@ -107,7 +107,10 @@ export function NuevaCuentaModal({
   const nMovMtcn = esWestern ? movMtcn.replace(/\D/g, "") : "";
   const movPersonaCompleta = [movPersona.trim(), nMovMtcn ? `MTCN ${nMovMtcn}` : ""].filter(Boolean).join(" ");
   const etiquetaMedio = medio ? (ETIQUETA_MEDIO[medio.nombre] ?? medio.nombre.replace(/_/g, " ")) : null;
-  const codigoMedio = medio ? (MONEDA_DEL_MEDIO[medio.nombre] ?? "COP") : "COP";
+  // Por Zelle hay clientes que traen dólares y clientes que traen pesos: se elige en cuál es este
+  const esZelle = medio?.nombre === "ZELLE";
+  const [monedaZelle, setMonedaZelle] = useState<"USD" | "COP">("USD");
+  const codigoMedio = esZelle ? monedaZelle : medio ? (MONEDA_DEL_MEDIO[medio.nombre] ?? "COP") : "COP";
   const nMovCantidad = movCantidad.trim() ? leerNumero(movCantidad)?.replace(/^-/, "") ?? null : null;
   const nMovValor = movValor.trim() ? leerNumero(movValor.replace(/%/g, "")) : null;
   // lo que multiplica a la cantidad: la tasa, o lo que queda tras la comisión (4% -> 0.96)
@@ -155,7 +158,10 @@ export function NuevaCuentaModal({
       if (quien) setMovPersona(quien);
       if (l.referencias.length) partes.push(`referencia ${l.referencias.join(" / ")}`);
       // si el comprobante está en otra moneda que la del medio elegido, se avisa: la cuenta no se cambia sola
-      const otraMoneda = l.moneda && medio && l.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${l.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
+      // por Zelle la moneda sale del comprobante (dólares o pesos)
+      const zelleSegunImagen = esZelle && (l.moneda === "USD" || l.moneda === "COP") ? l.moneda : null;
+      if (zelleSegunImagen) setMonedaZelle(zelleSegunImagen);
+      const otraMoneda = l.moneda && medio && !zelleSegunImagen && l.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${l.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
       setAvisoLectura(
         (partes.length
           ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}`
@@ -436,6 +442,16 @@ export function NuevaCuentaModal({
               {medio ? (
                 <>
                   Medio: <strong>{etiquetaMedio}</strong> · se mueve en <strong>{codigoMedio}</strong>. Se cambia en los botones de arriba.
+                  {esZelle && (
+                    <span className="cc-segmento cc-zelle-moneda" role="group" aria-label="Zelle en dólares o en pesos">
+                      <button type="button" className={monedaZelle === "USD" ? "activo" : ""} onClick={() => setMonedaZelle("USD")} aria-pressed={monedaZelle === "USD"}>
+                        Zelle en dólares
+                      </button>
+                      <button type="button" className={monedaZelle === "COP" ? "activo" : ""} onClick={() => setMonedaZelle("COP")} aria-pressed={monedaZelle === "COP"}>
+                        Zelle en pesos
+                      </button>
+                    </span>
+                  )}
                 </>
               ) : (
                 "Elegí arriba el medio: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle."
