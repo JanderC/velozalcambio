@@ -62,6 +62,7 @@ export interface FilaEstadoCuenta {
   tiene_comprobante: boolean; // tiene guardada la imagen del comprobante
   pagado_en: string | null; // cuándo se le pagó en Taquilla
   comision_descontada: boolean; // la tasa es el factor (0.96) de una comisión descontada: se muestra -4%
+  comision_incluida: boolean; // el % ya venía sumado en lo enviado: factor 1/1,06, se muestra +6%
   monto: string;
   total: string;
   anulado: boolean;
@@ -253,6 +254,7 @@ interface RegistrarMovimientoInput {
   tasaEsPorcentaje?: boolean;
   estadoConfirmacion?: "EN_PROCESO" | "CONFIRMADA"; // la transferencia entra confirmada o queda pendiente
   comisionDescontada?: boolean; // cantidad - comisión %: la tasa va como factor (4% -> "0.96")
+  comisionIncluida?: boolean; // el % ya venía sumado en lo enviado: cantidad ÷ (1 + %)
   cuentaDestino?: string;
   categoriaId?: number;
   cajaId?: number;

@@ -20,7 +20,7 @@ import {
   type SolicitudTaquilla,
   type Taquilla,
 } from "../../api/taquilla.api";
-import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { formatearMonto, leerNumero, pctDeComision, sumarDecimales } from "../../utils/montos";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import { OperacionesTaquilla } from "./OperacionesTaquilla";
 import "./taquilla.css";
@@ -462,7 +462,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
   }, [s.id, s.tiene_comprobante]);
 
   // Con comisión descontada la tasa guardada es lo que queda (0.9435): se muestra el % que se descontó
-  const comision = s.comision_descontada && s.tasa ? sumarDecimales("100", `-${multiplicarDecimales(s.tasa, "100", 6)}`) : null;
+  const comision = s.comision_descontada && s.tasa ? pctDeComision(s.tasa, s.comision_incluida) : null;
   const datos: [string, string | null][] = [
     ["Cliente", s.cliente_nombre],
     ["Cédula", s.cliente_cedula],
@@ -473,7 +473,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
     ["Referencia de la transferencia", referenciaDe(s) || null],
     ["Cuenta a la que se pagó", s.cuenta_destino],
     ["Envió", s.cantidad_base ? formatearMonto(s.cantidad_base.replace(/^-/, "")) : null],
-    [comision ? "Comisión" : "Tasa", comision ? `${formatearMonto(comision)}%` : s.tasa ? formatearMonto(s.tasa) : null],
+    [comision ? (s.comision_incluida ? "Comisión (ya sumada en lo enviado)" : "Comisión") : "Tasa", comision ? `${formatearMonto(comision)}%` : s.tasa ? formatearMonto(s.tasa) : null],
     ["Recibe", dinero(s.monto, s.moneda_codigo)],
     ["Registrada", `${fechaHora(s.fecha)} por ${s.registrado_por_nombre}`],
     ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada${s.pagado_caja_nombre ? ` en ${s.pagado_caja_nombre}` : ""} ${s.pagado_medio === "BANCOLOMBIA" ? "por Bancolombia" : "en efectivo"} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],

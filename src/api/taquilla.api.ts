@@ -29,6 +29,7 @@ export interface SolicitudTaquilla {
   cantidad_base: string | null;
   tasa: string | null;
   comision_descontada: boolean;
+  comision_incluida: boolean; // el % ya venía sumado en lo enviado
   cuenta_destino: string | null;
   // EN_PROCESO: Western todavía no la confirmó y no se puede pagar
   estado_confirmacion: "EN_PROCESO" | "CONFIRMADA" | null;

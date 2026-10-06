@@ -31,7 +31,7 @@ import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
-import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, pctDeComision, sumarDecimales } from "../../utils/montos";
 import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 import { CobroModal } from "./CobroModal";
 import { leerComprobante } from "./ocrComprobante";
@@ -60,9 +60,9 @@ function telefonoWhatsApp(telefono: string | null) {
 }
 
 /** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
-function tasaTexto(tasa: string, esPorcentaje: boolean, descontada = false) {
-  // comisión descontada: se guarda el factor (0.96) y se muestra -4%
-  if (descontada) return `-${formatearMonto(sumarDecimales("100", `-${multiplicarDecimales(tasa, "100", 6)}`))}%`;
+function tasaTexto(tasa: string, esPorcentaje: boolean, descontada = false, incluida = false) {
+  // comisión descontada: se guarda el factor (0.96) y se muestra -4%; si el % ya venía sumado en lo enviado, +6%
+  if (descontada) return `${incluida ? "+" : "-"}${formatearMonto(pctDeComision(tasa, incluida))}%`;
   return esPorcentaje ? `${formatearMonto(multiplicarDecimales(tasa, "100", 6))}%` : formatearMonto(tasa);
 }
 
@@ -313,7 +313,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     descripcion: m.descripcion ?? m.tipo,
     // operación con comisión descontada: el total enviado y el % (la tasa guardada es lo que queda: 0.9435 -> 5,65%)
     ...(m.comision_descontada && m.cantidad_base && m.tasa
-      ? { enviado: m.cantidad_base.replace(/^-/, ""), comision: sumarDecimales("100", `-${multiplicarDecimales(m.tasa, "100", 6)}`) }
+      ? { enviado: m.cantidad_base.replace(/^-/, ""), comision: pctDeComision(m.tasa, m.comision_incluida) }
       : {}),
     ...(m.estado_confirmacion === "EN_PROCESO"
       ? { sentido: "proceso" as const }
@@ -602,7 +602,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
                   {m.movimiento_caja_id && <span className="cc-chip-caja">caja</span>}
                 </td>
                 <td className="num">{m.cantidad_base ? <Monto valor={m.cantidad_base} simbolo="" /> : ""}</td>
-                <td className="num">{m.tasa ? tasaTexto(m.tasa, m.tasa_es_porcentaje, m.comision_descontada) : ""}</td>
+                <td className="num">{m.tasa ? tasaTexto(m.tasa, m.tasa_es_porcentaje, m.comision_descontada, m.comision_incluida) : ""}</td>
                 <td className="num">
                   <Monto valor={m.monto} simbolo={simbolo} />
                 </td>
@@ -742,6 +742,8 @@ function FilaNueva({
   // Si se cambia la tasa que venía puesta, queda esa para los próximos movimientos (la última usada).
   // Se puede desmarcar cuando es una tasa de una sola vez.
   const [mantenerTasa, setMantenerTasa] = useState(true);
+  // Comisión: el % ya viene sumado en lo que envió el cliente (mandó 10.600 = 10.000 + 6%): recibe 10.600 ÷ 1,06
+  const [comisionIncluida, setComisionIncluida] = useState(false);
   // Leer la imagen del comprobante: llena el número de referencia, el monto y la fecha
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
@@ -850,7 +852,12 @@ function FilaNueva({
   const nEscrita = tasa.trim() ? leerNumero(tasa.replace(/%/g, "")) : null;
   const fraccion = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : null;
   // con comisión descontada el multiplicador es lo que queda: 4% -> 0.96
-  const nTasa = fraccion ? (comisionDescuenta ? sumarDecimales("1", `-${fraccion}`) : fraccion) : nEscrita;
+  // (o, si el % ya venía sumado en lo enviado, lo que hay que sacarle: 6% -> 1 ÷ 1,06)
+  const incluida = comisionDescuenta && esPorcentaje && comisionIncluida;
+  const nTasa = fraccion ? (comisionDescuenta ? factorDeComision(nEscrita!, incluida) : fraccion) : nEscrita;
+  // lo que daría de la otra forma, para elegir de un vistazo
+  const montoSiIncluida =
+    comisionDescuenta && esPorcentaje && nCantidad && nEscrita && /[1-9]/.test(nEscrita) ? multiplicarDecimales(nCantidad.replace(/^-/, ""), factorDeComision(nEscrita, true), Number(cuenta.moneda_decimales ?? 0)) : null;
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
   const conTasa = tasa.trim() !== "";
   // Ventas y abonos: se puede anotar quién hizo la transferencia; si entró por Zelle es obligatorio
@@ -990,6 +997,7 @@ function FilaNueva({
     const tasaSiguiente = tasaModificada && mantenerTasa ? formatearMonto(nEscrita!) : tasaPuesta;
     setRecientes((r) => (tasaModificada && mantenerTasa ? { ...r, tasaHabitual: nEscrita! } : r));
     setMantenerTasa(true);
+    setComisionIncluida(false);
     setReferencia(referenciaPuesta);
     setPersona("");
     setCuentaDestino("");
@@ -1016,7 +1024,7 @@ function FilaNueva({
         (enCobro && conTasa ? ` (${formatearMonto(sinSigno(nCantidad!))} ${cobroCodigo} a ${formatearMonto(nTasa!)})` : ""),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
       fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
-      ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje, comisionDescontada: esPorcentaje && comisionDescuenta } : { monto: montoConSigno }),
+      ...(conTasa && !enCobro ? { cantidadBase: `${signo}${sinSigno(nCantidad!)}`, tasa: nTasa!, tasaEsPorcentaje: esPorcentaje, comisionDescontada: esPorcentaje && comisionDescuenta, comisionIncluida: incluida } : { monto: montoConSigno }),
       cuentaDestino: cuentaDestino.trim() || undefined,
       ...(llevaConfirmacion
         ? { estadoConfirmacion: confirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) }
@@ -1237,6 +1245,17 @@ function FilaNueva({
           </button>
         </p>
       )}
+      {comisionDescuenta && esPorcentaje && nEscrita && (
+        <label className="cc-check cc-mantener-tasa">
+          <input type="checkbox" checked={comisionIncluida} onChange={(e) => setComisionIncluida(e.target.checked)} />
+          Lo enviado ya trae el {formatearMonto(nEscrita)}% sumado
+          <small>
+            {montoSiIncluida
+              ? `Marcalo si mandó el monto con la comisión encima: recibe ${simbolo}${formatearMonto(montoSiIncluida)} y queda registrado lo que envió.`
+              : "Ej.: mandó 10.600 = 10.000 + 6%. Recibe 10.000 y queda registrado que envió 10.600."}
+          </small>
+        </label>
+      )}
       {tasaModificada && (
         <label className="cc-check cc-mantener-tasa">
           <input type="checkbox" checked={mantenerTasa} onChange={(e) => setMantenerTasa(e.target.checked)} />
@@ -1318,7 +1337,12 @@ function FilaNueva({
         )}
         {esPorcentaje && monto && nCantidad && nEscrita && (
           <span className="cc-explica-comision">
-            {comisionDescuenta ? (
+            {incluida ? (
+              <>
+                {simbolo}
+                {formatearMonto(sinSigno(nCantidad))} ya trae el {formatearMonto(nEscrita)}% sumado ={" "}
+              </>
+            ) : comisionDescuenta ? (
               <>
                 {simbolo}
                 {formatearMonto(sinSigno(nCantidad))} − {formatearMonto(nEscrita)}% de comisión ={" "}

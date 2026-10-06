@@ -6,7 +6,7 @@ import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { leerComprobante } from "./ocrComprobante";
 import { ApiError } from "../../api/client";
-import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
 const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
@@ -90,6 +90,8 @@ export function NuevaCuentaModal({
   //   comisión: al monto se le descuenta la comisión (1.000 − 4% = 960), en la moneda del medio
   // La que se use queda guardada para los próximos movimientos de ese cliente.
   const [movFormula, setMovFormula] = useState<"tasa" | "dividir" | "comision">("tasa");
+  // Comisión: el % ya viene sumado en lo que envió (mandó 10.600 = 10.000 + 6%)
+  const [movIncluida, setMovIncluida] = useState(false);
   const [movDestino, setMovDestino] = useState<"USD" | "USDT">("USD"); // a qué se llevan los pesos al dividir
   const [movResta, setMovResta] = useState(false);
   const [movCantidad, setMovCantidad] = useState("");
@@ -109,7 +111,7 @@ export function NuevaCuentaModal({
   const nMovCantidad = movCantidad.trim() ? leerNumero(movCantidad)?.replace(/^-/, "") ?? null : null;
   const nMovValor = movValor.trim() ? leerNumero(movValor.replace(/%/g, "")) : null;
   // lo que multiplica a la cantidad: la tasa, o lo que queda tras la comisión (4% -> 0.96)
-  const movFactor = !nMovValor || movFormula === "dividir" ? null : movFormula === "comision" ? sumarDecimales("1", `-${multiplicarDecimales(nMovValor, "0.01", 8)}`) : nMovValor;
+  const movFactor = !nMovValor || movFormula === "dividir" ? null : movFormula === "comision" ? factorDeComision(nMovValor, movIncluida) : nMovValor;
   // por tasa la cuenta queda en pesos; con comisión (o sin tasa) queda en la moneda del medio
   const codigoCuenta = movFormula === "dividir" ? movDestino : movFormula === "tasa" && movFactor ? "COP" : codigoMedio;
   const movMonto = !nMovCantidad
@@ -247,7 +249,7 @@ export function NuevaCuentaModal({
                 ? { estadoConfirmacion: "CONFIRMADA" as const }
                 : {}),
             ...(movFactor
-              ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true } : {}) }
+              ? { cantidadBase: `${signo}${nMovCantidad!}`, tasa: movFactor, ...(movFormula === "comision" ? { tasaEsPorcentaje: true, comisionDescontada: true, comisionIncluida: movIncluida } : {}) }
               : { monto: `${signo}${movMonto!}` }),
           });
           // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
@@ -384,29 +386,29 @@ export function NuevaCuentaModal({
         )}
         {!enLinea && (
           <>
-        <div className="cc-modal-fila">
-          <label>
-            Banco o canal de pago (opcional)
-            <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? onPersonalizar() : setCanalId(e.target.value ? Number(e.target.value) : ""))}>
-              <option value="">Sin banco</option>
-              {canales.filter((c) => c.nombre !== "SIN_BANCO").map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre.replace(/_/g, " ")}
-                </option>
-              ))}
-              <option value="personalizar">Personalizar…</option>
-            </select>
-          </label>
-          <label>
-            Moneda de la contabilidad
-            <select value={monedaId} onChange={(e) => setMonedaId(e.target.value ? Number(e.target.value) : "")}>
-              {monedas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.codigo} · {m.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="cc-modal-fila">
+          <label>
+            Banco o canal de pago (opcional)
+            <select value={canalId} onChange={(e) => (e.target.value === "personalizar" ? onPersonalizar() : setCanalId(e.target.value ? Number(e.target.value) : ""))}>
+              <option value="">Sin banco</option>
+              {canales.filter((c) => c.nombre !== "SIN_BANCO").map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre.replace(/_/g, " ")}
+                </option>
+              ))}
+              <option value="personalizar">Personalizar…</option>
+            </select>
+          </label>
+          <label>
+            Moneda de la contabilidad
+            <select value={monedaId} onChange={(e) => setMonedaId(e.target.value ? Number(e.target.value) : "")}>
+              {monedas.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.codigo} · {m.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
           </>
         )}
@@ -489,10 +491,16 @@ export function NuevaCuentaModal({
                 <output className={`cc-resultado ${movResta ? "cc-neg" : ""}`}>{movMonto ? `${movResta ? "- " : ""}${formatearMonto(movMonto)}` : "—"}</output>
               </label>
             </div>
+            {movFormula === "comision" && (
+              <label className="cc-check">
+                <input type="checkbox" checked={movIncluida} onChange={(e) => setMovIncluida(e.target.checked)} />
+                Lo enviado ya trae el % sumado (mandó 10.600 = 10.000 + 6%: recibe 10.000)
+              </label>
+            )}
             <small className="cc-primer-mov-nota">
               {movFormula === "comision"
                 ? nMovCantidad && nMovValor && movMonto
-                  ? `${formatearMonto(nMovCantidad)} − ${formatearMonto(nMovValor)}% de comisión = ${formatearMonto(movMonto)} ${codigoCuenta}. Esta comisión queda guardada para los próximos movimientos del cliente.`
+                  ? `${formatearMonto(nMovCantidad)} ${movIncluida ? `ya trae el ${formatearMonto(nMovValor)}% sumado` : `− ${formatearMonto(nMovValor)}% de comisión`} = ${formatearMonto(movMonto)} ${codigoCuenta}. Esta comisión queda guardada para los próximos movimientos del cliente.`
                   : "A la cantidad se le descuenta la comisión: 1.000 − 4% = 960. Queda guardada para los próximos movimientos del cliente."
                 : movFormula === "dividir"
                   ? nMovCantidad && nMovValor && movMonto

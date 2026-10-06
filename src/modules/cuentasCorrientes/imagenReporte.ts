@@ -1,5 +1,5 @@
 import type { EstadoCuenta } from "../../api/cuentasCorrientes.api";
-import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { formatearMonto, multiplicarDecimales, pctDeComision, sumarDecimales } from "../../utils/montos";
 
 const ANCHO = 1080;
 const MARGEN = 28;
@@ -180,7 +180,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titu
     if (m.tasa) {
       const enPorciento = formatearMonto(multiplicarDecimales(m.tasa, "100", 6));
       // comisión descontada: el factor 0.96 se muestra como -4%
-      const tasaTexto = m.comision_descontada ? `-${formatearMonto(sumarDecimales("100", `-${multiplicarDecimales(m.tasa, "100", 6)}`))}%` : m.tasa_es_porcentaje ? `${enPorciento}%` : formatearMonto(m.tasa);
+      const tasaTexto = m.comision_descontada ? `${m.comision_incluida ? "+" : "-"}${formatearMonto(pctDeComision(m.tasa, m.comision_incluida))}%` : m.tasa_es_porcentaje ? `${enPorciento}%` : formatearMonto(m.tasa);
       texto(tasaTexto, "tasa", medio, "#4b5563");
     }
     texto(dinero(m.monto), "monto", medio, colorMonto(m.monto));

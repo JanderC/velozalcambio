@@ -102,6 +102,24 @@ export function dividirDecimales(a: string, b: string, decimales: number): strin
   return (negativo && cociente !== 0n ? "-" : "") + entero + (dec ? `.${dec}` : "");
 }
 
+/**
+ * El % de comisión a partir del factor guardado en el movimiento.
+ *   descontada: enviado − %  -> factor 0,96 -> 4
+ *   incluida:   el % ya venía sumado en lo enviado (10.600 = 10.000 + 6%) -> factor 1/1,06 -> 6
+ */
+export function pctDeComision(factor: string, incluida: boolean): string {
+  const resta = sumarDecimales("100", `-${multiplicarDecimales(factor, "100", 6)}`); // (1 - factor) x 100
+  if (!incluida) return resta;
+  return dividirDecimales(resta, factor, 3) ?? resta; // (1 - factor) / factor x 100
+}
+
+/** El factor por el que se multiplica lo enviado: 1 − % (descontada) o 1 ÷ (1 + %) (ya sumada). pct como se escribe: "6". */
+export function factorDeComision(pct: string, incluida: boolean): string {
+  const fraccion = multiplicarDecimales(pct, "0.01", 8);
+  if (!incluida) return sumarDecimales("1", `-${fraccion}`);
+  return dividirDecimales("1", sumarDecimales("1", fraccion), 10) ?? "1";
+}
+
 export function sumarDecimales(a: string, b: string): string {
   const escala = Math.max(a.split(".")[1]?.length ?? 0, b.split(".")[1]?.length ?? 0);
   const aEntero = (v: string) => {
