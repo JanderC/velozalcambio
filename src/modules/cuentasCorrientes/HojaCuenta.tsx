@@ -32,6 +32,7 @@ import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 import { CobroModal } from "./CobroModal";
 import { leerComprobante } from "./ocrComprobante";
 
@@ -464,7 +465,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           <Lock size={14} /> {cerrando ? "Cerrando…" : estado?.cierre ? "Volver a cerrar y enviar" : "Cerrar día y enviar"}
         </button>
         {telefono && (
-          <a className="cc-whatsapp" href={`https://wa.me/${telefono}?text=${encodeURIComponent(mensajeSaldo)}`} target="_blank" rel="noreferrer" title={ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
+          <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeSaldo)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeSaldo)} target="_blank" rel="noreferrer" title={ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
             <MessageCircle size={14} /> {esConfirmaciones ? (ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
           </a>
         )}
@@ -481,7 +482,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
           <p>{mensajeAbono}</p>
           <div className="cc-aviso-abono-acciones">
             {/* Desde el WhatsApp personal, con el enlace de WhatsApp: siempre está. Sin teléfono registrado, se elige el contacto allá. */}
-            <a className="cc-whatsapp" href={`https://wa.me/${telefono ?? ""}?text=${encodeURIComponent(mensajeAbono)}`} target="_blank" rel="noreferrer">
+            <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeAbono)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeAbono)} target="_blank" rel="noreferrer">
               <MessageCircle size={14} /> Enviar desde mi WhatsApp
             </a>
             {telefono ? (

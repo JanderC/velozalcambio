@@ -14,6 +14,7 @@ import {
 } from "../../api/taquilla.api";
 import { DolaresPorBillete } from "./DolaresPorBillete";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 
 // Las monedas que se compran, se venden o se convierten en la ventanilla
 const MONEDAS: { codigo: string; nombre: string }[] = [
@@ -488,7 +489,8 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
                   {o.estado !== "ANULADA" && (
                     <a
                       className="cc-whatsapp"
-                      href={`https://wa.me/${wa ?? ""}?text=${encodeURIComponent(mensaje)}`}
+                      href={enlaceWhatsApp(wa, mensaje)}
+                      onClick={(e) => alAbrirWhatsApp(e, wa, mensaje)}
                       target="_blank"
                       rel="noreferrer"
                       title={wa ? "Enviarle la descripción al cliente por WhatsApp" : "Sin teléfono: al abrir WhatsApp elegís el contacto"}
