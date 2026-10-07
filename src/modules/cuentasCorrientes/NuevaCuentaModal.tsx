@@ -304,6 +304,8 @@ export function NuevaCuentaModal({
             terceroId: cuenta.tercero_id,
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
+            // el movimiento queda con el medio elegido arriba (el cliente puede haberse registrado con otro)
+            ...(enLinea && medio ? { canalMovimientoId: medio.id } : {}),
             tipo: movResta ? "ABONO" : "CARGO",
             // la referencia sale del medio: "Compra Zelle" o "Venta Zelle"
             descripcion:

@@ -75,7 +75,9 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
 
   const cargar = useCallback(async () => {
     try {
-      setCuentas(await getCuentasCorrientes({ canalId: canalId || undefined, tipoTercero: tipo || undefined, buscar, vista: modo }));
+      // En Confirmaciones el medio elegido arriba NO filtra la lista: el cliente es uno solo aunque cambie de medio.
+      // Ese botón solo dice con qué medio entra el próximo movimiento.
+      setCuentas(await getCuentasCorrientes({ canalId: modo === "cajas" ? undefined : canalId || undefined, tipoTercero: tipo || undefined, buscar, vista: modo }));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -105,8 +107,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
 
   // En Cuentas por Cobrar: primero las deudas más grandes
   const visibles = useMemo(() => {
-    // En Confirmaciones no se listan todos al entrar: solo lo que se busca o se filtra por banco
-    if (modo === "cajas" && !buscar.trim() && canalId === "") return [];
+    // En Confirmaciones no se listan todos al entrar: solo lo que se busca
+    if (modo === "cajas" && !buscar.trim()) return [];
     if (!enCobrar) return cuentas;
     const filtradas = cuentas.filter((c) => (sentido === "me-deben" ? conSaldo(c) && !yoDebo(c) : sentido === "yo-debo" ? yoDebo(c) : true));
     return [...filtradas].sort((a, b) => Math.abs(Number(b.saldo_actual)) - Math.abs(Number(a.saldo_actual)));
@@ -135,11 +137,11 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           />
         </div>
       )}
-      {/* Confirmaciones: los medios van arriba, bajo el buscador. Filtran la lista y definen el medio del movimiento. */}
+      {/* Confirmaciones: los medios van arriba, bajo el buscador. Definen con qué medio entra el movimiento; no filtran clientes. */}
       {enConfirmaciones && (
-        <div className="cc-chips cc-medios-top" role="tablist" aria-label="Medio">
-          <button role="tab" aria-selected={canalId === ""} className={canalId === "" ? "activo" : ""} onClick={() => setCanalId("")}>
-            Todos
+        <div className="cc-chips cc-medios-top" role="tablist" aria-label="Medio del movimiento">
+          <button role="tab" aria-selected={canalId === ""} className={canalId === "" ? "activo" : ""} onClick={() => setCanalId("")} title="El movimiento entra con el medio con que se registró el cliente">
+            Medio del cliente
           </button>
           {bancosConfirmaciones.map((c) => (
             <button key={c.id} role="tab" aria-selected={canalId === c.id} className={canalId === c.id ? "activo" : ""} onClick={() => setCanalId(c.id)}>
@@ -219,7 +221,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           {cargando && <p className="cc-lista-aviso">Cargando…</p>}
           {!cargando && visibles.length === 0 && !error && (
             <p className="cc-lista-aviso">
-              {buscar || tipo || sentido || canalId
+              {buscar || tipo || sentido || (canalId && modo !== "cajas")
                 ? modo === "cajas"
                   ? "No hay ningún cliente con ese dato."
                   : "Ninguna cuenta coincide."
@@ -281,7 +283,13 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
         </aside>
 
         {seleccionada ? (
-          <HojaCuenta key={seleccionada.id} cuenta={seleccionada} onActualizar={cargar} onVolver={() => setSeleccionadaId(null)} />
+          <HojaCuenta
+            key={seleccionada.id}
+            cuenta={seleccionada}
+            onActualizar={cargar}
+            onVolver={() => setSeleccionadaId(null)}
+            medio={enConfirmaciones ? (canales.find((c) => c.id === canalId) ?? null) : null}
+          />
         ) : enConfirmaciones && puedeCrear ? (
           // Confirmaciones: sin cliente abierto, el formulario para registrar uno nuevo está siempre a la vista
           <div className="cc-hoja cc-crear-panel">

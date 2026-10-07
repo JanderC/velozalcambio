@@ -101,7 +101,19 @@ function Monto({ valor, simbolo = "$" }: { valor: string; simbolo?: string }) {
  * La hoja de una cuenta, igual que el Excel: FECHA · REFERENCIA · CANTIDAD · TASA · MONTO · TOTAL,
  * con el saldo pendiente arriba y una fila para cargar el siguiente movimiento.
  */
-export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaCorrienteResumen; onActualizar: () => void; onVolver: () => void }) {
+export function HojaCuenta({
+  cuenta,
+  onActualizar,
+  onVolver,
+  medio = null,
+}: {
+  cuenta: CuentaCorrienteResumen;
+  onActualizar: () => void;
+  onVolver: () => void;
+  // Confirmaciones: el medio elegido arriba para el próximo movimiento. El cliente se registra una sola vez y cada
+  // movimiento lleva su medio (hoy por Nequi, mañana por Bancolombia). Sin elegir, va el medio con que se registró.
+  medio?: { id: number; nombre: string } | null;
+}) {
   const { usuario } = useAuth();
   const puedeAnular = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
   // La hoja es diaria: se ve y se cierra un día a la vez
@@ -674,6 +686,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
       {cuenta.estado === "DISPONIBLE" ? (
         <FilaNueva
           cuenta={actual}
+          medioElegido={medio}
           saldo={estado?.cuenta.saldo_actual ?? cuenta.saldo_actual}
           referencias={referencias}
           onGuardado={(abono) => {
@@ -694,11 +707,13 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
 
 function FilaNueva({
   cuenta,
+  medioElegido = null,
   saldo,
   referencias,
   onGuardado,
 }: {
   cuenta: CuentaCorrienteResumen;
+  medioElegido?: { id: number; nombre: string } | null;
   saldo: string;
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
@@ -718,6 +733,9 @@ function FilaNueva({
   // Confirmaciones: en vez de suma/abono se habla de "Compra" (le compramos al cliente lo que nos pasa: nos resta pesos o dólares
   // y queda a su favor hasta que se le paga) y "Venta" (le vendemos bolívares o dólares: nos aumenta el saldo en pesos)
   const enConfirmaciones = cuenta.modulo === "CAJA";
+  // El medio de ESTE movimiento: en Confirmaciones, el elegido arriba; si no se eligió, el medio con que se registró el cliente
+  const medioMov = enConfirmaciones && medioElegido ? medioElegido : { id: cuenta.canal_id, nombre: cuenta.canal_nombre };
+  const medioCambiado = medioMov.id !== cuenta.canal_id;
   // qué referencias restan: en Confirmaciones, las ventas; en los demás módulos, los abonos
   const restaSegunReferencia = (r: string) => (enConfirmaciones ? /^\s*(venta|recibe)/i.test(r) : restaPorReferencia(r));
   const comisionDescuenta = cuenta.formula === "COMISION";
@@ -852,7 +870,7 @@ function FilaNueva({
   // Con moneda de cobro configurada es esa. En Confirmaciones se puede dividir siempre, como al crear el cliente:
   // lo que llega es la moneda del medio; si es la misma de la cuenta, bolívares (o pesos si la cuenta no es en pesos).
   const MONEDA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "USD", ZELLE: "USD" };
-  const delMedio = MONEDA_DEL_MEDIO[cuenta.canal_nombre];
+  const delMedio = MONEDA_DEL_MEDIO[medioMov.nombre];
   const codigoDivision =
     cobroCodigo ?? (enConfirmaciones ? (delMedio && delMedio !== cuenta.moneda_codigo ? delMedio : cuenta.moneda_codigo === "COP" ? "VES" : "COP") : null);
   function activarCobro() {
@@ -905,11 +923,11 @@ function FilaNueva({
   // Quién envió o el número de la transferencia: siempre se puede anotar; si entró por Zelle es obligatorio
   const pidePersona = !referencia.includes(SEPARADOR_PERSONA);
   // Si se anota un número de transferencia, no puede haber ya un movimiento con ese número
-  const esWestern = /western/i.test(referencia) || cuenta.canal_nombre === "WESTERN_UNION";
+  const esWestern = /western/i.test(referencia) || medioMov.nombre === "WESTERN_UNION";
   const nMtcn = esWestern ? mtcn.replace(/\D/g, "") : "";
   // quién envió + el MTCN: así queda en la referencia del movimiento y entra en la revisión de números repetidos
   // Western Union y Zelle tardan en verificarse: pueden quedar pendientes, y ahí se elige si ya están confirmadas
-  const esZelle = /zelle/i.test(referencia) || cuenta.canal_nombre === "ZELLE";
+  const esZelle = /zelle/i.test(referencia) || medioMov.nombre === "ZELLE";
   const llevaConfirmacion = esWestern || (enConfirmaciones && !resta && esZelle);
   // en Confirmaciones, una Compra que no es por Western entra confirmada de una vez: pasa directo a Taquilla
   const confirmadaDirecto = enConfirmaciones && !resta && !llevaConfirmacion;
@@ -920,7 +938,7 @@ function FilaNueva({
   const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
   // En Confirmaciones el bloqueo es por medio de pago (el del cliente): la misma referencia puede estar en Bancolombia
   // y en Nequi, pero no dos veces en el mismo medio. En los demás módulos el medio no es el canal: se busca en todos.
-  const canalDelBloqueo = enConfirmaciones ? cuenta.canal_id : undefined;
+  const canalDelBloqueo = enConfirmaciones ? medioMov.id : undefined;
   useEffect(() => {
     setRepetido(null);
     if (!numeroMovimiento) return;
@@ -936,7 +954,7 @@ function FilaNueva({
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   // Confirmaciones: si no se escribe la operación, es "Compra Nequi" / "Venta Zelle"… según el botón y el medio del cliente.
   // (La referencia de la transferencia es el otro casillero: llenar ese no tiene que pedir este.)
-  const medioDelCliente = cuenta.canal_nombre === "SIN_BANCO" ? "" : cuenta.canal_nombre.toLowerCase().replace(/_/g, " ").replace(/(^|\s)\S/g, (l) => l.toUpperCase());
+  const medioDelCliente = medioMov.nombre === "SIN_BANCO" ? "" : medioMov.nombre.toLowerCase().replace(/_/g, " ").replace(/(^|\s)\S/g, (l) => l.toUpperCase());
   const operacionPorDefecto = `${resta ? "Venta" : "Compra"}${medioDelCliente ? ` ${medioDelCliente}` : ""}`;
   const referenciaFinal = referencia.trim() || (enConfirmaciones ? operacionPorDefecto : "");
   const sinSigno = (v: string) => v.replace(/^-/, "");
@@ -1075,6 +1093,8 @@ function FilaNueva({
       terceroId: cuenta.tercero_id,
       canalId: cuenta.canal_id,
       monedaId: cuenta.moneda_id,
+      // Confirmaciones: el movimiento queda con su medio (puede no ser el medio con que se registró el cliente)
+      ...(enConfirmaciones ? { canalMovimientoId: medioMov.id } : {}),
       tipo: resta ? ("ABONO" as const) : ("CARGO" as const),
       descripcion:
         (pidePersona && personaCompleta ? `${referenciaFinal}${SEPARADOR_PERSONA}${personaCompleta}` : referenciaFinal) +
@@ -1174,6 +1194,13 @@ function FilaNueva({
           <X size={18} />
         </button>
       </div>
+      {/* Confirmaciones: con qué medio entra este movimiento. El cliente es el mismo aunque cambie de medio. */}
+      {enConfirmaciones && medioMov.nombre !== "SIN_BANCO" && (
+        <p className={`cc-medio-mov ${medioCambiado ? "cambiado" : ""}`}>
+          Medio de este movimiento: <strong>{medioDelCliente}</strong>
+          {medioCambiado ? " (elegido arriba)" : " · para registrarlo por otro medio, elegilo en los botones de arriba"}
+        </p>
+      )}
       <div className="cc-nueva-campos">
         <label className="cc-c-fecha">
           Fecha

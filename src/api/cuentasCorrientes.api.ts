@@ -281,6 +281,7 @@ interface RegistrarMovimientoInput {
   estadoConfirmacion?: "EN_PROCESO" | "CONFIRMADA"; // la transferencia entra confirmada o queda pendiente
   comisionDescontada?: boolean; // cantidad - comisión %: la tasa va como factor (4% -> "0.96")
   comisionIncluida?: boolean; // el % ya venía sumado en lo enviado: cantidad ÷ (1 + %)
+  canalMovimientoId?: number; // Confirmaciones: el medio de ESTE movimiento (el cliente es uno solo, el medio va por movimiento)
   cuentaDestino?: string;
   categoriaId?: number;
   cajaId?: number;
