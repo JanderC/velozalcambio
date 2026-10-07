@@ -236,9 +236,7 @@ export function NuevaCuentaModal({
       if (!nMovCantidad || !/[1-9]/.test(nMovCantidad)) return setError("La cantidad del movimiento no es un número válido.");
       if (movValor.trim() && (!nMovValor || !/[1-9]/.test(nMovValor) || nMovValor.startsWith("-"))) return setError(movFormula === "comision" ? "La comisión no es un número válido." : "La tasa no es un número válido.");
       if (movFormula === "comision" && nMovValor && Number(nMovValor) >= 100) return setError("La comisión tiene que ser menor al 100%.");
-      if (movFormula === "tasa" && !movFactor && codigoMedio !== "COP") return setError(`Escribí la tasa para pasar ${codigoMedio} a ${movDestinoTasa}, o usá comisión.`);
-      if (movFormula === "tasa" && movFactor && codigoMedio === movDestinoTasa) return setError(`El medio elegido ya se mueve en ${movDestinoTasa}: elegí otra moneda en "Llevar a" o usá comisión.`);
-      if (movFormula === "dividir" && !nMovValor) return setError(`Escribí la tasa para dividir y llevar ${codigoMedio} a ${movDestino}.`);
+      if (movFormula === "tasa" && !movFactor && codigoMedio !== "COP") return setError(`Escribí la tasa para pasar ${codigoMedio} a ${movDestinoTasa}, o usá comisión.`);      if (movFormula === "dividir" && !nMovValor) return setError(`Escribí la tasa para dividir y llevar ${codigoMedio} a ${movDestino}.`);
       if (movFormula === "dividir" && codigoMedio === movDestino) return setError(`El medio elegido ya se mueve en ${movDestino}: no hay nada que dividir.`);
       if (!movMonto || !/[1-9]/.test(movMonto)) return setError("El monto del movimiento da cero: revisá la cantidad.");
       if (esWestern && nMovMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
@@ -552,7 +550,9 @@ export function NuevaCuentaModal({
                   <select value={destinoElegido} onChange={(e) => (movFormula === "dividir" ? setMovDestino : setMovDestinoTasa)(e.target.value)}>
                     {/* todas las monedas, menos la que ya trae el medio (no habría nada que convertir) */}
                     {monedas
-                      .filter((m) => m.codigo !== codigoMedio || m.codigo === destinoElegido)
+                      // al dividir no se lista la moneda del medio (no habría nada que dividir); al multiplicar sí,
+                      // porque por Nequi o Bancolombia se anota la cantidad vendida × tasa = pesos
+                      .filter((m) => movFormula !== "dividir" || m.codigo !== codigoMedio || m.codigo === destinoElegido)
                       .map((m) => (
                         <option key={m.id} value={m.codigo}>
                           {m.nombre} ({m.codigo})
