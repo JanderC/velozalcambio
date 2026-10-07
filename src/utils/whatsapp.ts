@@ -2,6 +2,15 @@ import type { MouseEvent } from "react";
 
 const esTelefono = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+/** Teléfono como lo pide WhatsApp: solo dígitos y con código de país (celular colombiano o venezolano sin él -> se le agrega). */
+export function telefonoWhatsApp(telefono: string | null | undefined) {
+  const d = (telefono ?? "").replace(/\D/g, "").replace(/^00/, "");
+  if (d.length < 8) return null;
+  if (d.length === 10 && d.startsWith("3")) return `57${d}`;
+  if (d.length === 11 && d.startsWith("04")) return `58${d.slice(1)}`;
+  return d;
+}
+
 /** El enlace de WhatsApp con el mensaje ya escrito (wa.me). Sin teléfono, allá se elige el contacto. */
 export function enlaceWhatsApp(telefono: string | null | undefined, mensaje: string) {
   return `https://wa.me/${telefono ?? ""}?text=${encodeURIComponent(mensaje)}`;

@@ -9,7 +9,6 @@ import {
   eliminarCuentaCorriente,
   type MovimientoConNumero,
   cerrarDiaCuenta,
-  cambiarModuloCuentaCorriente,
   configurarCobroCuenta,
   descargarExcelEstadoCuenta,
   getCanales,
@@ -186,22 +185,6 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     try {
       await anularMovimientoCC(id);
       await cargar();
-      onActualizar();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-
-  // Pasarla a Cuentas por Cobrar (sale de Cuentas Corrientes y se sigue llevando igual allá), o devolverla
-  async function mover() {
-    const destino = cuenta.modulo === "POR_COBRAR" ? "CORRIENTE" : "POR_COBRAR";
-    const pregunta =
-      destino === "POR_COBRAR"
-        ? `¿Pasar a ${cuenta.tercero_nombre} a Cuentas por Cobrar? Sale de Cuentas Corrientes y se sigue llevando igual desde allá.`
-        : `¿Devolver a ${cuenta.tercero_nombre} a Cuentas Corrientes?`;
-    if (!window.confirm(pregunta)) return;
-    try {
-      await cambiarModuloCuentaCorriente(cuenta.id, destino);
       onActualizar();
     } catch (e) {
       setError((e as Error).message);
@@ -386,11 +369,6 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
             </span>
           )}
           {cuenta.referencia && <span className="cc-hoy">Referencia: {cuenta.referencia}</span>}
-          {puedeAnular && cuenta.modulo !== "CAJA" && (
-            <button type="button" className="cc-mover" onClick={mover}>
-              {cuenta.modulo === "POR_COBRAR" ? "Devolver a Cuentas Corrientes" : "Pasar a Cuentas por Cobrar"}
-            </button>
-          )}
           {puedeAnular && (
             <span className="cc-acciones-cuenta">
               <button type="button" className="cc-mover" onClick={() => setEditandoCliente(true)}>

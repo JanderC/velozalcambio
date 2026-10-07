@@ -21,6 +21,7 @@ export interface CuentaCorrienteResumen {
   // Dónde se lleva: en Cuentas Corrientes, o pasada a Cuentas por Cobrar (poco movimiento)
   modulo: ModuloCuenta;
   referencia: string | null; // dato libre del cliente (Confirmaciones)
+  grupo_cobro: string | null; // Cuentas por Cobrar: el grupo en que se lleva ("Cerveloza", "Zelle", "Préstamos"...)
   // Fórmula con la que se le trabaja, guardada con su primer movimiento: por tasa, o con la comisión descontada del monto
   formula: "TASA" | "COMISION" | null;
   comision_pct: string | null;
@@ -121,12 +122,18 @@ export function crearCuentaCorriente(data: {
   canalId?: number; // sin banco: no es obligatorio
   modulo?: ModuloCuenta;
   referencia?: string;
+  grupoCobro?: string; // Cuentas por Cobrar: el grupo del cliente
   monedaCobroId?: number;
   tasaCobro?: string;
   monedaId: number;
   saldoInicial?: string;
 }) {
   return api.post<CuentaCorrienteResumen>("/cuentas-corrientes", data);
+}
+
+/** Cuentas por Cobrar: pasa al cliente a otro grupo. */
+export function cambiarGrupoCobro(id: number, grupo: string | null) {
+  return api.put<CuentaCorrienteResumen>(`/cuentas-corrientes/${id}/grupo`, { grupo });
 }
 
 /** Baja la hoja como .xlsx y la guarda con el nombre indicado. */
