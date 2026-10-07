@@ -61,7 +61,11 @@ function telefonoWhatsApp(telefono: string | null) {
 /** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
 function tasaTexto(tasa: string, esPorcentaje: boolean, descontada = false, incluida = false) {
   // comisión descontada: se guarda el factor (0.96) y se muestra -4%; si el % ya venía sumado en lo enviado, +6%
-  if (descontada) return `${incluida ? "+" : "-"}${formatearMonto(pctDeComision(tasa, incluida))}%`;
+  // (0%: familiar o amigo al que no se le cobra comisión)
+  if (descontada) {
+    const pct = pctDeComision(tasa, incluida);
+    return /[1-9]/.test(pct) ? `${incluida ? "+" : "-"}${formatearMonto(pct)}%` : "sin comisión";
+  }
   return esPorcentaje ? `${formatearMonto(multiplicarDecimales(tasa, "100", 6))}%` : formatearMonto(tasa);
 }
 
@@ -279,7 +283,7 @@ export function HojaCuenta({ cuenta, onActualizar, onVolver }: { cuenta: CuentaC
     const lineaRef = `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigosDeReferencia(anotado).join(" / ") || "—")}`;
     // Debajo de todo, como referencia: el total que mandó el cliente y la comisión con la que queda lo que recibe
     const pie = a.enviado
-      ? `\n\nReferencia: envió ${simbolo}${formatearMonto(a.enviado)}${sufijo}${a.comision ? ` · comisión ${formatearMonto(a.comision)}%` : ""}`
+      ? `\n\nReferencia: envió ${simbolo}${formatearMonto(a.enviado)}${sufijo}${a.comision && /[1-9]/.test(a.comision) ? ` · comisión ${formatearMonto(a.comision)}%` : ""}`
       : "";
     const aviso = (frase: string, ...lineas: string[]) => `Estimado(a), le informamos que ${frase}\n\n${lineas.join("\n")}${pie}`;
     if (a.sentido === "proceso") return aviso("la operación está en proceso de confirmación.", lineaRef, `Monto: ${monto}`, "En breves minutos estará disponible");
@@ -746,6 +750,8 @@ function FilaNueva({
   const [mantenerTasa, setMantenerTasa] = useState(true);
   // Comisión: el % ya viene sumado en lo que envió el cliente (mandó 10.600 = 10.000 + 6%): recibe 10.600 ÷ 1,06
   const [comisionIncluida, setComisionIncluida] = useState(false);
+  // Familiar o amigo: en este movimiento no se cobra comisión (lo que entra es lo que sale)
+  const [sinComision, setSinComision] = useState(false);
   // Leer la imagen del comprobante: llena el número de referencia, el monto y la fecha
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
@@ -882,7 +888,9 @@ function FilaNueva({
 
   const nCantidad = cantidad.trim() ? leerNumero(cantidad) : null;
   // Lo escrito en la casilla (ej. "3" si es comisión) y el multiplicador que se guarda (3% -> "0.03")
-  const nEscrita = tasa.trim() ? leerNumero(tasa.replace(/%/g, "")) : null;
+  // (sin comisión: es como si en la casilla dijera 0, sin tocar el % habitual del cliente)
+  const exonerado = sinComision && esPorcentaje && comisionDescuenta;
+  const nEscrita = exonerado ? "0" : tasa.trim() ? leerNumero(tasa.replace(/%/g, "")) : null;
   const fraccion = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : null;
   // con comisión descontada el multiplicador es lo que queda: 4% -> 0.96
   // (o, si el % ya venía sumado en lo enviado, lo que hay que sacarle: 6% -> 1 ÷ 1,06)
@@ -892,7 +900,7 @@ function FilaNueva({
   const montoSiIncluida =
     comisionDescuenta && esPorcentaje && nCantidad && nEscrita && /[1-9]/.test(nEscrita) ? multiplicarDecimales(nCantidad.replace(/^-/, ""), factorDeComision(nEscrita, true), Number(cuenta.moneda_decimales ?? 0)) : null;
   const nDirecto = montoDirecto.trim() ? leerNumero(montoDirecto) : null;
-  const conTasa = tasa.trim() !== "";
+  const conTasa = tasa.trim() !== "" || exonerado;
   // Ventas y abonos: se puede anotar quién hizo la transferencia; si entró por Zelle es obligatorio
   // Quién envió o el número de la transferencia: siempre se puede anotar; si entró por Zelle es obligatorio
   const pidePersona = !referencia.includes(SEPARADOR_PERSONA);
@@ -1047,6 +1055,7 @@ function FilaNueva({
     setRecientes((r) => (tasaModificada && mantenerTasa ? { ...r, tasaHabitual: nEscrita! } : r));
     setMantenerTasa(true);
     setComisionIncluida(false);
+    setSinComision(false);
     setReferencia(referenciaPuesta);
     setPersona("");
     setCuentaDestino("");
@@ -1270,7 +1279,8 @@ function FilaNueva({
             )}
           </div>
           <input
-            value={tasa}
+            value={exonerado ? "0" : tasa}
+            disabled={exonerado}
             onChange={(e) => setTasa(e.target.value)}
             inputMode="decimal"
             placeholder={esPorcentaje ? "3 (%)" : "3,2"}
@@ -1308,7 +1318,14 @@ function FilaNueva({
           </button>
         </p>
       )}
-      {comisionDescuenta && esPorcentaje && nEscrita && (
+      {/* Discreto: familiar o amigo al que no se le cobra comisión en este movimiento */}
+      {comisionDescuenta && esPorcentaje && (
+        <label className="cc-sin-comision">
+          <input type="checkbox" checked={sinComision} onChange={(e) => setSinComision(e.target.checked)} />
+          Familiar o amigo: sin comisión{sinComision ? " (recibe lo mismo que envió)" : ""}
+        </label>
+      )}
+      {comisionDescuenta && esPorcentaje && nEscrita && /[1-9]/.test(nEscrita) && !exonerado && (
         <label className="cc-check cc-mantener-tasa">
           <input type="checkbox" checked={comisionIncluida} onChange={(e) => setComisionIncluida(e.target.checked)} />
           Lo enviado ya trae el {formatearMonto(nEscrita)}% sumado
@@ -1408,7 +1425,7 @@ function FilaNueva({
             ) : comisionDescuenta ? (
               <>
                 {simbolo}
-                {formatearMonto(sinSigno(nCantidad))} − {formatearMonto(nEscrita)}% de comisión ={" "}
+                {formatearMonto(sinSigno(nCantidad))} {exonerado ? "sin comisión (familiar o amigo)" : `− ${formatearMonto(nEscrita)}% de comisión`} ={" "}
               </>
             ) : (
               <>

@@ -496,7 +496,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
     ["Referencia de la transferencia", referenciaDe(s) || null],
     ["Cuenta a la que se pagó", s.cuenta_destino],
     ["Envió", s.cantidad_base ? formatearMonto(s.cantidad_base.replace(/^-/, "")) : null],
-    [comision ? (s.comision_incluida ? "Comisión (ya sumada en lo enviado)" : "Comisión") : "Tasa", comision ? `${formatearMonto(comision)}%` : s.tasa ? formatearMonto(s.tasa) : null],
+    [comision ? (s.comision_incluida ? "Comisión (ya sumada en lo enviado)" : "Comisión") : "Tasa", comision ? (/[1-9]/.test(comision) ? `${formatearMonto(comision)}%` : "Sin comisión (familiar o amigo)") : s.tasa ? formatearMonto(s.tasa) : null],
     ["Recibe", dinero(s.monto, s.moneda_codigo)],
     ["Registrada", `${fechaHora(s.fecha)} por ${s.registrado_por_nombre}`],
     ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada${s.pagado_caja_nombre ? ` en ${s.pagado_caja_nombre}` : ""} ${textoMedio(s.pagado_medio)} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],

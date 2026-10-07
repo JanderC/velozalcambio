@@ -180,7 +180,9 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titu
     if (m.tasa) {
       const enPorciento = formatearMonto(multiplicarDecimales(m.tasa, "100", 6));
       // comisión descontada: el factor 0.96 se muestra como -4%
-      const tasaTexto = m.comision_descontada ? `${m.comision_incluida ? "+" : "-"}${formatearMonto(pctDeComision(m.tasa, m.comision_incluida))}%` : m.tasa_es_porcentaje ? `${enPorciento}%` : formatearMonto(m.tasa);
+      // (0%: familiar o amigo al que no se le cobró comisión -> la columna queda vacía)
+      const pctComision = m.comision_descontada ? pctDeComision(m.tasa, m.comision_incluida) : "";
+      const tasaTexto = m.comision_descontada ? (/[1-9]/.test(pctComision) ? `${m.comision_incluida ? "+" : "-"}${formatearMonto(pctComision)}%` : "") : m.tasa_es_porcentaje ? `${enPorciento}%` : formatearMonto(m.tasa);
       texto(tasaTexto, "tasa", medio, "#4b5563");
     }
     texto(dinero(m.monto), "monto", medio, colorMonto(m.monto));

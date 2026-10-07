@@ -94,6 +94,8 @@ export function NuevaCuentaModal({
   const [movFormula, setMovFormula] = useState<"tasa" | "dividir" | "comision">("tasa");
   // Comisión: el % ya viene sumado en lo que envió (mandó 10.600 = 10.000 + 6%)
   const [movIncluida, setMovIncluida] = useState(false);
+  // Familiar o amigo: no se le cobra comisión (lo que entra es lo que sale). El cliente queda guardado con 0%.
+  const [movSinComision, setMovSinComision] = useState(false);
   const [movDestino, setMovDestino] = useState("USD"); // a qué moneda se lleva lo que llega al dividir: cualquiera de las del sistema
   // ...y al multiplicar por la tasa: pesos por defecto, pero también bolívares u otra (USDT × tasa = Bs)
   const [movDestinoTasa, setMovDestinoTasa] = useState("COP");
@@ -140,7 +142,9 @@ export function NuevaCuentaModal({
   // en qué queda el total: Zelle según lo elegido, Western Union en pesos, el resto en la moneda del medio
   const codigoTotal = esZelle ? monedaZelle : medio ? (MONEDA_DEL_TOTAL[medio.nombre] ?? codigoMedio) : codigoMedio;
   const nMovCantidad = movCantidad.trim() ? leerNumero(movCantidad)?.replace(/^-/, "") ?? null : null;
-  const nMovValor = movValor.trim() ? leerNumero(movValor.replace(/%/g, "")) : null;
+  // (sin comisión: es como si en la casilla dijera 0)
+  const exonerado = movSinComision && movFormula === "comision";
+  const nMovValor = exonerado ? "0" : movValor.trim() ? leerNumero(movValor.replace(/%/g, "")) : null;
   // lo que multiplica a la cantidad: la tasa, o lo que queda tras la comisión (4% -> 0.96)
   const movFactor = !nMovValor || movFormula === "dividir" ? null : movFormula === "comision" ? factorDeComision(nMovValor, movIncluida) : nMovValor;
   // por tasa la cuenta queda en la moneda elegida en "Llevar a" (pesos por defecto); con comisión (o sin tasa), en la del total
@@ -234,7 +238,7 @@ export function NuevaCuentaModal({
     if (conMovimiento) {
       if (!medio) return setError("Elegí arriba el medio del movimiento: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle.");
       if (!nMovCantidad || !/[1-9]/.test(nMovCantidad)) return setError("La cantidad del movimiento no es un número válido.");
-      if (movValor.trim() && (!nMovValor || !/[1-9]/.test(nMovValor) || nMovValor.startsWith("-"))) return setError(movFormula === "comision" ? "La comisión no es un número válido." : "La tasa no es un número válido.");
+      if (!exonerado && movValor.trim() && (!nMovValor || !/[1-9]/.test(nMovValor) || nMovValor.startsWith("-"))) return setError(movFormula === "comision" ? "La comisión no es un número válido." : "La tasa no es un número válido.");
       if (movFormula === "comision" && nMovValor && Number(nMovValor) >= 100) return setError("La comisión tiene que ser menor al 100%.");
       if (movFormula === "tasa" && !movFactor && codigoMedio !== "COP") return setError(`Escribí la tasa para pasar ${codigoMedio} a ${movDestinoTasa}, o usá comisión.`);      if (movFormula === "dividir" && !nMovValor) return setError(`Escribí la tasa para dividir y llevar ${codigoMedio} a ${movDestino}.`);
       if (movFormula === "dividir" && codigoMedio === movDestino) return setError(`El medio elegido ya se mueve en ${movDestino}: no hay nada que dividir.`);
@@ -289,7 +293,7 @@ export function NuevaCuentaModal({
         const signo = movResta ? "-" : "";
         try {
           // la comisión usada queda guardada para la próxima vez
-          if (movFormula === "comision" && nMovValor) {
+          if (movFormula === "comision" && nMovValor && !exonerado) {
             try {
               localStorage.setItem("cc-ultima-comision-pct", movValor.replace(/%/g, "").trim());
             } catch {
@@ -329,6 +333,7 @@ export function NuevaCuentaModal({
       if (enLinea) {
         if (!errorMovimiento) {
           setMovResta(false);
+          setMovSinComision(false);
           setMovCantidad("");
           setMovValor(movFormula === "comision" ? movValor.replace(/%/g, "").trim() : "");
           setMovPersona("");
@@ -587,7 +592,7 @@ export function NuevaCuentaModal({
               <span aria-hidden="true">{movFormula === "comision" ? "−" : movFormula === "dividir" ? "÷" : "×"}</span>
               <label>
                 {movFormula === "comision" ? "Comisión %" : "Tasa"}
-                <input value={movValor} onChange={(e) => setMovValor(e.target.value)} inputMode="decimal" placeholder={movFormula === "comision" ? "4" : "3.200"} autoComplete="off" />
+                <input value={exonerado ? "0" : movValor} disabled={exonerado} onChange={(e) => setMovValor(e.target.value)} inputMode="decimal" placeholder={movFormula === "comision" ? "4" : "3.200"} autoComplete="off" />
               </label>
               <span aria-hidden="true">=</span>
               <label>
@@ -595,14 +600,25 @@ export function NuevaCuentaModal({
                 <output className={`cc-resultado ${movResta ? "cc-neg" : ""}`}>{movMonto ? `${movResta ? "- " : ""}${formatearMonto(movMonto)}` : "—"}</output>
               </label>
             </div>
-            {movFormula === "comision" && (
+            {movFormula === "comision" && !exonerado && (
               <label className="cc-check">
                 <input type="checkbox" checked={movIncluida} onChange={(e) => setMovIncluida(e.target.checked)} />
                 Lo enviado ya trae el % sumado (mandó 10.600 = 10.000 + 6%: recibe 10.000)
               </label>
             )}
+            {/* Discreto: familiar o amigo al que no se le cobra comisión */}
+            {movFormula === "comision" && (
+              <label className="cc-sin-comision">
+                <input type="checkbox" checked={movSinComision} onChange={(e) => setMovSinComision(e.target.checked)} />
+                Familiar o amigo: sin comisión
+              </label>
+            )}
             <small className="cc-primer-mov-nota">
-              {movFormula === "comision"
+              {exonerado
+                ? nMovCantidad && movMonto
+                  ? `${formatearMonto(nMovCantidad)} sin comisión = ${formatearMonto(movMonto)} ${codigoCuenta}: recibe lo mismo que envió. Este cliente queda guardado sin comisión para sus próximos movimientos.`
+                  : "Sin comisión: recibe lo mismo que envió. El cliente queda guardado sin comisión para sus próximos movimientos."
+                : movFormula === "comision"
                 ? nMovCantidad && nMovValor && movMonto
                   ? `${formatearMonto(nMovCantidad)} ${movIncluida ? `ya trae el ${formatearMonto(nMovValor)}% sumado` : `− ${formatearMonto(nMovValor)}% de comisión`} = ${formatearMonto(movMonto)} ${codigoCuenta}. Esta comisión queda guardada para los próximos movimientos del cliente.`
                   : "A la cantidad se le descuenta la comisión: 1.000 − 4% = 960. Queda guardada para los próximos movimientos del cliente."
