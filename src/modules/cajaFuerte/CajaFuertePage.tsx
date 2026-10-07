@@ -25,11 +25,11 @@ function montoFijo(valor: string) {
  * Los decimales van con coma ("1.500,5"); un punto escrito al final también abre los decimales.
  */
 function conPuntos(escrito: string) {
-  let t = escrito.replace(/[^d.,]/g, "");
+  let t = escrito.replace(/[^\d.,]/g, "");
   if (!t.includes(",") && t.endsWith(".")) t = `${t.slice(0, -1)},`;
   const coma = t.indexOf(",");
-  const entero = (coma === -1 ? t : t.slice(0, coma)).replace(/D/g, "").replace(/^0+(?=d)/, "");
-  const decimal = coma === -1 ? "" : t.slice(coma + 1).replace(/D/g, "").slice(0, 2);
+  const entero = (coma === -1 ? t : t.slice(0, coma)).replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  const decimal = coma === -1 ? "" : t.slice(coma + 1).replace(/\D/g, "").slice(0, 2);
   if (!entero && coma === -1) return "";
   return formatearMonto(entero || "0") + (coma === -1 ? "" : `,${decimal}`);
 }
