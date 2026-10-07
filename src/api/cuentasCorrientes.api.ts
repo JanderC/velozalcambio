@@ -123,6 +123,7 @@ export function crearCuentaCorriente(data: {
   modulo?: ModuloCuenta;
   referencia?: string;
   grupoCobro?: string; // Cuentas por Cobrar: el grupo del cliente
+  usarExistente?: boolean; // Confirmaciones: ya hay un cliente con ese nombre y es el mismo: se usa ese
   monedaCobroId?: number;
   tasaCobro?: string;
   monedaId: number;

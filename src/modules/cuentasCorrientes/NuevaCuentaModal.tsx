@@ -259,7 +259,7 @@ export function NuevaCuentaModal({
           return setError(aviso);
         }
       }
-      const cuenta = await crearCuentaCorriente({
+      const datosCuenta = {
         ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
         canalId: enLinea ? medio?.id : canalId === "" ? undefined : canalId,
         modulo,
@@ -269,6 +269,18 @@ export function NuevaCuentaModal({
         ...(conMovimiento && movFormula === "dividir" ? { monedaCobroId: monedas.find((m) => m.codigo === codigoMedio)?.id, tasaCobro: nMovValor! } : {}),
         monedaId: monedaCuentaId as number,
         saldoInicial: nSaldo ? `${saldoNegativo ? "-" : ""}${nSaldo.replace(/^-/, "")}` : undefined,
+      };
+      const cuenta = await crearCuentaCorriente(datosCuenta).catch((err) => {
+        // Confirmaciones: el cliente ya existe (quizás con otro medio, y por eso no salía en la lista filtrada).
+        // Se pregunta si es el mismo y, si lo es, el movimiento se le registra a él con este medio.
+        if (!(enLinea && err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
+        const esElMismo = window.confirm(
+          `Ya hay un cliente llamado "${nombre.trim()}" en el sistema.\n\n` +
+            `¿Es la misma persona? Aceptar: el movimiento se le registra a ese cliente${etiquetaMedio ? ` por ${etiquetaMedio}` : ""}.\n` +
+            `Cancelar: no se registra nada (si es otra persona, escribí el nombre distinto, por ejemplo con el segundo apellido).`
+        );
+        if (!esElMismo) throw err;
+        return crearCuentaCorriente({ ...datosCuenta, usarExistente: true });
       });
       // El cliente ya existe: ahora su movimiento. Si falla, el cliente queda creado y se avisa.
       let errorMovimiento: string | null = null;
