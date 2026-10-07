@@ -251,10 +251,11 @@ export function NuevaCuentaModal({
       // (con varias capturas hay varias referencias: se revisan todas)
       const numeros = !conMovimiento ? [] : nMovMtcn.length >= 4 ? [nMovMtcn] : codigosDeReferencia(movPersona);
       for (const numero of numeros) {
-        const ya = await buscarMovimientoPorNumero(numero).catch(() => null);
+        // en Confirmaciones solo se busca dentro del medio elegido: la misma referencia puede existir en otro banco
+        const ya = await buscarMovimientoPorNumero(numero, enLinea ? medio?.id : undefined).catch(() => null);
         if (ya) {
           // referencia repetida: no se crea el cliente ni se genera el movimiento, y se avisa con una alerta
-          const aviso = `Ya hay un movimiento con la referencia ${numero}: "${ya.descripcion}" de ${ya.tercero_nombre}. No se puede registrar dos veces: el movimiento NO se generó.`;
+          const aviso = `Ya hay un movimiento con la referencia ${numero}${enLinea && etiquetaMedio ? ` por ${etiquetaMedio}` : ""}:"${ya.descripcion}" de ${ya.tercero_nombre}. No se puede registrar dos veces: el movimiento NO se generó.`;
           window.alert(`Referencia repetida\n\n${aviso}`);
           return setError(aviso);
         }

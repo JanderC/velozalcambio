@@ -910,18 +910,21 @@ function FilaNueva({
   const numerosMovimiento = nMtcn.length >= 4 ? [nMtcn] : pidePersona ? codigosDeReferencia(persona) : [];
   const numeroMovimiento = numerosMovimiento[0] ?? null;
   const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
+  // En Confirmaciones el bloqueo es por medio de pago (el del cliente): la misma referencia puede estar en Bancolombia
+  // y en Nequi, pero no dos veces en el mismo medio. En los demás módulos el medio no es el canal: se busca en todos.
+  const canalDelBloqueo = enConfirmaciones ? cuenta.canal_id : undefined;
   useEffect(() => {
     setRepetido(null);
     if (!numeroMovimiento) return;
     const t = setTimeout(() => {
-      buscarMovimientoPorNumero(numeroMovimiento)
+      buscarMovimientoPorNumero(numeroMovimiento, canalDelBloqueo)
         .then(setRepetido)
         .catch(() => {});
     }, 400);
     return () => clearTimeout(t);
-  }, [numeroMovimiento]);
+  }, [numeroMovimiento, canalDelBloqueo]);
   const avisoRepetido = (m: MovimientoConNumero, numero: string | null = numeroMovimiento) =>
-    `Ya hay un movimiento con la referencia ${numero}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
+    `Ya hay un movimiento con la referencia ${numero}${canalDelBloqueo && m.canal_nombre ? ` por ${m.canal_nombre.replace(/_/g, " ")}` : ""}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   // Confirmaciones: si no se escribe la operación, es "Compra Nequi" / "Venta Zelle"… según el botón y el medio del cliente.
   // (La referencia de la transferencia es el otro casillero: llenar ese no tiene que pedir este.)
@@ -1004,7 +1007,7 @@ function FilaNueva({
     if (conCaja && !monedaCaja) return setError(`No encuentro la moneda ${movimientoCaja?.codigo ?? ""} para mover la caja.`);
     for (const numero of numerosMovimiento) {
       // se vuelve a consultar al guardar: el aviso de arriba puede no haber llegado todavía
-      const ya = (numero === numeroMovimiento ? repetido : null) ?? (await buscarMovimientoPorNumero(numero).catch(() => null));
+      const ya = (numero === numeroMovimiento ? repetido : null) ?? (await buscarMovimientoPorNumero(numero, canalDelBloqueo).catch(() => null));
       if (ya) {
         if (numero === numeroMovimiento) setRepetido(ya);
         // referencia repetida: no se genera el movimiento y se avisa con una alerta

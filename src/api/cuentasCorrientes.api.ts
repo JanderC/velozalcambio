@@ -188,6 +188,7 @@ export interface MovimientoConNumero {
   descripcion: string;
   monto: string;
   tercero_nombre: string;
+  canal_nombre?: string; // el medio de pago donde está registrada
 }
 
 /**
@@ -205,9 +206,14 @@ export function codigosDeReferencia(texto: string): string[] {
   return [...new Set(codigos)];
 }
 
-/** El movimiento ya registrado con ese número de transferencia, si lo hay. */
-export async function buscarMovimientoPorNumero(numero: string) {
-  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${encodeURIComponent(numero)}`)).movimiento;
+/**
+ * El movimiento ya registrado con ese número de transferencia, si lo hay.
+ * canalId: se busca solo dentro de ese medio de pago. La misma referencia puede existir en Bancolombia y en Nequi,
+ * pero no dos veces en el mismo medio. Sin canal se busca en todos.
+ */
+export async function buscarMovimientoPorNumero(numero: string, canalId?: number) {
+  const filtro = canalId ? `?canalId=${canalId}` : "";
+  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${encodeURIComponent(numero)}${filtro}`)).movimiento;
 }
 
 /** Manda un mensaje al cliente por el WhatsApp conectado al sistema. */
