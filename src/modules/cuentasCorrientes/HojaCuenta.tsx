@@ -923,6 +923,11 @@ function FilaNueva({
   const avisoRepetido = (m: MovimientoConNumero, numero: string | null = numeroMovimiento) =>
     `Ya hay un movimiento con la referencia ${numero}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
+  // Confirmaciones: si no se escribe la operación, es "Compra Nequi" / "Venta Zelle"… según el botón y el medio del cliente.
+  // (La referencia de la transferencia es el otro casillero: llenar ese no tiene que pedir este.)
+  const medioDelCliente = cuenta.canal_nombre === "SIN_BANCO" ? "" : cuenta.canal_nombre.toLowerCase().replace(/_/g, " ").replace(/(^|\s)\S/g, (l) => l.toUpperCase());
+  const operacionPorDefecto = `${resta ? "Venta" : "Compra"}${medioDelCliente ? ` ${medioDelCliente}` : ""}`;
+  const referenciaFinal = referencia.trim() || (enConfirmaciones ? operacionPorDefecto : "");
   const sinSigno = (v: string) => v.replace(/^-/, "");
   // Se escribió una tasa distinta a la que venía puesta
   const tasaModificada = !esPorcentaje && !enCobro && !!nEscrita && /[1-9]/.test(nEscrita) && nEscrita !== (recientes.tasaHabitual ?? "");
@@ -981,7 +986,13 @@ function FilaNueva({
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!referencia.trim()) return setError("Escribí la referencia (a quién o qué es).");
+    if (!referenciaFinal) {
+      return setError(
+        persona.trim()
+          ? 'Falta el primer casillero, "Referencia": ahí va qué es el movimiento (ej. Venta de Zelle, Abono efectivo). El número de la transferencia ya está en el de al lado.'
+          : 'Escribí en "Referencia" qué es el movimiento (ej. Venta de Zelle, Abono efectivo).'
+      );
+    }
     if (personaObligatoria && persona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
     if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
@@ -1054,7 +1065,7 @@ function FilaNueva({
       monedaId: cuenta.moneda_id,
       tipo: resta ? ("ABONO" as const) : ("CARGO" as const),
       descripcion:
-        (pidePersona && personaCompleta ? `${referencia.trim()}${SEPARADOR_PERSONA}${personaCompleta}` : referencia.trim()) +
+        (pidePersona && personaCompleta ? `${referenciaFinal}${SEPARADOR_PERSONA}${personaCompleta}` : referenciaFinal) +
         // lo que se movió de verdad en la moneda de cobro queda anotado en la referencia
         (enCobro && conTasa ? ` (${formatearMonto(sinSigno(nCantidad!))} ${codigoDivision} a ${formatearMonto(nTasa!)})` : ""),
       // Hoy va con la hora real; otra fecha, al mediodía de ese día
@@ -1103,7 +1114,7 @@ function FilaNueva({
       );
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : "No se pudo guardar el movimiento.";
-      setError(`"${escrito.referencia.trim()}" no se guardó: ${mensaje}`);
+      setError(`"${escrito.referencia.trim() || referenciaFinal}" no se guardó: ${mensaje}`);
       setAbierta(true);
       if ((refInput.current?.value ?? "") === referenciaPuesta) {
         setReferencia(escrito.referencia);
@@ -1157,13 +1168,14 @@ function FilaNueva({
           <input type="date" value={fecha} max={hoyBogota()} onChange={(e) => setFecha(e.target.value)} />
         </label>
         <label className="cc-c-ref">
-          Referencia
+          {/* En Confirmaciones este casillero es la operación (se arma sola si queda vacío); la referencia de la transferencia va en el de al lado */}
+          {enConfirmaciones ? "Operación" : "Referencia"}
           <input
             ref={refInput}
             list="cc-referencias"
             value={referencia}
             onChange={(e) => alCambiarReferencia(e.target.value)}
-            placeholder="Venta de Zelle, Venta de bss, Abono dólares…"
+            placeholder={enConfirmaciones ? `${operacionPorDefecto} (se pone sola)` : "Venta de Zelle, Venta de bss, Abono dólares…"}
             autoComplete="off"
           />
           <datalist id="cc-referencias">
