@@ -1,5 +1,5 @@
 // Montos y tasas viajan como string ("3.2") para no perder precisión.
-// Estas funciones solo tocan texto: nunca convierten a number.
+// Estas funciones solo tocan texto: nunca convierten a number.//
 
 // Lo que escribe la cajera -> formato que acepta el backend: dígitos y un solo punto decimal.
 // La coma se toma como separador decimal ("3,2" -> "3.2").
