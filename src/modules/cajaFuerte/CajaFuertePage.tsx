@@ -14,10 +14,30 @@ const MONEDAS: { codigo: MonedaCajaFuerte; nombre: string; corto: string; simbol
 ];
 const TAMANOS = [10, 25, 50];
 
+/** Siempre con puntos de miles y dos decimales: "1500" -> "1.500,00", "16210.5000" -> "16.210,50". */
+function montoFijo(valor: string) {
+  const [entero = "0", decimal = ""] = valor.trim().split(".");
+  return `${formatearMonto(entero)},${`${decimal}00`.slice(0, 2)}`;
+}
+
+/**
+ * Lo que se va escribiendo en la casilla del monto, con los puntos de miles puestos solos: "1500" -> "1.500".
+ * Los decimales van con coma ("1.500,5"); un punto escrito al final también abre los decimales.
+ */
+function conPuntos(escrito: string) {
+  let t = escrito.replace(/[^d.,]/g, "");
+  if (!t.includes(",") && t.endsWith(".")) t = `${t.slice(0, -1)},`;
+  const coma = t.indexOf(",");
+  const entero = (coma === -1 ? t : t.slice(0, coma)).replace(/D/g, "").replace(/^0+(?=d)/, "");
+  const decimal = coma === -1 ? "" : t.slice(coma + 1).replace(/D/g, "").slice(0, 2);
+  if (!entero && coma === -1) return "";
+  return formatearMonto(entero || "0") + (coma === -1 ? "" : `,${decimal}`);
+}
+
 function dinero(monto: string, codigo: MonedaCajaFuerte) {
   const m = MONEDAS.find((x) => x.codigo === codigo)!;
   const negativo = monto.startsWith("-");
-  return `${negativo ? "− " : ""}${m.simbolo} ${formatearMonto(negativo ? monto.slice(1) : monto)}`;
+  return `${negativo ? "− " : ""}${m.simbolo} ${montoFijo(negativo ? monto.slice(1) : monto)}`;
 }
 
 function fechaHora(fecha: string) {
@@ -163,7 +183,7 @@ export function CajaFuertePage() {
       {valor === null ? <span className="cf-vacio">—</span> : dinero(valor, codigo)}
       {m.codigo === codigo && (
         <small>
-          {m.tipo === "INGRESO" ? "+" : "−"} {formatearMonto(m.monto)}
+          {m.tipo === "INGRESO" ? "+" : "−"} {montoFijo(m.monto)}
         </small>
       )}
     </td>
@@ -192,10 +212,10 @@ export function CajaFuertePage() {
                 <strong>{s ? dinero(s.monto, m.codigo) : "…"}</strong>
                 <span className="cf-saldo-hoy">
                   <span className="sube">
-                    <ArrowDownToLine size={13} /> Hoy entró {s ? formatearMonto(s.entroHoy) : "0"}
+                    <ArrowDownToLine size={13} /> Hoy entró {s ? montoFijo(s.entroHoy) : "0,00"}
                   </span>
                   <span className="baja">
-                    <ArrowUpFromLine size={13} /> salió {s ? formatearMonto(s.salioHoy) : "0"}
+                    <ArrowUpFromLine size={13} /> salió {s ? montoFijo(s.salioHoy) : "0,00"}
                   </span>
                 </span>
               </article>
@@ -286,7 +306,17 @@ export function CajaFuertePage() {
               <span className="cf-etiqueta">Monto</span>
               <span className="cf-monto-caja">
                 <span>{MONEDAS.find((m) => m.codigo === moneda)!.simbolo}</span>
-                <input ref={refMonto} value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="0" autoComplete="off" aria-label="Monto" />
+                <input
+                  ref={refMonto}
+                  value={monto}
+                  onChange={(e) => setMonto(conPuntos(e.target.value))}
+                  // al salir de la casilla queda completo: 1.500 -> 1.500,00
+                  onBlur={() => nMonto && /[1-9]/.test(nMonto) && setMonto(montoFijo(nMonto))}
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  autoComplete="off"
+                  aria-label="Monto"
+                />
               </span>
             </label>
 
