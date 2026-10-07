@@ -95,6 +95,8 @@ export function NuevaCuentaModal({
   // Comisión: el % ya viene sumado en lo que envió (mandó 10.600 = 10.000 + 6%)
   const [movIncluida, setMovIncluida] = useState(false);
   const [movDestino, setMovDestino] = useState("USD"); // a qué moneda se lleva lo que llega al dividir: cualquiera de las del sistema
+  // ...y al multiplicar por la tasa: pesos por defecto, pero también bolívares u otra (USDT × tasa = Bs)
+  const [movDestinoTasa, setMovDestinoTasa] = useState("COP");
   const [movResta, setMovResta] = useState(false);
   const [movCantidad, setMovCantidad] = useState("");
   const [movValor, setMovValor] = useState(""); // la tasa o el % de comisión
@@ -141,8 +143,10 @@ export function NuevaCuentaModal({
   const nMovValor = movValor.trim() ? leerNumero(movValor.replace(/%/g, "")) : null;
   // lo que multiplica a la cantidad: la tasa, o lo que queda tras la comisión (4% -> 0.96)
   const movFactor = !nMovValor || movFormula === "dividir" ? null : movFormula === "comision" ? factorDeComision(nMovValor, movIncluida) : nMovValor;
-  // por tasa la cuenta queda en pesos; con comisión (o sin tasa) queda en la moneda del total
-  const codigoCuenta = movFormula === "dividir" ? movDestino : movFormula === "tasa" && movFactor ? "COP" : codigoTotal;
+  // por tasa la cuenta queda en la moneda elegida en "Llevar a" (pesos por defecto); con comisión (o sin tasa), en la del total
+  const codigoCuenta = movFormula === "dividir" ? movDestino : movFormula === "tasa" && movFactor ? movDestinoTasa : codigoTotal;
+  // la moneda a la que se lleva, según la fórmula elegida
+  const destinoElegido = movFormula === "dividir" ? movDestino : movDestinoTasa;
   const movMonto = !nMovCantidad
     ? null
     : movFormula === "dividir"
@@ -232,7 +236,8 @@ export function NuevaCuentaModal({
       if (!nMovCantidad || !/[1-9]/.test(nMovCantidad)) return setError("La cantidad del movimiento no es un número válido.");
       if (movValor.trim() && (!nMovValor || !/[1-9]/.test(nMovValor) || nMovValor.startsWith("-"))) return setError(movFormula === "comision" ? "La comisión no es un número válido." : "La tasa no es un número válido.");
       if (movFormula === "comision" && nMovValor && Number(nMovValor) >= 100) return setError("La comisión tiene que ser menor al 100%.");
-      if (movFormula === "tasa" && !movFactor && codigoMedio !== "COP") return setError(`Escribí la tasa para pasar ${codigoMedio} a pesos, o usá comisión.`);
+      if (movFormula === "tasa" && !movFactor && codigoMedio !== "COP") return setError(`Escribí la tasa para pasar ${codigoMedio} a ${movDestinoTasa}, o usá comisión.`);
+      if (movFormula === "tasa" && movFactor && codigoMedio === movDestinoTasa) return setError(`El medio elegido ya se mueve en ${movDestinoTasa}: elegí otra moneda en "Llevar a" o usá comisión.`);
       if (movFormula === "dividir" && !nMovValor) return setError(`Escribí la tasa para dividir y llevar ${codigoMedio} a ${movDestino}.`);
       if (movFormula === "dividir" && codigoMedio === movDestino) return setError(`El medio elegido ya se mueve en ${movDestino}: no hay nada que dividir.`);
       if (!movMonto || !/[1-9]/.test(movMonto)) return setError("El monto del movimiento da cero: revisá la cantidad.");
@@ -541,19 +546,19 @@ export function NuevaCuentaModal({
                   Comisión %
                 </button>
               </div>
-              {movFormula === "dividir" && (
+              {movFormula !== "comision" && (
                 <label className="cc-primer-mov-destino">
                   Llevar a
-                  <select value={movDestino} onChange={(e) => setMovDestino(e.target.value)}>
-                    {/* todas las monedas, menos la que ya trae el medio (no habría nada que dividir) */}
+                  <select value={destinoElegido} onChange={(e) => (movFormula === "dividir" ? setMovDestino : setMovDestinoTasa)(e.target.value)}>
+                    {/* todas las monedas, menos la que ya trae el medio (no habría nada que convertir) */}
                     {monedas
-                      .filter((m) => m.codigo !== codigoMedio || m.codigo === movDestino)
+                      .filter((m) => m.codigo !== codigoMedio || m.codigo === destinoElegido)
                       .map((m) => (
                         <option key={m.id} value={m.codigo}>
                           {m.nombre} ({m.codigo})
                         </option>
                       ))}
-                    {monedas.length === 0 && <option value={movDestino}>{movDestino}</option>}
+                    {monedas.length === 0 && <option value={destinoElegido}>{destinoElegido}</option>}
                   </select>
                 </label>
               )}
@@ -592,7 +597,9 @@ export function NuevaCuentaModal({
                   ? nMovCantidad && nMovValor && movMonto
                     ? `${formatearMonto(nMovCantidad)} ${codigoMedio} ÷ ${formatearMonto(nMovValor)} = ${formatearMonto(movMonto)} ${movDestino}. La cuenta del cliente queda en ${movDestino} y la tasa guardada para los próximos movimientos.`
                     : `Lo que llega en ${codigoMedio} se divide por la tasa y queda en ${movDestino}: 82.500 ÷ 3.280 = 25,15.`
-                  : "Cantidad × tasa = total en pesos. La tasa queda guardada para los próximos movimientos del cliente."}
+                  : nMovCantidad && movFactor && movMonto
+                    ? `${formatearMonto(nMovCantidad)} ${codigoMedio} × ${formatearMonto(movFactor)} = ${formatearMonto(movMonto)} ${movDestinoTasa}. La cuenta del cliente queda en ${movDestinoTasa} y la tasa guardada para los próximos movimientos.`
+                    : `Cantidad × tasa = total en ${movDestinoTasa}. En "Llevar a" se elige la moneda (ej. USDT × tasa = bolívares). La tasa queda guardada para los próximos movimientos del cliente.`}
             </small>
             <label>
               Referencia de la transferencia y quién envió (opcional)
