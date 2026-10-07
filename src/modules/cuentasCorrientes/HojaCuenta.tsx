@@ -738,12 +738,16 @@ function FilaNueva({
   const medioCambiado = medioMov.id !== cuenta.canal_id;
   // qué referencias restan: en Confirmaciones, las ventas; en los demás módulos, los abonos
   const restaSegunReferencia = (r: string) => (enConfirmaciones ? /^\s*(venta|recibe)/i.test(r) : restaPorReferencia(r));
-  const comisionDescuenta = cuenta.formula === "COMISION";
+  // El cliente se trabaja con comisión (así se guardó con su primer movimiento): el formulario arranca en %, con el suyo
+  const clienteConComision = cuenta.formula === "COMISION";
+  // Qué hace "Comisión %": en Confirmaciones SIEMPRE descuenta de lo enviado (20.600 − 5% = 19.570), aunque el cliente
+  // se haya registrado por tasa. En los demás módulos, salvo los clientes de comisión, es el monto de la comisión (el 5% de 20.600).
+  const comisionDescuenta = clienteConComision || cuenta.modulo === "CAJA";
   const pctCuenta = comisionDescuenta && cuenta.comision_pct ? formatearMonto(cuenta.comision_pct) : "";
   // Cliente que se trabaja dividiendo (cuenta en USD o USDT, llega en pesos): el formulario abre en ese modo con su tasa
-  const iniciaEnCobro = !comisionDescuenta && !!cuenta.moneda_cobro_codigo && !!cuenta.tasa_cobro && cuenta.formula == null;
+  const iniciaEnCobro = !clienteConComision && !!cuenta.moneda_cobro_codigo && !!cuenta.tasa_cobro && cuenta.formula == null;
   const [tasa, setTasa] = useState(iniciaEnCobro ? formatearMonto(cuenta.tasa_cobro!) : pctCuenta);
-  const [esPorcentaje, setEsPorcentaje] = useState(comisionDescuenta); // comisión: cantidad x % (o cantidad - %) en vez de cantidad x tasa
+  const [esPorcentaje, setEsPorcentaje] = useState(clienteConComision); // comisión: cantidad x % (o cantidad - %) en vez de cantidad x tasa
   // Movimiento hecho en la moneda de cobro (ej. pagó en pesos una cuenta en dólares): cantidad ÷ tasa
   const [enCobro, setEnCobro] = useState(iniciaEnCobro);
   const [montoDirecto, setMontoDirecto] = useState("");
@@ -808,7 +812,7 @@ function FilaNueva({
         if (l.total) {
           // En la moneda de la cuenta es el monto directo; en otra, es la cantidad y se aplica la tasa.
           // El cliente que trabaja con comisión siempre va por la cantidad: a lo enviado se le aplica su %.
-          if ((!l.moneda || l.moneda === cuenta.moneda_codigo) && !comisionDescuenta) {
+          if ((!l.moneda || l.moneda === cuenta.moneda_codigo) && !clienteConComision) {
             setTasa("");
             setEsPorcentaje(false);
             setEnCobro(false);
@@ -1082,10 +1086,10 @@ function FilaNueva({
     setCantidad("");
     // el cliente de comisión sigue en comisión, con su %
     // el que se trabaja dividiendo sigue con la tasa que se acaba de usar
-    setTasa(comisionDescuenta ? pctCuenta || tasa : iniciaEnCobro && enCobro ? tasa : tasaSiguiente);
+    setTasa(clienteConComision ? pctCuenta || tasa : iniciaEnCobro && enCobro ? tasa : tasaSiguiente);
     setMontoDirecto("");
     setResta(restaSegunReferencia(referenciaPuesta));
-    setEsPorcentaje(comisionDescuenta);
+    setEsPorcentaje(clienteConComision);
     if (window.matchMedia("(max-width: 860px)").matches) setAbierta(false);
     else refInput.current?.focus();
     const signo = resta ? "-" : "";
