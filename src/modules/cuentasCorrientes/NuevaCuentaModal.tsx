@@ -546,7 +546,7 @@ export function NuevaCuentaModal({
               </div>
               {movFormula !== "comision" && (
                 <label className="cc-primer-mov-destino">
-                  Llevar a
+                  Se entrega en
                   <select value={destinoElegido} onChange={(e) => (movFormula === "dividir" ? setMovDestino : setMovDestinoTasa)(e.target.value)}>
                     {/* todas las monedas, menos la que ya trae el medio (no habría nada que convertir) */}
                     {monedas
@@ -578,7 +578,7 @@ export function NuevaCuentaModal({
               </label>
               <span aria-hidden="true">=</span>
               <label>
-                Total ({codigoCuenta})
+                Total a entregar ({movFormula === "comision" ? codigoCuenta : destinoElegido})
                 <output className={`cc-resultado ${movResta ? "cc-neg" : ""}`}>{movMonto ? `${movResta ? "- " : ""}${formatearMonto(movMonto)}` : "—"}</output>
               </label>
             </div>
@@ -599,7 +599,7 @@ export function NuevaCuentaModal({
                     : `Lo que llega en ${codigoMedio} se divide por la tasa y queda en ${movDestino}: 82.500 ÷ 3.280 = 25,15.`
                   : nMovCantidad && movFactor && movMonto
                     ? `${formatearMonto(nMovCantidad)} ${codigoMedio} × ${formatearMonto(movFactor)} = ${formatearMonto(movMonto)} ${movDestinoTasa}. La cuenta del cliente queda en ${movDestinoTasa} y la tasa guardada para los próximos movimientos.`
-                    : `Cantidad × tasa = total en ${movDestinoTasa}. En "Llevar a" se elige la moneda (ej. USDT × tasa = bolívares). La tasa queda guardada para los próximos movimientos del cliente.`}
+                    : `Cantidad × tasa = total en ${movDestinoTasa}. En "Se entrega en" se elige la moneda: llega en una y se entrega en otra (ej. USDT × tasa = bolívares). La tasa queda guardada para los próximos movimientos del cliente.`}
             </small>
             <label>
               Referencia de la transferencia y quién envió (opcional)
