@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, MessageSquareText, Send, Smile, X } from "lucide-react";
 import { whatsappApi } from "../../../api/whatsapp.api";
-import { EMOJIS } from "../utilidades";
+import { EMOJIS, imagenDelPortapapeles, traeImagen } from "../utilidades";
 
 /** Enter envía, Shift+Enter hace salto de línea. Escribir acá pausa el bot en este chat. */
 export function Composer({ jid, botActivo, respuestasRapidas }: { jid: string; botActivo: boolean; respuestasRapidas: string[] }) {
@@ -27,6 +27,23 @@ export function Composer({ jid, botActivo, respuestasRapidas }: { jid: string; b
     setVistaFoto(url);
     return () => URL.revokeObjectURL(url);
   }, [foto]);
+
+  // Pegar una captura o una foto (Ctrl+V) la deja lista para enviar, igual que en WhatsApp Web.
+  // Se escucha en toda la pantalla: no hace falta tener el cursor en la casilla del mensaje.
+  useEffect(() => {
+    const alPegar = (e: ClipboardEvent) => {
+      if (!traeImagen(e.clipboardData)) return; // texto: se pega normal
+      e.preventDefault();
+      void imagenDelPortapapeles(e.clipboardData).then((imagen) => {
+        if (!imagen) return setError("No se pudo leer esa imagen. Probá guardarla y adjuntarla con el botón de foto.");
+        setError(null);
+        setFoto(imagen);
+        area.current?.focus();
+      });
+    };
+    document.addEventListener("paste", alPegar);
+    return () => document.removeEventListener("paste", alPegar);
+  }, []);
 
   async function enviar() {
     if (enviando || (!texto.trim() && !foto)) return;
@@ -134,7 +151,7 @@ export function Composer({ jid, botActivo, respuestasRapidas }: { jid: string; b
               void enviar();
             }
           }}
-          placeholder="Escribí un mensaje"
+          placeholder="Escribí un mensaje, o pegá una imagen con Ctrl+V"
           title={botActivo ? "Si escribís, el bot se pausa en este chat" : undefined}
           aria-label="Mensaje"
         />

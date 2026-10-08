@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, MessageCircle, Search, Send, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Search, Send, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
 import { useStreamWhatsapp } from "../../modules/whatsapp/useStreamWhatsapp";
-import { etiquetaDia, fechaLista, horaCorta, sonarAviso } from "../../modules/whatsapp/utilidades";
+import { etiquetaDia, fechaLista, horaCorta, imagenDelPortapapeles, sonarAviso, traeImagen } from "../../modules/whatsapp/utilidades";
 import "./burbujaWhatsapp.css";
 
 /** Lo que otro módulo le pide a la burbuja: abrir el chat de un teléfono en una línea, con un texto ya escrito. */
@@ -58,6 +58,10 @@ function Burbuja() {
   const [mensajes, setMensajes] = useState<MensajeWa[]>([]);
   const [cargandoChat, setCargandoChat] = useState(false);
   const [texto, setTexto] = useState("");
+  // Foto a enviar: adjuntada con el botón o pegada con Ctrl+V (una captura, por ejemplo)
+  const [foto, setFoto] = useState<File | null>(null);
+  const [vistaFoto, setVistaFoto] = useState<string | null>(null);
+  const archivoRef = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recien, setRecien] = useState(false); // acaba de llegar un mensaje: la burbuja late
@@ -117,12 +121,33 @@ function Burbuja() {
     estabaConectado.current = conectado;
   }, [conectado, cargar]);
 
+  useEffect(() => {
+    if (!foto) return setVistaFoto(null);
+    const url = URL.createObjectURL(foto);
+    setVistaFoto(url);
+    return () => URL.revokeObjectURL(url);
+  }, [foto]);
+
+  // Pegar una imagen en la casilla del mensaje la deja lista para enviar. Se frena ahí mismo para que la pantalla
+  // de atrás (ej. Confirmaciones, que lee comprobantes pegados) no la tome también.
+  function alPegar(e: ClipboardEvent<HTMLTextAreaElement>) {
+    if (!traeImagen(e.clipboardData)) return; // texto: se pega normal
+    e.preventDefault();
+    e.nativeEvent.stopPropagation();
+    void imagenDelPortapapeles(e.clipboardData).then((imagen) => {
+      if (!imagen) return setError("No se pudo leer esa imagen. Probá adjuntarla con el botón de foto.");
+      setError(null);
+      setFoto(imagen);
+    });
+  }
+
   // ---------- Abrir un chat ----------
   const abrirChat = useCallback(async (c: ChatWa, textoInicial?: string) => {
     setChat(c);
     setMensajes([]);
     setError(null);
     setTexto(textoInicial ?? "");
+    setFoto(null);
     setCargandoChat(true);
     try {
       const r = await whatsappApi.mensajes(c.jid);
@@ -159,12 +184,15 @@ function Burbuja() {
 
   async function enviar() {
     const t = texto.trim();
-    if (!chat || !t || enviando) return;
+    if (!chat || (!t && !foto) || enviando) return;
     setEnviando(true);
     setError(null);
     try {
-      await whatsappApi.enviar(chat.jid, t);
+      // con foto, el texto va como pie de foto
+      if (foto) await whatsappApi.enviarImagen(chat.jid, foto, t);
+      else await whatsappApi.enviar(chat.jid, t);
       setTexto("");
+      setFoto(null);
     } catch (e) {
       // acá llegan las protecciones: "ya se le escribió y no respondió", "esa línea no está conectada"…
       setError(e instanceof ApiError ? e.message : "No se pudo enviar el mensaje.");
@@ -283,18 +311,41 @@ function Burbuja() {
                 </p>
               )}
               {chatSinLinea && !error && <p className="wb-error suave">La línea {chat.nombreLinea} no está conectada: los mensajes no salen hasta que se vincule de nuevo.</p>}
+              {vistaFoto && (
+                <div className="wb-foto">
+                  <img src={vistaFoto} alt="Foto a enviar" />
+                  <span>Lista para enviar. Lo que escribas abajo va como pie de foto.</span>
+                  <button onClick={() => setFoto(null)} aria-label="Quitar la foto">
+                    <X size={15} />
+                  </button>
+                </div>
+              )}
               <div className="wb-redactar">
+                <button className="wb-adjuntar" onClick={() => archivoRef.current?.click()} aria-label="Adjuntar una foto" title="Adjuntar una foto (o pegala con Ctrl+V)">
+                  <ImagePlus size={19} />
+                </button>
+                <input
+                  ref={archivoRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  hidden
+                  onChange={(e) => {
+                    setFoto(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
                 <textarea
                   ref={areaRef}
                   value={texto}
                   onChange={(e) => setTexto(e.target.value)}
                   onKeyDown={alTeclear}
+                  onPaste={alPegar}
                   rows={texto.includes("\n") || texto.length > 60 ? 3 : 1}
-                  placeholder="Escribí un mensaje (Enter envía)"
+                  placeholder="Mensaje (Enter envía) · Ctrl+V pega una imagen"
                   aria-label="Mensaje"
                   maxLength={4000}
                 />
-                <button onClick={() => void enviar()} disabled={enviando || !texto.trim()} aria-label="Enviar mensaje" title="Enviar">
+                <button className="wb-enviar" onClick={() => void enviar()} disabled={enviando || (!texto.trim() && !foto)} aria-label="Enviar mensaje" title="Enviar">
                   <Send size={18} />
                 </button>
               </div>

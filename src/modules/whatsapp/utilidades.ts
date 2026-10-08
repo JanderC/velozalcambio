@@ -37,6 +37,34 @@ export function haceMinutos(fecha: string | null) {
   return h < 24 ? `hace ${h} h` : `hace ${Math.floor(h / 24)} d`;
 }
 
+const TIPOS_FOTO = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * La imagen que viene en el portapapeles (una captura pegada con Ctrl+V, una foto copiada), lista para enviarse.
+ * null si lo pegado no es una imagen. Si es de un tipo que WhatsApp no recibe por acá (GIF, BMP…), se pasa a PNG.
+ */
+export async function imagenDelPortapapeles(datos: DataTransfer | null): Promise<File | null> {
+  const archivo = [...(datos?.files ?? [])].find((f) => f.type.startsWith("image/"));
+  if (!archivo) return null;
+  if (TIPOS_FOTO.includes(archivo.type)) return archivo;
+  try {
+    const mapa = await createImageBitmap(archivo);
+    const lienzo = document.createElement("canvas");
+    lienzo.width = mapa.width;
+    lienzo.height = mapa.height;
+    lienzo.getContext("2d")?.drawImage(mapa, 0, 0);
+    const blob = await new Promise<Blob | null>((resolver) => lienzo.toBlob(resolver, "image/png"));
+    return blob ? new File([blob], "captura.png", { type: "image/png" }) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** ¿Lo que se está pegando trae una imagen? (para decidir en el momento si se frena el pegado normal de texto) */
+export function traeImagen(datos: DataTransfer | null) {
+  return [...(datos?.files ?? [])].some((f) => f.type.startsWith("image/"));
+}
+
 let audio: AudioContext | null = null;
 /** Dos tonos cortos (sin archivo de audio). El navegador lo permite después de una interacción. */
 export function sonarAviso() {
