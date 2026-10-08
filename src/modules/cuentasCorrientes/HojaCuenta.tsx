@@ -124,7 +124,7 @@ export function HojaCuenta({
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
   const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
   // Abono recién cargado (o elegido en la tabla): se le puede confirmar al cliente por WhatsApp
-  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string } | null>(null);
+  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string; texto?: string } | null>(null);
   const [estadoAviso, setEstadoAviso] = useState<"" | "enviando" | "enviado">("");
   const [copiado, setCopiado] = useState(false);
 
@@ -314,12 +314,16 @@ export function HojaCuenta({
 
   // Todos los avisos al cliente llevan el mismo formato: la frase, y debajo la referencia, el monto y el estado.
   type Aviso = NonNullable<typeof abonoParaAvisar>;
+  // La referencia va anotada en el movimiento después del " · ": el MTCN, o el código que se cargó. Solo eso, sin "Compra Zelle".
+  function refDeDescripcion(descripcion: string) {
+    const mtcn = /MTCN\s*(\d+)/i.exec(descripcion)?.[1];
+    const anotado = (descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
+    return `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigosDeReferencia(anotado).join(" / ") || "—")}`;
+  }
   function construirAviso(a: Aviso) {
+    if (a.texto) return a.texto; // el mensaje ya armado (varias operaciones juntas)
     const monto = `${simbolo}${formatearMonto(a.monto)}${sufijo}`;
-    // La referencia va anotada en el movimiento después del " · ": el MTCN, o el código que se cargó. Solo eso, sin "Compra Zelle".
-    const mtcn = /MTCN\s*(\d+)/i.exec(a.descripcion)?.[1];
-    const anotado = (a.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
-    const lineaRef = `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigosDeReferencia(anotado).join(" / ") || "—")}`;
+    const lineaRef = refDeDescripcion(a.descripcion);
     // Debajo de todo, como referencia: el total que mandó el cliente y la comisión con la que queda lo que recibe
     const pie = a.enviado
       ? `\n\nReferencia: envió ${simbolo}${formatearMonto(a.enviado)}${sufijo}${a.comision && /[1-9]/.test(a.comision) ? ` · comisión ${formatearMonto(a.comision)}%` : ""}`
@@ -357,7 +361,29 @@ export function HojaCuenta({
 
   // Botón de arriba. En Confirmaciones se envía la última operación hecha (con su referencia), no el saldo global.
   const ultimaOperacion = esConfirmaciones ? [...(estado?.movimientos ?? [])].reverse().find((m) => !m.anulado) : undefined;
-  const mensajeSaldo = ultimaOperacion
+  // El cliente puede mandar el dinero en varias transferencias registradas por separado: si hoy hay varias operaciones
+  // como la última (mismo estado) que todavía no se le pagaron, van todas en un solo mensaje, con el total.
+  const sentidoUltima = ultimaOperacion ? avisoDeMovimiento(ultimaOperacion).sentido : undefined;
+  const operacionesJuntas =
+    ultimaOperacion && (sentidoUltima === "confirmada" || sentidoUltima === "retiro" || sentidoUltima === "proceso")
+      ? (estado?.movimientos ?? []).filter((m) => {
+          if (m.anulado || m.pagado_en || m.monto.startsWith("-")) return false;
+          const s = avisoDeMovimiento(m).sentido;
+          return sentidoUltima === "proceso" ? s === "proceso" : s === "confirmada" || s === "retiro";
+        })
+      : [];
+  function construirAvisoDeVarias(movs: FilaEstadoCuenta[]) {
+    const plata = (v: string) => `${simbolo}${formatearMonto(v)}${sufijo}`;
+    const cuerpo = movs.map((m) => `${refDeDescripcion(m.descripcion ?? m.tipo)} · ${plata(m.monto)}`).join("\n");
+    const total = plata(movs.reduce((suma, m) => sumarDecimales(suma, m.monto), "0"));
+    return sentidoUltima === "proceso"
+      ? `Estimado(a), le informamos que las operaciones están en proceso de confirmación.\n\n${cuerpo}\nMonto total: ${total}\nEn breves minutos estará disponible`
+      : `Estimado(a), le informamos que las operaciones han sido confirmadas.\n\n${cuerpo}\nRecibe en total: ${total}\nDisponible para recoger`;
+  }
+  const variasOperaciones = operacionesJuntas.length > 1;
+  const mensajeSaldo = variasOperaciones
+    ? construirAvisoDeVarias(operacionesJuntas)
+    : ultimaOperacion
     ? construirAviso(avisoDeMovimiento(ultimaOperacion))
     : `Estimado(a), le informamos su saldo al ${fechaCorta(new Date().toISOString())}.\n\n${saldoParaCliente}`;
 
@@ -538,7 +564,7 @@ export function HojaCuenta({
         </button>
         {(telefono || esConfirmaciones) && (
           <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeSaldo)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeSaldo)} target="_blank" rel="noreferrer" title={!telefono ? "Sin teléfono registrado: al abrir WhatsApp elegís el contacto" : ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
-            <MessageCircle size={14} /> {esConfirmaciones ? (ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
+            <MessageCircle size={14} /> {esConfirmaciones ? (variasOperaciones ? `Enviar las ${operacionesJuntas.length} operaciones` : ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
           </a>
         )}
         {/* La misma última operación, pero por uno de los WhatsApp vinculados al sistema: abre el aviso para elegir la línea y enviarlo */}
@@ -547,7 +573,7 @@ export function HojaCuenta({
             className="cc-whatsapp cc-whatsapp-vinculado"
             onClick={() => {
               setEstadoAviso("");
-              setAbonoParaAvisar(avisoDeMovimiento(ultimaOperacion));
+              setAbonoParaAvisar({ ...avisoDeMovimiento(ultimaOperacion), ...(variasOperaciones ? { texto: mensajeSaldo } : {}) });
             }}
             title="Enviar la última operación desde un WhatsApp vinculado al sistema (Bolívares, Pesos o Dólares): se elige la línea y sale sola"
           >
@@ -947,11 +973,10 @@ function FilaNueva({
             setCantidad(formatearMonto(l.total));
           }
         }
+        // La fecha de la captura no cambia la del movimiento: lo que se registra hoy queda en el día de hoy (con la fecha
+        // de la captura quedaba escondido en otro día). Si es de otro día, se avisa y se cambia a mano en "Fecha".
         const fechaLeida = l.primera?.fecha;
-        if (fechaLeida && fechaLeida <= hoyBogota()) {
-          setFecha(fechaLeida);
-          partes.push(`fecha ${fechaCorta(`${fechaLeida}T12:00:00-05:00`)}`);
-        }
+        if (fechaLeida && fechaLeida < hoyBogota()) partes.push(`la captura es del ${fechaCorta(`${fechaLeida}T12:00:00-05:00`)} (el movimiento queda con la fecha de hoy)`);
       }
       setAvisoLectura(
         (partes.length
