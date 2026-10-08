@@ -162,6 +162,27 @@ function buscarFecha(texto: string): string | null {
   return null;
 }
 
+const hoyEnBogota = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+const diasAtras = (fecha: string, hoy: string) => Math.round((Date.parse(hoy + "T12:00:00Z") - Date.parse(fecha + "T12:00:00Z")) / 86_400_000);
+const DIAS_CREIBLES = 10;
+
+/**
+ * La fecha leída de una captura solo sirve si es de estos días. Zelle la escribe a la americana (mes/día): un pago del
+ * 7 de octubre dice 10/07 y se leía como 10 de julio, y el movimiento quedaba escondido en otro día. Si con el día y
+ * el mes al revés cae en estos días, es esa; si no cae de ninguna forma, no se usa (queda la de hoy).
+ */
+export function fechaCreible(fecha: string | null, hoy = hoyEnBogota()): string | null {
+  if (!fecha) return null;
+  const [a, m, d] = fecha.split("-");
+  const posibles = [fecha, Number(d) <= 12 ? a + "-" + d + "-" + m : null].filter((f): f is string => {
+    if (!f) return false;
+    const dias = diasAtras(f, hoy);
+    return dias >= 0 && dias <= DIAS_CREIBLES;
+  });
+  posibles.sort((x, y) => diasAtras(x, hoy) - diasAtras(y, hoy));
+  return posibles[0] ?? null;
+}
+
 function buscarBanco(texto: string): string | null {
   const bancos = ["Zelle", "Bancolombia", "Nequi", "Daviplata", "Binance", "Western Union", "Banco de Venezuela", "Banesco", "Mercantil", "Provincial", "Pago Móvil"];
   return bancos.find((b) => new RegExp(b.replace("ó", "[oó]"), "i").test(texto)) ?? (BANCO_DE_EEUU.test(texto) ? "Zelle" : null);
@@ -281,6 +302,11 @@ const ESPERA_IA_MS = 14_000;
  * (y lo que una no vio se completa con la otra). Así la lectura nunca depende de que la IA esté disponible.
  */
 export async function leerComprobante(imagen: File): Promise<DatosComprobante> {
+  const d = await leerSinRevisar(imagen);
+  return { ...d, fecha: fechaCreible(d.fecha) };
+}
+
+async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
   const local = leerLocal(imagen).then(
     (d) => ({ d, error: null as Error | null }),
     (e: unknown) => ({ d: null, error: e as Error })
