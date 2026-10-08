@@ -282,6 +282,9 @@ function Burbuja() {
                   <strong>{chat.nombre}</strong>
                   <span>{chat.esGrupo ? `Grupo · línea ${chat.nombreLinea}` : `+${chat.telefono} · línea ${chat.nombreLinea}`}</span>
                 </div>
+                <button className="wb-icono wb-letra" onClick={tamano.pasarLetra} title={`Cambiar el tamaño de la letra (pasa a ${tamano.letraSiguiente})`} aria-label={`Cambiar el tamaño de la letra a ${tamano.letraSiguiente}`}>
+                  Aa
+                </button>
                 <button className="wb-icono wb-tamano" onClick={tamano.pasarAlSiguiente} title={`Cambiar el tamaño de la ventana (pasa a ${tamano.siguiente}). También se estira desde la esquina de arriba a la izquierda.`} aria-label={`Cambiar el tamaño de la ventana a ${tamano.siguiente}`}>
                   <Maximize2 size={15} />
                 </button>
@@ -460,6 +463,9 @@ function Burbuja() {
                   <strong>WhatsApp</strong>
                   <span>{totalSinLeer > 0 ? `${totalSinLeer} ${totalSinLeer === 1 ? "mensaje sin leer" : "mensajes sin leer"}` : conectado ? "Al día" : "Reconectando…"}</span>
                 </div>
+                <button className="wb-icono wb-letra" onClick={tamano.pasarLetra} title={`Cambiar el tamaño de la letra (pasa a ${tamano.letraSiguiente})`} aria-label={`Cambiar el tamaño de la letra a ${tamano.letraSiguiente}`}>
+                  Aa
+                </button>
                 <button className="wb-icono wb-tamano" onClick={tamano.pasarAlSiguiente} title={`Cambiar el tamaño de la ventana (pasa a ${tamano.siguiente}). También se estira desde la esquina de arriba a la izquierda.`} aria-label={`Cambiar el tamaño de la ventana a ${tamano.siguiente}`}>
                   <Maximize2 size={15} />
                 </button>
