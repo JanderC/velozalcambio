@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Camera, CheckCircle2, ClipboardPaste, MessageCircle, UserCheck, UserPlus, X } from "lucide-react";
 import { Modal } from "../../components/common/Modal";
+import { EnviarReportePorVinculado } from "../../components/whatsapp/EnviarReportePorVinculado";
 import { ApiError } from "../../api/client";
 import { crearCuentaCorriente, getEstadoCuenta, registrarMovimientoCC, subirComprobanteMovimiento, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import type { Moneda } from "../../api/monedas.api";
@@ -238,6 +239,8 @@ export function TransferenciaCobrarModal({
             <a className="cc-whatsapp cxc-transf-wa" href={enlaceWhatsApp(tel, hecho.mensaje)} onClick={(e) => alAbrirWhatsApp(e, tel, hecho.mensaje)} target="_blank" rel="noreferrer" title={tel ? "Abre WhatsApp con el mensaje escrito; el reporte se pega con Ctrl+V" : "Sin teléfono: al abrir WhatsApp elegís el contacto"}>
               <MessageCircle size={14} /> Abrir su WhatsApp
             </a>
+            {/* Desde uno de los WhatsApp vinculados al sistema: sale el reporte con el mensaje, sin abrir nada */}
+            {tel && <EnviarReportePorVinculado telefono={tel} nombre={hecho.cuenta.tercero_nombre} imagen={hecho.blob} nombreArchivo={nombreArchivo} texto={hecho.mensaje} monedaCodigo={hecho.cuenta.moneda_codigo} />}
             <button
               type="button"
               className="cc-btn-secundario"

@@ -450,3 +450,7 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-rango-fechas { display: flex; gap: 12px; flex-wrap: wrap; }
 .cc-rango-fechas label { display: grid; gap: 4px; font-size: 0.82rem; color: #4b5563; flex: 1; min-width: 140px; }
 .cc-rango-fechas input { padding: 9px 10px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: inherit; }
+
+/* Enviar el reporte desde un WhatsApp vinculado */
+.cc-reporte-vinculado .cc-guardar { padding: 8px 12px; font-size: 0.84rem; }
+.cc-reporte-vinculado .cc-form-error { flex-basis: 100%; margin: 0 4px 2px; }

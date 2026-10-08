@@ -35,6 +35,7 @@ import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { LINEAS_WA, whatsappApi, type ConexionWa, type LineaWa } from "../../api/whatsapp.api";
 import { abrirChatEnBurbuja } from "../../components/whatsapp/BurbujaWhatsapp";
+import { EnviarReportePorVinculado } from "../../components/whatsapp/EnviarReportePorVinculado";
 import { CobroModal } from "./CobroModal";
 
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
@@ -684,6 +685,8 @@ export function HojaCuenta({
               <button type="button" className="cc-btn-secundario" onClick={() => descargarBlob(reporte.blob, reporte.nombre)}>
                 Descargar
               </button>
+              {/* Al cliente, desde uno de los WhatsApp vinculados al sistema */}
+              {telefono && <EnviarReportePorVinculado telefono={telefono} nombre={cuenta.tercero_nombre} imagen={reporte.blob} nombreArchivo={reporte.nombre} monedaCodigo={cuenta.moneda_codigo} />}
             </div>
             <img src={reporte.url} alt="Reporte de movimientos" />
           </div>
