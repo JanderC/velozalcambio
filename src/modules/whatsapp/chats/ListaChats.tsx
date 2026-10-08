@@ -1,5 +1,5 @@
 import { Bot, Search, UserRound, X } from "lucide-react";
-import type { ChatWa, FiltroChats } from "../../../api/whatsapp.api";
+import { LINEAS_WA, type ChatWa, type ConexionWa, type FiltroChats, type LineaWa } from "../../../api/whatsapp.api";
 import { fechaLista } from "../utilidades";
 import { EsperandoPorTi } from "./EsperandoPorTi";
 
@@ -31,6 +31,10 @@ interface Props {
   esperando: ChatWa[];
   filtro: FiltroChats;
   onFiltro: (f: FiltroChats) => void;
+  // Cuál de los tres teléfonos se mira (null = todos)
+  linea: LineaWa | null;
+  onLinea: (l: LineaWa | null) => void;
+  lineas: ConexionWa[];
   busqueda: string;
   onBusqueda: (q: string) => void;
   abierto: string | null;
@@ -56,6 +60,30 @@ export function ListaChats(p: Props) {
             <X size={14} />
           </button>
         )}
+      </div>
+      {/* Las tres líneas: cada una es un teléfono del negocio */}
+      <div className="wa-lineas-chips" role="tablist" aria-label="Línea de WhatsApp">
+        <button role="tab" aria-selected={p.linea === null} className={p.linea === null ? "activo" : ""} onClick={() => p.onLinea(null)}>
+          Todas
+        </button>
+        {LINEAS_WA.map((l) => {
+          const estado = p.lineas.find((x) => x.linea === l.id);
+          const sinLeer = p.chats.filter((c) => c.linea === l.id).reduce((s, c) => s + c.noLeidos, 0);
+          return (
+            <button
+              key={l.id}
+              role="tab"
+              aria-selected={p.linea === l.id}
+              className={`l${l.id} ${p.linea === l.id ? "activo" : ""}`}
+              onClick={() => p.onLinea(l.id)}
+              title={estado?.estado === "CONECTADO" ? `Línea ${l.nombre}: conectada${estado.numero ? ` (+${estado.numero})` : ""}` : `Línea ${l.nombre}: sin vincular o desconectada`}
+            >
+              <i className={estado?.estado === "CONECTADO" ? "ok" : "mal"} />
+              {l.nombre}
+              {sinLeer > 0 && <b>{sinLeer}</b>}
+            </button>
+          );
+        })}
       </div>
       <div className="wa-filtros" role="tablist">
         {FILTROS.map((f) => (
@@ -91,6 +119,7 @@ export function ListaChats(p: Props) {
                       {c.necesitaHumano ? <strong className="wa-item-motivo">⚠ {c.motivo ?? "Necesita atención"}</strong> : c.ultimoMensaje ?? ""}
                     </span>
                     <span className="wa-item-marcas">
+                      {p.linea === null && <span className={`wa-linea-chip l${c.linea}`}>{c.nombreLinea}</span>}
                       {c.botActivo ? (
                         <Bot size={14} aria-label="Lo atiende el bot" className="wa-marca-bot" />
                       ) : (

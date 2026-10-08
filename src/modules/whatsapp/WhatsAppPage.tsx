@@ -24,7 +24,7 @@ export function WhatsAppPage() {
         </NavLink>
         {esAdmin && (
           <NavLink to="/whatsapp/conexion" className={({ isActive }) => (isActive ? "activo" : "")}>
-            <Smartphone size={16} /> Conexión
+            <Smartphone size={16} /> Líneas
           </NavLink>
         )}
         {esAdmin && (

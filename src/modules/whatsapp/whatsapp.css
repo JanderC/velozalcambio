@@ -329,3 +329,33 @@
   .wa-tarjetas { grid-template-columns: 1fr; }
   .wa-qr img, .wa-qr > span { width: 200px; height: 200px; }
 }
+
+/* ---------- Tres líneas (Bolívares, Pesos, Dólares) ---------- */
+.wa-lineas-chips { display: flex; gap: 6px; padding: 2px 12px 8px; overflow-x: auto; }
+.wa-lineas-chips button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--wa-borde); border-radius: 999px; background: white; color: #3b4a54; font: inherit; font-size: 0.8rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.wa-lineas-chips button.activo { border-color: var(--wa-verde); background: #d9fdd3; color: var(--wa-verde-oscuro); }
+.wa-lineas-chips i { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+.wa-lineas-chips i.ok { background: #22c55e; }
+.wa-lineas-chips b { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--wa-verde); color: white; font-size: 0.68rem; text-align: center; }
+.wa-linea-chip { padding: 1px 7px; border-radius: 999px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+.wa-linea-chip.l1 { background: #fef3c7; color: #92400e; }
+.wa-linea-chip.l2 { background: #dbeafe; color: #1e40af; }
+.wa-linea-chip.l3 { background: #dcfce7; color: #166534; }
+
+.wa-lineas-cabeza { max-width: 1200px; margin-bottom: 14px; }
+.wa-lineas-cabeza h2 { margin: 0 0 4px; font-family: "Space Grotesk", sans-serif; font-size: 1.35rem; color: var(--color-navy-dark); }
+.wa-lineas-cabeza p { margin: 0; color: var(--wa-gris); font-size: 0.9rem; }
+.wa-tarjetas-lineas { margin-bottom: 16px; }
+.wa-linea { border-top: 4px solid #cbd5e1; }
+.wa-linea.l1 { border-top-color: #f59e0b; }
+.wa-linea.l2 { border-top-color: #3b82f6; }
+.wa-linea.l3 { border-top-color: #22c55e; }
+.wa-linea-titulo { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.wa-linea-titulo h2 { margin: 0 0 2px; }
+.wa-linea-icono { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #f0f2f5; color: #54656f; flex-shrink: 0; }
+.wa-linea.conectada .wa-linea-icono { background: #d9fdd3; color: var(--wa-verde-oscuro); }
+.wa-linea-mantenimiento { margin-top: 14px; border-top: 1px solid var(--wa-borde); padding-top: 10px; }
+.wa-linea-mantenimiento summary { cursor: pointer; color: var(--wa-gris); font-size: 0.82rem; font-weight: 600; }
+.wa-linea-mantenimiento .wa-botones { margin-top: 10px; }
+.wa-tarjeta-proteccion { grid-column: 1 / -1; }
+.wa-tarjeta-proteccion h2 { display: flex; align-items: center; gap: 8px; }

@@ -217,8 +217,9 @@ export async function buscarMovimientoPorNumero(numero: string, canalId?: number
 }
 
 /** Manda un mensaje al cliente por el WhatsApp conectado al sistema. */
-export function avisarClienteCuenta(id: number, texto: string) {
-  return api.post<{ ok: true }>(`/cuentas-corrientes/${id}/avisar`, { texto });
+export function avisarClienteCuenta(id: number, texto: string, linea: 1 | 2 | 3 = 1) {
+  // linea: por cuál de los WhatsApp vinculados sale (1 Bolívares, 2 Pesos, 3 Dólares)
+  return api.post<{ ok: true }>(`/cuentas-corrientes/${id}/avisar`, { texto, linea });
 }
 
 export interface DatosComprobante {

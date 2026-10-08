@@ -2,7 +2,17 @@ import { api } from "./client";
 
 export type EstadoConexionWa = "DESCONECTADO" | "CONECTANDO" | "ESPERANDO_QR" | "CONECTADO" | "REEMPLAZADA";
 
+// El negocio atiende con tres WhatsApp, uno por tipo de cambio: cada línea es un teléfono vinculado
+export type LineaWa = 1 | 2 | 3;
+export const LINEAS_WA: { id: LineaWa; nombre: string }[] = [
+  { id: 1, nombre: "Bolívares" },
+  { id: 2, nombre: "Pesos" },
+  { id: 3, nombre: "Dólares" },
+];
+
 export interface ConexionWa {
+  linea: LineaWa;
+  nombreLinea: string;
   estado: EstadoConexionWa;
   qr: string | null;
   numero: string | null;
@@ -10,10 +20,14 @@ export interface ConexionWa {
   ultimoError: string | null;
   conectadoDesde: string | null;
   cola?: { enCola: number; enviadosUltimoMinuto: number; enviadosHoy: number };
+  // mensajes y chats sin leer de esa línea (solo en /lineas)
+  sinLeer?: { mensajes: number; chats: number };
 }
 
 export interface ChatWa {
-  jid: string;
+  jid: string; // la clave del chat: lleva "#2" o "#3" si es de esas líneas
+  linea: LineaWa;
+  nombreLinea: string;
   telefono: string;
   nombre: string;
   nombreWhatsapp: string | null;
@@ -158,15 +172,20 @@ export interface ResultadoSimulacion {
 const j = (jid: string) => encodeURIComponent(jid);
 
 export const whatsappApi = {
-  estado: () => api.get<ConexionWa>("/whatsapp/estado"),
-  iniciar: () => api.post<ConexionWa>("/whatsapp/conexion/iniciar"),
-  reconectar: () => api.post<ConexionWa>("/whatsapp/conexion/reconectar"),
-  pedirCodigo: (numero: string) => api.post<{ codigo: string }>("/whatsapp/conexion/codigo", { numero }),
-  cerrarSesion: () => api.post<ConexionWa>("/whatsapp/conexion/cerrar-sesion"),
-  reset: () => api.post<ConexionWa>("/whatsapp/conexion/reset"),
+  // Las tres líneas: estado, número vinculado, cola de envío y mensajes sin leer
+  lineas: () => api.get<ConexionWa[]>("/whatsapp/lineas"),
+  estado: (linea: LineaWa = 1) => api.get<ConexionWa>(`/whatsapp/estado?linea=${linea}`),
+  iniciar: (linea: LineaWa = 1) => api.post<ConexionWa>(`/whatsapp/conexion/iniciar?linea=${linea}`),
+  reconectar: (linea: LineaWa = 1) => api.post<ConexionWa>(`/whatsapp/conexion/reconectar?linea=${linea}`),
+  pedirCodigo: (numero: string, linea: LineaWa = 1) => api.post<{ codigo: string }>(`/whatsapp/conexion/codigo?linea=${linea}`, { numero }),
+  cerrarSesion: (linea: LineaWa = 1) => api.post<ConexionWa>(`/whatsapp/conexion/cerrar-sesion?linea=${linea}`),
+  reset: (linea: LineaWa = 1) => api.post<ConexionWa>(`/whatsapp/conexion/reset?linea=${linea}`),
 
-  chats: (filtro: FiltroChats, q: string) =>
-    api.get<ChatWa[]>(`/whatsapp/chats?filtro=${filtro}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""}`),
+  // linea: solo los chats de ese teléfono; sin ella, los de los tres
+  chats: (filtro: FiltroChats, q: string, linea?: LineaWa | null) =>
+    api.get<ChatWa[]>(`/whatsapp/chats?filtro=${filtro}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""}${linea ? `&linea=${linea}` : ""}`),
+  // El chat de un teléfono en una línea (lo crea vacío si no existía). No envía nada.
+  abrirChat: (telefono: string, linea: LineaWa, nombre?: string) => api.post<ChatWa>("/whatsapp/chats/abrir", { telefono, linea, nombre }),
   mensajes: (jid: string, opciones: { antesDe?: string; q?: string } = {}) => {
     const p = new URLSearchParams();
     if (opciones.antesDe) p.set("antesDe", opciones.antesDe);

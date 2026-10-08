@@ -5,6 +5,7 @@ import {
   type ChatWa,
   type ConexionWa,
   type FiltroChats,
+  type LineaWa,
   type MensajeWa,
 } from "../../../api/whatsapp.api";
 import { useStreamWhatsapp, type EventoStream } from "../useStreamWhatsapp";
@@ -22,7 +23,8 @@ function ordenar(chats: ChatWa[]) {
   });
 }
 
-function cumpleFiltro(c: ChatWa, filtro: FiltroChats) {
+function cumpleFiltro(c: ChatWa, filtro: FiltroChats, linea: LineaWa | null) {
+  if (linea && c.linea !== linea) return false;
   if (filtro === "archivados") return c.archivado;
   if (c.archivado) return false;
   if (filtro === "no_leidos") return c.noLeidos > 0;
@@ -36,6 +38,8 @@ export function ChatsPanel() {
   const [chats, setChats] = useState<ChatWa[]>([]);
   const [esperando, setEsperando] = useState<ChatWa[]>([]);
   const [filtro, setFiltro] = useState<FiltroChats>("todos");
+  // Cuál de los tres teléfonos se está mirando (null = los tres juntos)
+  const [linea, setLinea] = useState<LineaWa | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +47,7 @@ export function ChatsPanel() {
   const [mensajes, setMensajes] = useState<MensajeWa[]>([]);
   const [hayMas, setHayMas] = useState(false);
   const [verCliente, setVerCliente] = useState(false);
-  const [conexion, setConexion] = useState<ConexionWa | null>(null);
+  const [lineas, setLineas] = useState<ConexionWa[]>([]);
   const [respuestasRapidas, setRespuestasRapidas] = useState<string[]>([]);
   const abiertoRef = useRef<string | null>(null);
   abiertoRef.current = abierto;
@@ -51,14 +55,14 @@ export function ChatsPanel() {
   // ---------- Carga ----------
   const cargarChats = useCallback(async () => {
     try {
-      setChats(await whatsappApi.chats(filtro, busqueda));
+      setChats(await whatsappApi.chats(filtro, busqueda, linea));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setCargando(false);
     }
-  }, [filtro, busqueda]);
+  }, [filtro, busqueda, linea]);
 
   useEffect(() => {
     const t = setTimeout(cargarChats, busqueda ? 300 : 0);
@@ -71,7 +75,7 @@ export function ChatsPanel() {
 
   useEffect(() => {
     cargarEsperando();
-    whatsappApi.estado().then(setConexion).catch(() => {});
+    whatsappApi.lineas().then(setLineas).catch(() => {});
     whatsappApi
       .config()
       .then((r) => setRespuestasRapidas(r.config.panel?.respuestasRapidas ?? []))
@@ -108,7 +112,7 @@ export function ChatsPanel() {
         // Con búsqueda activa solo se actualiza lo que ya está en pantalla
         if (busqueda) return lista.map((c) => (c.jid === chat.jid ? chat : c));
         const sin = lista.filter((c) => c.jid !== chat.jid);
-        return cumpleFiltro(chat, filtro) ? ordenar([chat, ...sin]) : sin;
+        return cumpleFiltro(chat, filtro, linea) ? ordenar([chat, ...sin]) : sin;
       });
       setEsperando((lista) => {
         const sin = lista.filter((c) => c.jid !== chat.jid);
@@ -128,7 +132,10 @@ export function ChatsPanel() {
       setMensajes((lista) => lista.map((x) => (String(x.id) === String(e.id) ? { ...x, estado: e.estado, error: e.error } : x)));
     }
     if (tipo === "atencion") cargarEsperando();
-    if (tipo === "conexion") setConexion((c) => ({ ...(c ?? ({} as ConexionWa)), ...(datos as ConexionWa) }));
+    if (tipo === "conexion") {
+      const c = datos as ConexionWa;
+      setLineas((lista) => (lista.some((l) => l.linea === c.linea) ? lista.map((l) => (l.linea === c.linea ? { ...l, ...c } : l)) : [...lista, c]));
+    }
   });
 
   // Al volver a la pestaña, lo abierto queda leído
@@ -149,6 +156,7 @@ export function ChatsPanel() {
     };
   }, [totalNoLeidos]);
 
+  const sinConectar = lineas.filter((l) => l.estado !== "CONECTADO");
   const chatAbierto = chats.find((c) => c.jid === abierto) ?? esperando.find((c) => c.jid === abierto) ?? null;
 
   function actualizarLocal(chat: ChatWa) {
@@ -157,14 +165,14 @@ export function ChatsPanel() {
 
   return (
     <div className={`wa-chats ${abierto ? "con-chat" : ""} ${verCliente && abierto ? "con-cliente" : ""}`}>
-      {(conexion && conexion.estado !== "CONECTADO") || !streamConectado ? (
+      {!streamConectado || (lineas.length > 0 && sinConectar.length > 0) ? (
         <div className="wa-banner-conexion" role="status">
           <WifiOff size={15} />
           {!streamConectado
             ? "Reconectando con el servidor…"
-            : conexion?.estado === "REEMPLAZADA"
-              ? "WhatsApp se abrió en otro lugar. Un administrador debe reconectarlo desde Conexión."
-              : "WhatsApp no está conectado: los mensajes no se envían hasta que se reconecte."}
+            : sinConectar.length === lineas.length
+              ? "Ninguna línea de WhatsApp está conectada: se vinculan en la pestaña Líneas."
+              : `Sin conectar: ${sinConectar.map((l) => l.nombreLinea).join(" y ")}. Los mensajes de esas líneas no entran ni salen hasta vincularlas.`}
         </div>
       ) : null}
 
@@ -173,6 +181,9 @@ export function ChatsPanel() {
         esperando={esperando}
         filtro={filtro}
         onFiltro={setFiltro}
+        linea={linea}
+        onLinea={setLinea}
+        lineas={lineas}
         busqueda={busqueda}
         onBusqueda={setBusqueda}
         abierto={abierto}

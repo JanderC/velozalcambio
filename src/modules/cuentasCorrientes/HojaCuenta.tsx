@@ -33,6 +33,8 @@ import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, pctDeComision, sumarDecimales } from "../../utils/montos";
 import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
+import { LINEAS_WA, whatsappApi, type ConexionWa, type LineaWa } from "../../api/whatsapp.api";
+import { abrirChatEnBurbuja } from "../../components/whatsapp/BurbujaWhatsapp";
 import { CobroModal } from "./CobroModal";
 
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
@@ -334,10 +336,46 @@ export function HojaCuenta({
     ? construirAviso(avisoDeMovimiento(ultimaOperacion))
     : `Estimado(a), le informamos su saldo al ${fechaCorta(new Date().toISOString())}.\n\n${saldoParaCliente}`;
 
+  // Por cuál de los WhatsApp vinculados sale el aviso (Bolívares, Pesos o Dólares). Se recuerda la última usada;
+  // la primera vez se propone según la moneda de la cuenta.
+  const [lineasWa, setLineasWa] = useState<ConexionWa[]>([]);
+  const [lineaAviso, setLineaAviso] = useState<LineaWa>(() => {
+    try {
+      const guardada = Number(localStorage.getItem("wa-linea-aviso"));
+      if (guardada === 1 || guardada === 2 || guardada === 3) return guardada;
+    } catch {
+      // sin almacenamiento: se propone por la moneda
+    }
+    return cuenta.moneda_codigo === "VES" ? 1 : cuenta.moneda_codigo === "COP" ? 2 : 3;
+  });
+  const hayAviso = !!abonoParaAvisar;
+  useEffect(() => {
+    if (!hayAviso) return;
+    whatsappApi
+      .lineas()
+      .then((l) => {
+        setLineasWa(l);
+        // si la línea propuesta no está conectada y otra sí, se pasa a esa
+        setLineaAviso((actual) => (l.find((x) => x.linea === actual)?.estado === "CONECTADO" ? actual : (l.find((x) => x.estado === "CONECTADO")?.linea ?? actual)));
+      })
+      .catch(() => setLineasWa([]));
+  }, [hayAviso]);
+  const lineaElegida = lineasWa.find((l) => l.linea === lineaAviso);
+  const lineaConectada = lineaElegida?.estado === "CONECTADO";
+  function elegirLineaAviso(l: LineaWa) {
+    setLineaAviso(l);
+    setEstadoAviso("");
+    try {
+      localStorage.setItem("wa-linea-aviso", String(l));
+    } catch {
+      // no es grave: solo no se recuerda
+    }
+  }
+
   async function avisarConElSistema() {
     setEstadoAviso("enviando");
     try {
-      await avisarClienteCuenta(cuenta.id, mensajeAbono);
+      await avisarClienteCuenta(cuenta.id, mensajeAbono, lineaAviso);
       setEstadoAviso("enviado");
       setError(null);
     } catch (e) {
@@ -491,13 +529,35 @@ export function HojaCuenta({
           <p>{mensajeAbono}</p>
           <div className="cc-aviso-abono-acciones">
             {/* Desde el WhatsApp personal, con el enlace de WhatsApp: siempre está. Sin teléfono registrado, se elige el contacto allá. */}
-            <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeAbono)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeAbono)} target="_blank" rel="noreferrer">
-              <MessageCircle size={14} /> Enviar desde mi WhatsApp
+            <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeAbono)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeAbono)} target="_blank" rel="noreferrer" title="Abre WhatsApp con el mensaje escrito: lo envía usted desde su propio WhatsApp">
+              <MessageCircle size={14} /> Por mi WhatsApp
             </a>
             {telefono ? (
-              <button type="button" className="cc-guardar" onClick={avisarConElSistema} disabled={estadoAviso !== ""}>
-                {estadoAviso === "enviando" ? "Enviando…" : estadoAviso === "enviado" ? "Enviado por el sistema" : "Enviar por el sistema"}
-              </button>
+              // Por el WhatsApp vinculado al sistema: se elige la línea y sale solo
+              <span className="cc-aviso-vinculado">
+                <select value={lineaAviso} onChange={(e) => elegirLineaAviso(Number(e.target.value) as LineaWa)} aria-label="Línea de WhatsApp por la que sale el aviso">
+                  {LINEAS_WA.map((l) => {
+                    const estado = lineasWa.find((x) => x.linea === l.id);
+                    return (
+                      <option key={l.id} value={l.id}>
+                        {l.nombre}
+                        {estado?.estado === "CONECTADO" ? (estado.numero ? ` · +${estado.numero}` : "") : " · sin vincular"}
+                      </option>
+                    );
+                  })}
+                </select>
+                <button type="button" className="cc-guardar" onClick={avisarConElSistema} disabled={estadoAviso !== "" || !lineaConectada} title={lineaConectada ? "Sale solo por el WhatsApp vinculado de esa línea" : "Esa línea no está vinculada: se vincula en WhatsApp → Líneas"}>
+                  {estadoAviso === "enviando" ? "Enviando…" : estadoAviso === "enviado" ? "Enviado ✓" : "Enviar por el vinculado"}
+                </button>
+                <button
+                  type="button"
+                  className="cc-btn-secundario"
+                  onClick={() => abrirChatEnBurbuja({ telefono: telefono!, linea: lineaAviso, nombre: cuenta.tercero_nombre, texto: estadoAviso === "enviado" ? "" : mensajeAbono })}
+                  title="Abre el chat con este cliente acá mismo, sin salir de la pantalla"
+                >
+                  Ver chat
+                </button>
+              </span>
             ) : (
               <span>Sin teléfono registrado: al abrir WhatsApp eliges el contacto.</span>
             )}
