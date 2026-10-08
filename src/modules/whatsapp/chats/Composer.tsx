@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, MessageSquareText, Send, Smile, Sticker, X } from "lucide-react";
-import { whatsappApi } from "../../../api/whatsapp.api";
-import { EMOJIS, imagenDelPortapapeles, traeImagen } from "../utilidades";
+import { ImagePlus, MessageSquareText, Reply, Send, Smile, Sticker, X } from "lucide-react";
+import { whatsappApi, type MensajeWa } from "../../../api/whatsapp.api";
+import { EMOJIS, imagenDelPortapapeles, resumenDeMensaje, traeImagen } from "../utilidades";
 import { STICKERS_WA } from "../stickers";
 
 /** Enter envía, Shift+Enter hace salto de línea. Escribir acá pausa el bot en este chat. */
-export function Composer({ jid, botActivo, respuestasRapidas }: { jid: string; botActivo: boolean; respuestasRapidas: string[] }) {
+export function Composer({
+  jid,
+  botActivo,
+  respuestasRapidas,
+  respondiendo = null,
+  onSoltarRespuesta,
+}: {
+  jid: string;
+  botActivo: boolean;
+  respuestasRapidas: string[];
+  /** El mensaje al que se está respondiendo: lo que se envíe sale citándolo */
+  respondiendo?: MensajeWa | null;
+  onSoltarRespuesta?: () => void;
+}) {
   const [texto, setTexto] = useState("");
   const [menu, setMenu] = useState<"emojis" | "rapidas" | "stickers" | null>(null);
   const [foto, setFoto] = useState<File | null>(null);
@@ -46,13 +59,19 @@ export function Composer({ jid, botActivo, respuestasRapidas }: { jid: string; b
     return () => document.removeEventListener("paste", alPegar);
   }, []);
 
+  const respondiendoId = respondiendo?.id;
+  useEffect(() => {
+    if (respondiendoId) area.current?.focus();
+  }, [respondiendoId]);
+
   async function enviar() {
     if (enviando || (!texto.trim() && !foto)) return;
     setEnviando(true);
     setError(null);
     try {
-      if (foto) await whatsappApi.enviarImagen(jid, foto, texto);
-      else await whatsappApi.enviar(jid, texto.trim());
+      if (foto) await whatsappApi.enviarImagen(jid, foto, texto, respondiendo?.id);
+      else await whatsappApi.enviar(jid, texto.trim(), respondiendo?.id);
+      onSoltarRespuesta?.();
       setTexto("");
       setFoto(null);
       setMenu(null);
@@ -70,7 +89,8 @@ export function Composer({ jid, botActivo, respuestasRapidas }: { jid: string; b
     setEnviando(true);
     setError(null);
     try {
-      await whatsappApi.enviarSticker(jid, id);
+      await whatsappApi.enviarSticker(jid, id, respondiendo?.id);
+      onSoltarRespuesta?.();
       setMenu(null);
     } catch (e) {
       setError((e as Error).message);
@@ -99,6 +119,18 @@ export function Composer({ jid, botActivo, respuestasRapidas }: { jid: string; b
           {error}
           <button onClick={() => setError(null)} aria-label="Cerrar">
             <X size={13} />
+          </button>
+        </div>
+      )}
+      {respondiendo && (
+        <div className="wa-composer-cita">
+          <Reply size={16} />
+          <span>
+            <b>Respondiendo a {respondiendo.deMi ? "tu mensaje" : "su mensaje"}</b>
+            <span>{resumenDeMensaje(respondiendo) || "Mensaje"}</span>
+          </span>
+          <button onClick={() => onSoltarRespuesta?.()} aria-label="No responder a ese mensaje">
+            <X size={15} />
           </button>
         </div>
       )}

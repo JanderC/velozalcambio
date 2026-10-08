@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, Check, CheckCheck, Clock, FileText, Receipt, X } from "lucide-react";
+import { AlertCircle, Check, CheckCheck, Clock, FileText, Receipt, Reply, X } from "lucide-react";
 import { Modal } from "../../../components/common/Modal";
 import { whatsappApi, type MensajeWa } from "../../../api/whatsapp.api";
 import { horaCorta, partesFormato } from "../utilidades";
@@ -41,7 +41,18 @@ function Ticks({ m }: { m: MensajeWa }) {
   return <CheckCheck size={15} aria-label={m.estado === "leido" ? "Leído" : "Entregado"} className={`wa-tick ${m.estado === "leido" ? "leido" : ""}`} />;
 }
 
-export function Burbuja({ mensaje: m, resaltar, onVerImagen }: { mensaje: MensajeWa; resaltar?: string; onVerImagen: (url: string) => void }) {
+export function Burbuja({
+  mensaje: m,
+  resaltar,
+  onVerImagen,
+  onResponder,
+}: {
+  mensaje: MensajeWa;
+  resaltar?: string;
+  onVerImagen: (url: string) => void;
+  /** Responder a este mensaje: queda citado arriba de lo que se escriba */
+  onResponder?: (m: MensajeWa) => void;
+}) {
   const [comprobante, setComprobante] = useState(false);
 
   if (m.interno) {
@@ -57,6 +68,18 @@ export function Burbuja({ mensaje: m, resaltar, onVerImagen }: { mensaje: Mensaj
   return (
     <div className={`wa-fila ${m.deMi ? "mia" : "suya"}`}>
       <div className={clase}>
+        {/* El mensaje al que responde, citado */}
+        {m.cita && (
+          <span className={`wa-cita ${m.cita.deMi ? "mia" : "suya"}`}>
+            <b>{m.cita.deMi ? "Tú" : "Cliente"}</b>
+            <span>{m.cita.texto}</span>
+          </span>
+        )}
+        {onResponder && m.estado !== "error" && m.estado !== "pendiente" && (
+          <button className="wa-responder" onClick={() => onResponder(m)} aria-label="Responder a este mensaje" title="Responder a este mensaje">
+            <Reply size={15} />
+          </button>
+        )}
         {m.deMi && m.autor !== "humano" && <span className="wa-autor">{AUTORES[m.autor]}</span>}
 
         {(m.tipo === "imagen" || m.tipo === "sticker") &&

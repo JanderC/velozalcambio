@@ -366,3 +366,21 @@
 .wa-popover.stickers button:hover:not(:disabled) { border-color: var(--wa-verde); background: #d9fdd3; }
 .wa-popover.stickers button:disabled { opacity: 0.5; cursor: default; }
 .wa-popover.stickers img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Responder a un mensaje: la cita dentro del globo, el botón y la barra sobre la casilla */
+.wa-cita { display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px; padding: 5px 8px; border-left: 4px solid var(--wa-verde); border-radius: 6px; background: rgba(0, 0, 0, 0.06); font-size: 0.8rem; max-width: 100%; }
+.wa-cita.suya { border-left-color: #6b7fd7; }
+.wa-cita b { font-size: 0.74rem; color: var(--wa-verde-oscuro); }
+.wa-cita.suya b { color: #4a5bb5; }
+.wa-cita span { color: #54656f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-responder { position: absolute; top: 2px; display: none; place-items: center; width: 26px; height: 26px; border: none; border-radius: 50%; background: white; color: #54656f; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); cursor: pointer; z-index: 2; }
+.wa-fila.suya .wa-responder { right: -32px; }
+.wa-fila.mia .wa-responder { left: -32px; }
+.wa-burbuja:hover .wa-responder, .wa-responder:focus-visible { display: grid; }
+.wa-responder:hover { background: #d9fdd3; color: var(--wa-verde-oscuro); }
+@media (hover: none) { .wa-responder { display: grid; opacity: 0.75; } }
+.wa-composer-cita { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; padding: 7px 10px; border-left: 4px solid var(--wa-verde); border-radius: 8px; background: white; color: var(--wa-verde-oscuro); }
+.wa-composer-cita > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wa-composer-cita b { font-size: 0.76rem; }
+.wa-composer-cita span span { font-size: 0.82rem; color: #54656f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-composer-cita button { display: grid; place-items: center; width: 26px; height: 26px; border: none; border-radius: 50%; background: #f0f2f5; color: #54656f; cursor: pointer; flex-shrink: 0; }

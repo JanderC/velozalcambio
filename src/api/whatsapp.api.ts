@@ -61,6 +61,8 @@ export interface MensajeWa {
   error: string | null;
   interno: boolean;
   fecha: string;
+  // el mensaje al que responde (citado arriba del globo)
+  cita?: { id: string; deMi: boolean; texto: string } | null;
 }
 
 export type FiltroChats = "todos" | "no_leidos" | "atencion" | "bot" | "humano" | "archivados";
@@ -193,15 +195,18 @@ export const whatsappApi = {
     return api.get<{ mensajes: MensajeWa[]; hayMas: boolean }>(`/whatsapp/chats/${j(jid)}/mensajes?${p}`);
   },
   leer: (jid: string) => api.post<void>(`/whatsapp/chats/${j(jid)}/leer`),
-  enviar: (jid: string, texto: string) => api.post<{ id: string }>(`/whatsapp/chats/${j(jid)}/mensajes`, { texto }),
-  enviarImagen: (jid: string, archivo: File, texto: string) => {
+  // respondeA: id del mensaje del chat que se contesta (sale citado, como al "responder" en WhatsApp)
+  enviar: (jid: string, texto: string, respondeA?: string | null) => api.post<{ id: string }>(`/whatsapp/chats/${j(jid)}/mensajes`, { texto, ...(respondeA ? { respondeA } : {}) }),
+  enviarImagen: (jid: string, archivo: File, texto: string, respondeA?: string | null) => {
     const fd = new FormData();
     fd.append("archivo", archivo);
     if (texto.trim()) fd.append("texto", texto.trim());
+    if (respondeA) fd.append("respondeA", respondeA);
     return api.postForm<{ id: string }>(`/whatsapp/chats/${j(jid)}/imagen`, fd);
   },
   // Un sticker del negocio ("pago", "pagos-y-salvos"): sale como sticker de WhatsApp
-  enviarSticker: (jid: string, sticker: string) => api.post<{ id: string }>(`/whatsapp/chats/${j(jid)}/sticker`, { sticker }),
+  enviarSticker: (jid: string, sticker: string, respondeA?: string | null) =>
+    api.post<{ id: string }>(`/whatsapp/chats/${j(jid)}/sticker`, { sticker, ...(respondeA ? { respondeA } : {}) }),
   actualizarChat: (jid: string, cambios: { nombreGuardado?: string | null; archivado?: boolean; terceroId?: number | null }) =>
     api.put<ChatWa>(`/whatsapp/chats/${j(jid)}`, cambios),
   devolverAlBot: (jid: string) => api.post<ChatWa>(`/whatsapp/chats/${j(jid)}/devolver-bot`),

@@ -109,3 +109,11 @@ export const EMOJIS = [
   "🏦", "📲", "📞", "✉️", "🕐", "📍", "🇨🇴", "🇻🇪", "🇺🇸", "⚠️", "❗", "❓",
   "😅", "🤔", "😔", "🥳", "🎉", "❤️",
 ];
+
+/** Lo que se muestra de un mensaje al citarlo: su texto o, si es una foto o un audio, qué es. */
+export function resumenDeMensaje(m: { tipo: string; texto: string | null }) {
+  const etiquetas: Record<string, string> = { imagen: "📷 Foto", audio: "🎤 Nota de voz", documento: "📄 Documento", sticker: "Sticker", video: "🎥 Video" };
+  const etiqueta = etiquetas[m.tipo];
+  if (!etiqueta) return m.texto ?? "";
+  return m.texto ? `${etiqueta}: ${m.texto}` : etiqueta;
+}

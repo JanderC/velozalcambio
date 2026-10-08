@@ -68,6 +68,25 @@
 .wb-tick-error { color: #c0392b; }
 .wb-no-salio { display: block; margin-top: 3px; font-size: 0.7rem; color: #c0392b; }
 
+/* Responder a un mensaje */
+.wb-globo { position: relative; }
+.wb-cita { display: flex; flex-direction: column; margin-bottom: 4px; padding: 4px 7px; border-left: 3px solid var(--wb-verde); border-radius: 5px; background: rgba(0, 0, 0, 0.06); font-size: 0.76rem; }
+.wb-cita.suya { border-left-color: #6b7fd7; }
+.wb-cita b { font-size: 0.7rem; color: var(--wb-verde-oscuro); }
+.wb-cita.suya b { color: #4a5bb5; }
+.wb-cita span { color: #54656f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+.wb-responder { position: absolute; top: 2px; display: none; place-items: center; width: 24px; height: 24px; border: none; border-radius: 50%; background: white; color: #54656f; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); cursor: pointer; }
+.wb-fila.suya .wb-responder { right: -29px; }
+.wb-fila.mia .wb-responder { left: -29px; }
+.wb-globo:hover .wb-responder, .wb-responder:focus-visible { display: grid; }
+.wb-responder:hover { background: #d9fdd3; color: var(--wb-verde-oscuro); }
+@media (hover: none) { .wb-responder { display: grid; opacity: 0.75; } }
+.wb-respondiendo { display: flex; align-items: center; gap: 9px; padding: 7px 12px; border-top: 1px solid var(--wb-borde); border-left: 4px solid var(--wb-verde); background: white; color: var(--wb-verde-oscuro); flex-shrink: 0; }
+.wb-respondiendo > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wb-respondiendo b { font-size: 0.72rem; }
+.wb-respondiendo span span { font-size: 0.78rem; color: #54656f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wb-respondiendo button { display: grid; place-items: center; width: 24px; height: 24px; border: none; border-radius: 50%; background: #f0f2f5; color: #54656f; cursor: pointer; flex-shrink: 0; }
+
 .wb-error { margin: 0; padding: 8px 12px; background: #fdecea; color: #b42318; font-size: 0.78rem; font-weight: 600; flex-shrink: 0; }
 .wb-error.suave { background: #fff7ed; color: #9a3412; font-weight: 500; }
 .wb-redactar { display: flex; align-items: flex-end; gap: 8px; padding: 8px 10px; background: #f0f2f5; flex-shrink: 0; }

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Search, Send, Sticker, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Reply, Search, Send, Sticker, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
 import { useStreamWhatsapp } from "../../modules/whatsapp/useStreamWhatsapp";
-import { etiquetaDia, fechaLista, horaCorta, imagenDelPortapapeles, sonarAviso, traeImagen } from "../../modules/whatsapp/utilidades";
+import { etiquetaDia, fechaLista, horaCorta, imagenDelPortapapeles, resumenDeMensaje, sonarAviso, traeImagen } from "../../modules/whatsapp/utilidades";
 import { STICKERS_WA } from "../../modules/whatsapp/stickers";
 import "./burbujaWhatsapp.css";
 
@@ -64,6 +64,8 @@ function Burbuja() {
   const [vistaFoto, setVistaFoto] = useState<string | null>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
   const [verStickers, setVerStickers] = useState(false);
+  // El mensaje que se está respondiendo: lo que se envíe sale citándolo
+  const [respondiendo, setRespondiendo] = useState<MensajeWa | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recien, setRecien] = useState(false); // acaba de llegar un mensaje: la burbuja late
@@ -151,6 +153,7 @@ function Burbuja() {
     setTexto(textoInicial ?? "");
     setFoto(null);
     setVerStickers(false);
+    setRespondiendo(null);
     setCargandoChat(true);
     try {
       const r = await whatsappApi.mensajes(c.jid);
@@ -192,10 +195,11 @@ function Burbuja() {
     setError(null);
     try {
       // con foto, el texto va como pie de foto
-      if (foto) await whatsappApi.enviarImagen(chat.jid, foto, t);
-      else await whatsappApi.enviar(chat.jid, t);
+      if (foto) await whatsappApi.enviarImagen(chat.jid, foto, t, respondiendo?.id);
+      else await whatsappApi.enviar(chat.jid, t, respondiendo?.id);
       setTexto("");
       setFoto(null);
+      setRespondiendo(null);
     } catch (e) {
       // acá llegan las protecciones: "ya se le escribió y no respondió", "esa línea no está conectada"…
       setError(e instanceof ApiError ? e.message : "No se pudo enviar el mensaje.");
@@ -210,7 +214,8 @@ function Burbuja() {
     setEnviando(true);
     setError(null);
     try {
-      await whatsappApi.enviarSticker(chat.jid, id);
+      await whatsappApi.enviarSticker(chat.jid, id, respondiendo?.id);
+      setRespondiendo(null);
       setVerStickers(false);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "No se pudo enviar el sticker.");
@@ -292,6 +297,25 @@ function Burbuja() {
                       ) : (
                         <div className={`wb-fila ${m.deMi ? "mia" : "suya"}`}>
                           <div className={`wb-globo ${m.estado === "error" ? "error" : ""}`}>
+                            {m.cita && (
+                              <span className={`wb-cita ${m.cita.deMi ? "mia" : "suya"}`}>
+                                <b>{m.cita.deMi ? "Tú" : "Cliente"}</b>
+                                <span>{m.cita.texto}</span>
+                              </span>
+                            )}
+                            {m.estado !== "error" && m.estado !== "pendiente" && (
+                              <button
+                                className="wb-responder"
+                                onClick={() => {
+                                  setRespondiendo(m);
+                                  areaRef.current?.focus();
+                                }}
+                                aria-label="Responder a este mensaje"
+                                title="Responder a este mensaje"
+                              >
+                                <Reply size={14} />
+                              </button>
+                            )}
                             {(m.tipo === "imagen" || m.tipo === "sticker") &&
                               (m.mediaUrl ? (
                                 <a href={m.mediaUrl} target="_blank" rel="noreferrer" title="Ver la foto en grande">
@@ -328,6 +352,18 @@ function Burbuja() {
                 </p>
               )}
               {chatSinLinea && !error && <p className="wb-error suave">La línea {chat.nombreLinea} no está conectada: los mensajes no salen hasta que se vincule de nuevo.</p>}
+              {respondiendo && (
+                <div className="wb-respondiendo">
+                  <Reply size={15} />
+                  <span>
+                    <b>Respondiendo a {respondiendo.deMi ? "tu mensaje" : "su mensaje"}</b>
+                    <span>{resumenDeMensaje(respondiendo) || "Mensaje"}</span>
+                  </span>
+                  <button onClick={() => setRespondiendo(null)} aria-label="No responder a ese mensaje">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               {vistaFoto && (
                 <div className="wb-foto">
                   <img src={vistaFoto} alt="Foto a enviar" />

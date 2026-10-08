@@ -28,6 +28,8 @@ export function ChatAbierto(p: Props) {
   const [resultados, setResultados] = useState<MensajeWa[] | null>(null);
   const [visor, setVisor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // El mensaje que se está respondiendo (queda citado arriba de la casilla hasta enviar o cancelar)
+  const [respondiendo, setRespondiendo] = useState<MensajeWa | null>(null);
 
   // Mantener abajo al llegar mensajes (si el usuario ya estaba abajo) y la posición al cargar anteriores
   useLayoutEffect(() => {
@@ -170,14 +172,14 @@ export function ChatAbierto(p: Props) {
           return (
             <Fragment key={m.id}>
               {nuevoDia && <div className="wa-dia">{etiquetaDia(m.fecha)}</div>}
-              <Burbuja mensaje={m} resaltar={resultados ? q : undefined} onVerImagen={setVisor} />
+              <Burbuja mensaje={m} resaltar={resultados ? q : undefined} onVerImagen={setVisor} onResponder={setRespondiendo} />
             </Fragment>
           );
         })}
         </div>
       </div>
 
-      <Composer jid={chat.jid} botActivo={chat.botActivo} respuestasRapidas={p.respuestasRapidas} />
+      <Composer jid={chat.jid} botActivo={chat.botActivo} respuestasRapidas={p.respuestasRapidas} respondiendo={respondiendo} onSoltarRespuesta={() => setRespondiendo(null)} />
       {visor && <VisorImagen url={visor} onCerrar={() => setVisor(null)} />}
     </section>
   );
