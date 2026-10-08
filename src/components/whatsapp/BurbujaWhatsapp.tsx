@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Search, Send, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Search, Send, Sticker, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
 import { useStreamWhatsapp } from "../../modules/whatsapp/useStreamWhatsapp";
 import { etiquetaDia, fechaLista, horaCorta, imagenDelPortapapeles, sonarAviso, traeImagen } from "../../modules/whatsapp/utilidades";
+import { STICKERS_WA } from "../../modules/whatsapp/stickers";
 import "./burbujaWhatsapp.css";
 
 /** Lo que otro módulo le pide a la burbuja: abrir el chat de un teléfono en una línea, con un texto ya escrito. */
@@ -62,6 +63,7 @@ function Burbuja() {
   const [foto, setFoto] = useState<File | null>(null);
   const [vistaFoto, setVistaFoto] = useState<string | null>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
+  const [verStickers, setVerStickers] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recien, setRecien] = useState(false); // acaba de llegar un mensaje: la burbuja late
@@ -148,6 +150,7 @@ function Burbuja() {
     setError(null);
     setTexto(textoInicial ?? "");
     setFoto(null);
+    setVerStickers(false);
     setCargandoChat(true);
     try {
       const r = await whatsappApi.mensajes(c.jid);
@@ -199,6 +202,20 @@ function Burbuja() {
     } finally {
       setEnviando(false);
       areaRef.current?.focus();
+    }
+  }
+  // Los stickers del negocio salen al tocarlos
+  async function enviarSticker(id: string) {
+    if (!chat || enviando) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      await whatsappApi.enviarSticker(chat.jid, id);
+      setVerStickers(false);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo enviar el sticker.");
+    } finally {
+      setEnviando(false);
     }
   }
   function alTeclear(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -320,7 +337,19 @@ function Burbuja() {
                   </button>
                 </div>
               )}
+              {verStickers && (
+                <div className="wb-stickers" role="listbox" aria-label="Stickers">
+                  {STICKERS_WA.map((s) => (
+                    <button key={s.id} onClick={() => void enviarSticker(s.id)} disabled={enviando} title={`Enviar el sticker ${s.nombre}`} aria-label={`Enviar el sticker ${s.nombre}`}>
+                      <img src={s.src} alt={s.nombre} />
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="wb-redactar">
+                <button className={`wb-adjuntar ${verStickers ? "activo" : ""}`} onClick={() => setVerStickers((v) => !v)} aria-label="Stickers" title="Stickers">
+                  <Sticker size={19} />
+                </button>
                 <button className="wb-adjuntar" onClick={() => archivoRef.current?.click()} aria-label="Adjuntar una foto" title="Adjuntar una foto (o pegala con Ctrl+V)">
                   <ImagePlus size={19} />
                 </button>

@@ -200,6 +200,8 @@ export const whatsappApi = {
     if (texto.trim()) fd.append("texto", texto.trim());
     return api.postForm<{ id: string }>(`/whatsapp/chats/${j(jid)}/imagen`, fd);
   },
+  // Un sticker del negocio ("pago", "pagos-y-salvos"): sale como sticker de WhatsApp
+  enviarSticker: (jid: string, sticker: string) => api.post<{ id: string }>(`/whatsapp/chats/${j(jid)}/sticker`, { sticker }),
   actualizarChat: (jid: string, cambios: { nombreGuardado?: string | null; archivado?: boolean; terceroId?: number | null }) =>
     api.put<ChatWa>(`/whatsapp/chats/${j(jid)}`, cambios),
   devolverAlBot: (jid: string) => api.post<ChatWa>(`/whatsapp/chats/${j(jid)}/devolver-bot`),
