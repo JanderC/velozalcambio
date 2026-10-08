@@ -190,10 +190,6 @@
 .wa-popover.emojis { display: grid; grid-template-columns: repeat(8, 36px); gap: 2px; }
 .wa-popover.emojis button { border: none; background: none; font-size: 1.3rem; width: 36px; height: 36px; border-radius: 6px; cursor: pointer; }
 .wa-popover.emojis button:hover { background: #f0f2f5; }
-.wa-popover.rapidas { width: min(420px, calc(100% - 20px)); max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
-.wa-popover.rapidas button { border: none; background: none; text-align: left; padding: 9px 10px; border-radius: 6px; font-family: inherit; font-size: 0.86rem; cursor: pointer; }
-.wa-popover.rapidas button:hover { background: #f0f2f5; }
-.wa-popover.rapidas p { font-size: 0.82rem; color: var(--wa-gris); margin: 4px; }
 .wa-composer-foto { display: flex; align-items: center; gap: 10px; background: white; border-radius: 8px; padding: 6px; margin-bottom: 6px; font-size: 0.8rem; color: var(--wa-gris); }
 .wa-composer-foto img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; }
 .wa-composer-foto span { flex: 1; }

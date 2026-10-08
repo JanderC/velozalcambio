@@ -1,11 +1,12 @@
 import { NavLink, Route, Routes, Navigate } from "react-router-dom";
-import { Bot, MessageCircle, Send, Smartphone } from "lucide-react";
+import { Bot, ClipboardList, MessageCircle, Send, Smartphone } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
 import { ChatsPanel } from "./chats/ChatsPanel";
 import { ConexionPanel } from "./ConexionPanel";
 import { EnviosPanel } from "./EnviosPanel";
 import { ConfigIaPanel } from "./ia/ConfigIaPanel";
+import { RespuestasRapidasPanel } from "./rapidas/RespuestasRapidasPanel";
 import "./whatsapp.css";
 
 export function WhatsAppPage() {
@@ -32,6 +33,9 @@ export function WhatsAppPage() {
             <Bot size={16} /> Bot e IA
           </NavLink>
         )}
+        <NavLink to="/whatsapp/rapidas" className={({ isActive }) => (isActive ? "activo" : "")}>
+          <ClipboardList size={16} /> Respuestas rápidas
+        </NavLink>
       </nav>
       <div className="wa-contenido">
         <Routes>
@@ -39,6 +43,7 @@ export function WhatsAppPage() {
           <Route path="envios" element={<EnviosPanel />} />
           {esAdmin && <Route path="conexion" element={<ConexionPanel />} />}
           {esAdmin && <Route path="ia" element={<ConfigIaPanel />} />}
+          <Route path="rapidas" element={<RespuestasRapidasPanel />} />
           <Route path="*" element={<Navigate to="/whatsapp" replace />} />
         </Routes>
       </div>

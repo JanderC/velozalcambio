@@ -15,7 +15,6 @@ interface Props {
   onChatActualizado: (c: ChatWa) => void;
   onVerCliente: () => void;
   verCliente: boolean;
-  respuestasRapidas: string[];
 }
 
 export function ChatAbierto(p: Props) {
@@ -179,7 +178,7 @@ export function ChatAbierto(p: Props) {
         </div>
       </div>
 
-      <Composer jid={chat.jid} botActivo={chat.botActivo} respuestasRapidas={p.respuestasRapidas} respondiendo={respondiendo} onSoltarRespuesta={() => setRespondiendo(null)} />
+      <Composer jid={chat.jid} botActivo={chat.botActivo} respondiendo={respondiendo} onSoltarRespuesta={() => setRespondiendo(null)} />
       {visor && <VisorImagen url={visor} onCerrar={() => setVisor(null)} />}
     </section>
   );

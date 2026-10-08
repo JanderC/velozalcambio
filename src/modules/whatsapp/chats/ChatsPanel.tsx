@@ -49,7 +49,6 @@ export function ChatsPanel() {
   const [hayMas, setHayMas] = useState(false);
   const [verCliente, setVerCliente] = useState(false);
   const [lineas, setLineas] = useState<ConexionWa[]>([]);
-  const [respuestasRapidas, setRespuestasRapidas] = useState<string[]>([]);
   const abiertoRef = useRef<string | null>(null);
   abiertoRef.current = abierto;
 
@@ -77,10 +76,6 @@ export function ChatsPanel() {
   useEffect(() => {
     cargarEsperando();
     whatsappApi.lineas().then(setLineas).catch(() => {});
-    whatsappApi
-      .config()
-      .then((r) => setRespuestasRapidas(r.config.panel?.respuestasRapidas ?? []))
-      .catch(() => {});
   }, [cargarEsperando]);
 
   const abrir = useCallback(async (jid: string) => {
@@ -205,7 +200,6 @@ export function ChatsPanel() {
           onChatActualizado={actualizarLocal}
           onVerCliente={() => setVerCliente((v) => !v)}
           verCliente={verCliente}
-          respuestasRapidas={respuestasRapidas}
         />
       ) : (
         <div className="wa-vacio">

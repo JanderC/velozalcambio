@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, MessageCircle, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
 import { useStreamWhatsapp } from "../../modules/whatsapp/useStreamWhatsapp";
 import { etiquetaDia, fechaLista, horaCorta, imagenDelPortapapeles, resumenDeMensaje, sonarAviso, traeImagen } from "../../modules/whatsapp/utilidades";
 import { STICKERS_WA } from "../../modules/whatsapp/stickers";
+import { SelectorRapidas } from "../../modules/whatsapp/rapidas/SelectorRapidas";
 import "./burbujaWhatsapp.css";
 
 /** Lo que otro módulo le pide a la burbuja: abrir el chat de un teléfono en una línea, con un texto ya escrito. */
@@ -64,6 +65,13 @@ function Burbuja() {
   const [vistaFoto, setVistaFoto] = useState<string | null>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
   const [verStickers, setVerStickers] = useState(false);
+  // El portapapeles de respuestas rápidas: tocar una la deja escrita en el mensaje
+  const [verRapidas, setVerRapidas] = useState(false);
+  function ponerRapida(t: string) {
+    setTexto(t);
+    setVerRapidas(false);
+    requestAnimationFrame(() => areaRef.current?.focus());
+  }
   // El mensaje que se está respondiendo: lo que se envíe sale citándolo
   const [respondiendo, setRespondiendo] = useState<MensajeWa | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -372,6 +380,7 @@ function Burbuja() {
                   </button>
                 </div>
               )}
+              {verRapidas && <SelectorRapidas compacto onElegir={ponerRapida} onCerrar={() => setVerRapidas(false)} />}
               {verStickers && (
                 <div className="wb-stickers" role="listbox" aria-label="Stickers">
                   {STICKERS_WA.map((s) => (
@@ -382,8 +391,27 @@ function Burbuja() {
                 </div>
               )}
               <div className="wb-redactar">
-                <button className={`wb-adjuntar ${verStickers ? "activo" : ""}`} onClick={() => setVerStickers((v) => !v)} aria-label="Stickers" title="Stickers">
+                <button
+                  className={`wb-adjuntar ${verStickers ? "activo" : ""}`}
+                  onClick={() => {
+                    setVerStickers((v) => !v);
+                    setVerRapidas(false);
+                  }}
+                  aria-label="Stickers"
+                  title="Stickers"
+                >
                   <Sticker size={19} />
+                </button>
+                <button
+                  className={`wb-adjuntar ${verRapidas ? "activo" : ""}`}
+                  onClick={() => {
+                    setVerRapidas((v) => !v);
+                    setVerStickers(false);
+                  }}
+                  aria-label="Respuestas rápidas"
+                  title="Respuestas rápidas"
+                >
+                  <ClipboardList size={19} />
                 </button>
                 <button className="wb-adjuntar" onClick={() => archivoRef.current?.click()} aria-label="Adjuntar una foto" title="Adjuntar una foto (o pegala con Ctrl+V)">
                   <ImagePlus size={19} />

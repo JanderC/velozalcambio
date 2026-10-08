@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, MessageSquareText, Reply, Send, Smile, Sticker, X } from "lucide-react";
+import { ClipboardList, ImagePlus, Reply, Send, Smile, Sticker, X } from "lucide-react";
 import { whatsappApi, type MensajeWa } from "../../../api/whatsapp.api";
 import { EMOJIS, imagenDelPortapapeles, resumenDeMensaje, traeImagen } from "../utilidades";
 import { STICKERS_WA } from "../stickers";
+import { SelectorRapidas } from "../rapidas/SelectorRapidas";
+import { filtrarRapidas, useRespuestasRapidas } from "../rapidas/useRespuestasRapidas";
 
 /** Enter envía, Shift+Enter hace salto de línea. Escribir acá pausa el bot en este chat. */
 export function Composer({
   jid,
   botActivo,
-  respuestasRapidas,
   respondiendo = null,
   onSoltarRespuesta,
 }: {
   jid: string;
   botActivo: boolean;
-  respuestasRapidas: string[];
   /** El mensaje al que se está respondiendo: lo que se envíe sale citándolo */
   respondiendo?: MensajeWa | null;
   onSoltarRespuesta?: () => void;
@@ -27,6 +27,15 @@ export function Composer({
   const [error, setError] = useState<string | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const archivo = useRef<HTMLInputElement>(null);
+  // Escribir "/" al empezar el mensaje abre las respuestas rápidas; lo que sigue a la barra las va filtrando
+  const rapidas = useRespuestasRapidas();
+  const porBarra = texto.startsWith("/") && !texto.includes("\n") && !foto;
+  const filtroBarra = texto.slice(1);
+  function ponerRapida(t: string) {
+    setTexto(t);
+    setMenu(null);
+    requestAnimationFrame(() => area.current?.focus());
+  }
 
   useEffect(() => {
     const el = area.current;
@@ -161,32 +170,20 @@ export function Composer({
           ))}
         </div>
       )}
-      {menu === "rapidas" && (
-        <div className="wa-popover rapidas" role="listbox" aria-label="Respuestas rápidas">
-          {respuestasRapidas.length === 0 && <p>No hay respuestas rápidas. Un administrador puede cargarlas en Bot e IA.</p>}
-          {respuestasRapidas.map((r) => (
-            <button
-              key={r}
-              onClick={() => {
-                setTexto(r);
-                setMenu(null);
-                area.current?.focus();
-              }}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+      {menu === "rapidas" ? (
+        <SelectorRapidas onElegir={ponerRapida} onCerrar={() => setMenu(null)} />
+      ) : (
+        porBarra && <SelectorRapidas filtro={filtroBarra} onElegir={ponerRapida} onCerrar={() => setTexto("")} />
       )}
       <div className="wa-composer-fila">
         <button className={`wa-icono ${menu === "emojis" ? "activo" : ""}`} onClick={() => setMenu(menu === "emojis" ? null : "emojis")} aria-label="Emojis">
           <Smile size={21} />
         </button>
-        <button className={`wa-icono ${menu === "rapidas" ? "activo" : ""}`} onClick={() => setMenu(menu === "rapidas" ? null : "rapidas")} aria-label="Respuestas rápidas">
-          <MessageSquareText size={20} />
-        </button>
         <button className={`wa-icono ${menu === "stickers" ? "activo" : ""}`} onClick={() => setMenu(menu === "stickers" ? null : "stickers")} aria-label="Stickers" title="Stickers">
           <Sticker size={20} />
+        </button>
+        <button className={`wa-icono ${menu === "rapidas" ? "activo" : ""}`} onClick={() => setMenu(menu === "rapidas" ? null : "rapidas")} aria-label="Respuestas rápidas" title='Respuestas rápidas (o escribí "/")'>
+          <ClipboardList size={20} />
         </button>
         <button className="wa-icono" onClick={() => archivo.current?.click()} aria-label="Enviar foto">
           <ImagePlus size={20} />
@@ -209,10 +206,16 @@ export function Composer({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              void enviar();
+              // con el "/" abierto, Enter pone la primera respuesta que coincide (no manda la barra)
+              const primera = porBarra ? filtrarRapidas(rapidas, filtroBarra)[0] : undefined;
+              if (primera) ponerRapida(primera.texto);
+              else if (!porBarra) void enviar();
+            } else if (e.key === "Escape" && (porBarra || menu)) {
+              if (porBarra) setTexto("");
+              setMenu(null);
             }
           }}
-          placeholder="Escribí un mensaje, o pegá una imagen con Ctrl+V"
+          placeholder='Escribí un mensaje · "/" abre las respuestas rápidas · Ctrl+V pega una imagen'
           title={botActivo ? "Si escribís, el bot se pausa en este chat" : undefined}
           aria-label="Mensaje"
         />

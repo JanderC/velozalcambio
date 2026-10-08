@@ -10,6 +10,14 @@ export const LINEAS_WA: { id: LineaWa; nombre: string }[] = [
   { id: 3, nombre: "Dólares" },
 ];
 
+// Una respuesta rápida: un texto ya escrito, con título para encontrarlo, que se pone en el mensaje con un toque
+export interface RespuestaRapidaWa {
+  id: number;
+  titulo: string;
+  texto: string;
+  orden: number;
+}
+
 export interface ConexionWa {
   linea: LineaWa;
   nombreLinea: string;
@@ -222,6 +230,12 @@ export const whatsappApi = {
   outbox: () => api.get<OutboxWa[]>("/whatsapp/outbox"),
   reintentarOutbox: (id: string) => api.post<void>(`/whatsapp/outbox/${id}/reintentar`),
   recibirPorWhatsapp: (txId: number) => api.get<{ url: string; codigo: string; qr: string }>(`/whatsapp/recibir/${txId}`),
+
+  rapidas: () => api.get<RespuestaRapidaWa[]>("/whatsapp/respuestas-rapidas"),
+  crearRapida: (datos: { titulo: string; texto: string }) => api.post<RespuestaRapidaWa>("/whatsapp/respuestas-rapidas", datos),
+  actualizarRapida: (id: number, datos: { titulo: string; texto: string }) => api.put<RespuestaRapidaWa>(`/whatsapp/respuestas-rapidas/${id}`, datos),
+  eliminarRapida: (id: number) => api.delete<void>(`/whatsapp/respuestas-rapidas/${id}`),
+  ordenarRapidas: (ids: number[]) => api.put<RespuestaRapidaWa[]>("/whatsapp/respuestas-rapidas/orden", { ids }),
 
   config: () => api.get<RespuestaConfig>("/whatsapp/config"),
   guardarConfig: (config: ConfigWa) => api.put<RespuestaConfig>("/whatsapp/config", config),

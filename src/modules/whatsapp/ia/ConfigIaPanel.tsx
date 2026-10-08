@@ -291,18 +291,6 @@ export function ConfigIaPanel() {
           </label>
         </section>
 
-        <section className="wa-tarjeta">
-          <h2>Respuestas rápidas del panel</h2>
-          <label>
-            Una por línea
-            <textarea
-              rows={5}
-              value={config.panel.respuestasRapidas.join("\n")}
-              onChange={(e) => cambiar("panel", { respuestasRapidas: e.target.value.split("\n") })}
-              onBlur={() => cambiar("panel", { respuestasRapidas: config.panel.respuestasRapidas.map((r) => r.trim()).filter(Boolean) })}
-            />
-          </label>
-        </section>
 
         <div className="wa-guardar">
           {error && <span className="wa-error">{error}</span>}
