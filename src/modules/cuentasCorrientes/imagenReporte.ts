@@ -111,7 +111,7 @@ const negar = (v: string) => (v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ?
  * titulo: una línea arriba de la tabla con el día del reporte (ej. "Cierre del día 05/10/2026"), para que
  * un cierre hecho después siga saliendo con la fecha de su día.
  */
-export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titulo?: string): Promise<Blob> {
+export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titulo?: string, abonado = "Abonado en el día"): Promise<Blob> {
   const altoTitulo = titulo ? ALTO_FILA : 0;
   const vigentes = estado.movimientos.filter((m) => !m.anulado);
   const cuadro = lineasDelCuadro(estado);
@@ -192,7 +192,7 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titu
   // Lo que abonó el cliente en el día, en la moneda de la cuenta
   c.fillStyle = "#eef7f0";
   c.fillRect(0, y, ANCHO, ALTO_FILA);
-  texto("Abonado en el día", "fecha", y + ALTO_FILA / 2, "#1a7f37", true);
+  texto(abonado, "fecha", y + ALTO_FILA / 2, "#1a7f37", true);
   texto(dinero(abonadoEnElDia(estado)), "total", y + ALTO_FILA / 2, "#1a7f37", true);
   y += ALTO_FILA;
   franja("Saldo pendiente", estado.saldoFinal);

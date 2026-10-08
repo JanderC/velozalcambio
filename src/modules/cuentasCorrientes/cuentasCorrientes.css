@@ -438,3 +438,11 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
   .cc-modo-tasa button { padding: 3px 8px; font-size: 0.78rem; }
   .cc-form-acciones button { flex: 1; padding: 13px; }
 }
+
+/* Reporte por rango de fechas */
+.cc-rango-enlace { background: none; border: none; padding: 4px 2px; color: #4b5563; font-size: 0.8rem; text-decoration: underline; cursor: pointer; font-family: inherit; }
+.cc-rango-enlace:hover { color: #12305a; }
+.cc-rango { display: grid; gap: 14px; }
+.cc-rango-fechas { display: flex; gap: 12px; flex-wrap: wrap; }
+.cc-rango-fechas label { display: grid; gap: 4px; font-size: 0.82rem; color: #4b5563; flex: 1; min-width: 140px; }
+.cc-rango-fechas input { padding: 9px 10px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: inherit; }

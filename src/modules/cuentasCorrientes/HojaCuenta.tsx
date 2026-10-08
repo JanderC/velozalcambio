@@ -232,6 +232,31 @@ export function HojaCuenta({
     }
   }
 
+  // Reporte por rango de fechas: los mismos movimientos, de un día a otro (imagen o Excel)
+  const [rango, setRango] = useState<{ desde: string; hasta: string } | null>(null);
+  const [generandoRango, setGenerandoRango] = useState(false);
+  const rangoValido = !!rango && !!rango.desde && !!rango.hasta && rango.desde <= rango.hasta;
+  async function reporteDelRango(formato: "imagen" | "excel") {
+    if (!rango || !rangoValido) return;
+    setGenerandoRango(true);
+    try {
+      const nombre = `${rango.desde}-a-${rango.hasta}`;
+      if (formato === "excel") {
+        await descargarExcelEstadoCuenta(cuenta.id, rango, `Cuenta ${cuenta.tercero_nombre} ${nombre}.xlsx`);
+      } else {
+        const delRango = await getEstadoCuenta(cuenta.id, rango);
+        const titulo = rango.desde === rango.hasta ? `Movimientos del día ${fechaDelDia(rango.desde)}` : `Movimientos del ${fechaDelDia(rango.desde)} al ${fechaDelDia(rango.hasta)}`;
+        await entregarReporte(await generarImagenReporte(delRango, simbolo, titulo, rango.desde === rango.hasta ? undefined : "Abonado en el período"), `movimientos-${nombre}.png`);
+      }
+      setRango(null);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setGenerandoRango(false);
+    }
+  }
+
   // Cierre diario: deja anotado el saldo con el que cerró el día y manda el reporte del día como imagen
   async function cerrarDia() {
     setCerrando(true);
@@ -519,6 +544,9 @@ export function HojaCuenta({
         <button className="cc-descargar cc-compartir" onClick={compartir} disabled={!estado} title="Compartir una imagen con los movimientos">
           <Share2 size={14} /> Compartir reporte
         </button>
+        <button className="cc-rango-enlace" onClick={() => setRango({ desde: dia, hasta: dia })} title="Generar el reporte de varios días: desde qué día hasta qué día">
+          Por rango de fechas
+        </button>
         <button className="cc-descargar" onClick={descargar} disabled={descargando} title="Descargar esta hoja en Excel">
           <Download size={14} /> {descargando ? "Descargando…" : "Descargar Excel"}
         </button>
@@ -574,8 +602,33 @@ export function HojaCuenta({
           </div>
         </Modal>
       )}
+      {rango && (
+        <Modal titulo="Reporte por rango de fechas" onCerrar={() => setRango(null)}>
+          <div className="cc-rango">
+            <div className="cc-rango-fechas">
+              <label>
+                Desde
+                <input type="date" value={rango.desde} max={hoyBogota()} onChange={(e) => setRango({ ...rango, desde: e.target.value })} />
+              </label>
+              <label>
+                Hasta
+                <input type="date" value={rango.hasta} min={rango.desde} max={hoyBogota()} onChange={(e) => setRango({ ...rango, hasta: e.target.value })} />
+              </label>
+            </div>
+            {!rangoValido && <p className="cc-form-error">El día "desde" tiene que ser anterior o igual al "hasta".</p>}
+            <div className="cc-reporte-acciones">
+              <button type="button" className="cc-guardar" disabled={!rangoValido || generandoRango} onClick={() => void reporteDelRango("imagen")}>
+                {generandoRango ? "Generando…" : "Generar reporte"}
+              </button>
+              <button type="button" className="cc-btn-secundario" disabled={!rangoValido || generandoRango} onClick={() => void reporteDelRango("excel")}>
+                Descargar Excel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {reporte && (
-        <Modal titulo="Reporte del día" ancho="ancho" onCerrar={cerrarReporte}>
+        <Modal titulo="Reporte" ancho="ancho" onCerrar={cerrarReporte}>
           <div className="cc-reporte">
             <div className="cc-reporte-acciones">
               <button
@@ -593,7 +646,7 @@ export function HojaCuenta({
                 Descargar
               </button>
             </div>
-            <img src={reporte.url} alt="Reporte de movimientos del día" />
+            <img src={reporte.url} alt="Reporte de movimientos" />
           </div>
         </Modal>
       )}
