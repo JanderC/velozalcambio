@@ -384,3 +384,7 @@
 .wa-composer-cita b { font-size: 0.76rem; }
 .wa-composer-cita span span { font-size: 0.82rem; color: #54656f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-composer-cita button { display: grid; place-items: center; width: 26px; height: 26px; border: none; border-radius: 50%; background: #f0f2f5; color: #54656f; cursor: pointer; flex-shrink: 0; }
+
+/* Grupos */
+.wa-avatar.grupo { background: #d5e3f5; color: #1e4f8a; display: grid; place-items: center; }
+.wa-remitente { color: #1e4f8a; font-weight: 700; }

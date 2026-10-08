@@ -1,4 +1,4 @@
-import { Bot, Search, UserRound, X } from "lucide-react";
+import { Bot, Search, UserRound, Users, X } from "lucide-react";
 import { LINEAS_WA, type ChatWa, type ConexionWa, type FiltroChats, type LineaWa } from "../../../api/whatsapp.api";
 import { fechaLista } from "../utilidades";
 import { EsperandoPorTi } from "./EsperandoPorTi";
@@ -6,6 +6,7 @@ import { EsperandoPorTi } from "./EsperandoPorTi";
 const FILTROS: { valor: FiltroChats; etiqueta: string }[] = [
   { valor: "todos", etiqueta: "Todos" },
   { valor: "no_leidos", etiqueta: "No leídos" },
+  { valor: "grupos", etiqueta: "Grupos" },
   { valor: "atencion", etiqueta: "Atención" },
   { valor: "bot", etiqueta: "Bot" },
   { valor: "humano", etiqueta: "Persona" },
@@ -108,7 +109,7 @@ export function ListaChats(p: Props) {
           {p.chats.map((c) => (
             <li key={c.jid}>
               <button className={`wa-item ${p.abierto === c.jid ? "activo" : ""}`} onClick={() => p.onAbrir(c.jid)}>
-                <span className={`wa-avatar ${c.necesitaHumano ? "alerta" : ""}`}>{iniciales(c.nombre)}</span>
+                <span className={`wa-avatar ${c.necesitaHumano ? "alerta" : ""} ${c.esGrupo ? "grupo" : ""}`}>{c.esGrupo ? <Users size={20} aria-label="Grupo" /> : iniciales(c.nombre)}</span>
                 <span className="wa-item-cuerpo">
                   <span className="wa-item-fila">
                     <span className="wa-item-nombre">{c.nombre}</span>
@@ -120,7 +121,7 @@ export function ListaChats(p: Props) {
                     </span>
                     <span className="wa-item-marcas">
                       {p.linea === null && <span className={`wa-linea-chip l${c.linea}`}>{c.nombreLinea}</span>}
-                      {c.botActivo ? (
+                      {c.esGrupo ? null : c.botActivo ? (
                         <Bot size={14} aria-label="Lo atiende el bot" className="wa-marca-bot" />
                       ) : (
                         <UserRound size={14} aria-label="Lo atiende una persona" className="wa-marca-humano" />

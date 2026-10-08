@@ -81,6 +81,8 @@ export function Burbuja({
           </button>
         )}
         {m.deMi && m.autor !== "humano" && <span className="wa-autor">{AUTORES[m.autor]}</span>}
+        {/* En un grupo: quién escribió */}
+        {!m.deMi && m.remitente && <span className="wa-autor wa-remitente">{m.remitente}</span>}
 
         {(m.tipo === "imagen" || m.tipo === "sticker") &&
           (m.mediaUrl ? (

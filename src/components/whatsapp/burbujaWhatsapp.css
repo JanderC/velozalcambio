@@ -68,6 +68,8 @@
 .wb-tick-error { color: #c0392b; }
 .wb-no-salio { display: block; margin-top: 3px; font-size: 0.7rem; color: #c0392b; }
 
+.wb-avatar.grupo { background: #d5e3f5; color: #1e4f8a; }
+.wb-remitente { display: block; margin-bottom: 2px; font-size: 0.72rem; color: #1e4f8a; }
 /* Responder a un mensaje */
 .wb-globo { position: relative; }
 .wb-cita { display: flex; flex-direction: column; margin-bottom: 4px; padding: 4px 7px; border-left: 3px solid var(--wb-verde); border-radius: 5px; background: rgba(0, 0, 0, 0.06); font-size: 0.76rem; }

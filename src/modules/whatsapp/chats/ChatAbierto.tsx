@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Archive, ArchiveRestore, ArrowLeft, Bot, IdCard, Search, UserRound, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Bot, IdCard, Search, UserRound, Users, X } from "lucide-react";
 import { whatsappApi, type ChatWa, type MensajeWa } from "../../../api/whatsapp.api";
 import { etiquetaDia } from "../utilidades";
 import { Burbuja, VisorImagen } from "./Burbuja";
@@ -92,16 +92,16 @@ export function ChatAbierto(p: Props) {
         <button className="wa-icono wa-solo-movil" onClick={p.onCerrar} aria-label="Volver a la lista">
           <ArrowLeft size={20} />
         </button>
-        <span className={`wa-avatar ${chat.necesitaHumano ? "alerta" : ""}`}>{iniciales(chat.nombre)}</span>
+        <span className={`wa-avatar ${chat.necesitaHumano ? "alerta" : ""} ${chat.esGrupo ? "grupo" : ""}`}>{chat.esGrupo ? <Users size={20} aria-label="Grupo" /> : iniciales(chat.nombre)}</span>
         <button className="wa-chat-titulo" onClick={p.onVerCliente} title="Ver datos del cliente">
           <strong>{chat.nombre}</strong>
           <span>
-            +{chat.telefono}
-            {chat.frio ? " · nunca nos escribió" : ""}
+            {chat.esGrupo ? `Grupo · línea ${chat.nombreLinea}` : `+${chat.telefono} · línea ${chat.nombreLinea}`}
+            {!chat.esGrupo && chat.frio ? " · nunca nos escribió" : ""}
           </span>
         </button>
         <div className="wa-chat-acciones">
-          {chat.botActivo ? (
+          {chat.esGrupo ? null : chat.botActivo ? (
             <button className="wa-chip bot" onClick={() => accion(() => whatsappApi.tomar(chat.jid))} title="Pausar el bot y atender yo">
               <Bot size={14} /> <span>Bot activo</span>
             </button>

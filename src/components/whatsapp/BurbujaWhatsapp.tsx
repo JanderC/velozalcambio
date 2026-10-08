@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Reply, Search, Send, Sticker, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock, ExternalLink, ImagePlus, MessageCircle, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
@@ -265,12 +265,10 @@ function Burbuja() {
                 <button className="wb-icono" onClick={() => setChat(null)} aria-label="Volver a la lista de chats">
                   <ArrowLeft size={18} />
                 </button>
-                <span className="wb-avatar">{INICIAL(chat.nombre)}</span>
+                <span className={`wb-avatar ${chat.esGrupo ? "grupo" : ""}`}>{chat.esGrupo ? <Users size={18} aria-label="Grupo" /> : INICIAL(chat.nombre)}</span>
                 <div className="wb-cabeza-datos">
                   <strong>{chat.nombre}</strong>
-                  <span>
-                    +{chat.telefono} · línea {chat.nombreLinea}
-                  </span>
+                  <span>{chat.esGrupo ? `Grupo · línea ${chat.nombreLinea}` : `+${chat.telefono} · línea ${chat.nombreLinea}`}</span>
                 </div>
                 <Link className="wb-icono" to="/whatsapp" title="Abrir el módulo de WhatsApp" aria-label="Abrir el módulo de WhatsApp">
                   <ExternalLink size={16} />
@@ -284,7 +282,7 @@ function Burbuja() {
                 {cargandoChat && <p className="wb-aviso">Cargando…</p>}
                 {!cargandoChat && mensajes.length === 0 && (
                   <p className="wb-aviso">
-                    {chat.frio ? "Este cliente todavía no le escribió a esta línea. Se le puede mandar un solo mensaje hasta que responda." : "Sin mensajes todavía."}
+                    {chat.esGrupo ? "Todavía no hay mensajes de este grupo guardados acá." : chat.frio ? "Este cliente todavía no le escribió a esta línea. Se le puede mandar un solo mensaje hasta que responda." : "Sin mensajes todavía."}
                   </p>
                 )}
                 {mensajes.map((m, i) => {
@@ -297,6 +295,7 @@ function Burbuja() {
                       ) : (
                         <div className={`wb-fila ${m.deMi ? "mia" : "suya"}`}>
                           <div className={`wb-globo ${m.estado === "error" ? "error" : ""}`}>
+                            {!m.deMi && m.remitente && <b className="wb-remitente">{m.remitente}</b>}
                             {m.cita && (
                               <span className={`wb-cita ${m.cita.deMi ? "mia" : "suya"}`}>
                                 <b>{m.cita.deMi ? "Tú" : "Cliente"}</b>
@@ -472,7 +471,7 @@ function Burbuja() {
                 {lista.map((c) => (
                   <li key={c.jid}>
                     <button onClick={() => void abrirChat(c)} className={c.noLeidos > 0 ? "sin-leer" : ""}>
-                      <span className="wb-avatar">{INICIAL(c.nombre)}</span>
+                      <span className={`wb-avatar ${c.esGrupo ? "grupo" : ""}`}>{c.esGrupo ? <Users size={18} aria-label="Grupo" /> : INICIAL(c.nombre)}</span>
                       <span className="wb-item">
                         <span className="wb-item-fila">
                           <strong>{c.nombre}</strong>

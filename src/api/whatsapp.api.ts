@@ -28,6 +28,7 @@ export interface ChatWa {
   jid: string; // la clave del chat: lleva "#2" o "#3" si es de esas líneas
   linea: LineaWa;
   nombreLinea: string;
+  esGrupo: boolean; // un grupo de WhatsApp en el que está ese teléfono
   telefono: string;
   nombre: string;
   nombreWhatsapp: string | null;
@@ -61,11 +62,12 @@ export interface MensajeWa {
   error: string | null;
   interno: boolean;
   fecha: string;
+  remitente?: string | null; // en un grupo: quién lo escribió
   // el mensaje al que responde (citado arriba del globo)
   cita?: { id: string; deMi: boolean; texto: string } | null;
 }
 
-export type FiltroChats = "todos" | "no_leidos" | "atencion" | "bot" | "humano" | "archivados";
+export type FiltroChats = "todos" | "no_leidos" | "atencion" | "bot" | "humano" | "archivados" | "grupos";
 
 export interface ClienteLateral {
   chat: ChatWa;

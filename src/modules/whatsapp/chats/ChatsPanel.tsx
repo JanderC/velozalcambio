@@ -31,6 +31,7 @@ function cumpleFiltro(c: ChatWa, filtro: FiltroChats, linea: LineaWa | null) {
   if (filtro === "atencion") return c.necesitaHumano;
   if (filtro === "bot") return c.botActivo;
   if (filtro === "humano") return !c.botActivo;
+  if (filtro === "grupos") return c.esGrupo;
   return true;
 }
 
