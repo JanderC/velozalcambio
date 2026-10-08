@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -540,6 +540,19 @@ export function HojaCuenta({
           <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeSaldo)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeSaldo)} target="_blank" rel="noreferrer" title={!telefono ? "Sin teléfono registrado: al abrir WhatsApp elegís el contacto" : ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
             <MessageCircle size={14} /> {esConfirmaciones ? (ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
           </a>
+        )}
+        {/* La misma última operación, pero por uno de los WhatsApp vinculados al sistema: abre el aviso para elegir la línea y enviarlo */}
+        {telefono && ultimaOperacion && (
+          <button
+            className="cc-whatsapp cc-whatsapp-vinculado"
+            onClick={() => {
+              setEstadoAviso("");
+              setAbonoParaAvisar(avisoDeMovimiento(ultimaOperacion));
+            }}
+            title="Enviar la última operación desde un WhatsApp vinculado al sistema (Bolívares, Pesos o Dólares): se elige la línea y sale sola"
+          >
+            <Send size={14} /> Enviar desde el vinculado
+          </button>
         )}
         <button className="cc-descargar cc-compartir" onClick={compartir} disabled={!estado} title="Compartir una imagen con los movimientos">
           <Share2 size={14} /> Compartir reporte

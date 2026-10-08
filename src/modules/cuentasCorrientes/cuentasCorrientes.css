@@ -232,6 +232,10 @@ div.cc-c-num { display: flex; flex-direction: column; gap: 4px; }
 .cc-descargar:disabled { opacity: 0.6; cursor: default; }
 .cc-whatsapp { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: #25d366; color: white; font-weight: 600; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; text-decoration: none; }
 .cc-whatsapp:hover { background: #1eb858; }
+/* Enviar por el WhatsApp vinculado al sistema: al lado del verde, en el tono oscuro de WhatsApp */
+.cc-whatsapp-vinculado { border: none; cursor: pointer; font-family: inherit; background: #128c7e; }
+.cc-whatsapp-vinculado:hover { background: #0e7468; }
+.cc-whatsapp + .cc-whatsapp-vinculado { margin-left: 0; }
 .cc-whatsapp + .cc-descargar, .cc-descargar + .cc-descargar { margin-left: 0; }
 .cc-compartir { border-color: var(--color-navy) !important; color: var(--color-navy) !important; }
 .cc-operador { align-self: flex-start; margin-top: 27px; color: #9ca3af; font-weight: 700; }
