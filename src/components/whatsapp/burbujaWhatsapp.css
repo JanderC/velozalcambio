@@ -8,7 +8,7 @@
 @keyframes wb-latido { 0%, 100% { transform: scale(1); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28), 0 0 0 0 rgba(0, 168, 132, 0.6); } 50% { transform: scale(1.12); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28), 0 0 0 14px rgba(0, 168, 132, 0); } }
 .wb-globito { position: absolute; top: -4px; right: -4px; min-width: 24px; height: 24px; padding: 0 6px; display: grid; place-items: center; border-radius: 12px; border: 2px solid white; background: #e11d48; color: white; font-size: 0.74rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 
-.wb-panel { position: absolute; right: 0; bottom: 72px; width: 380px; height: min(580px, calc(100vh - 110px)); display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; background: white; box-shadow: 0 18px 50px rgba(15, 23, 42, 0.32); animation: wb-entrar 0.16s ease-out; }
+.wb-panel { position: absolute; right: 0; bottom: 72px; width: min(var(--wb-ancho, 440px), calc(100vw - 40px)); height: min(var(--wb-alto, 680px), calc(100vh - 110px)); display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; background: white; box-shadow: 0 18px 50px rgba(15, 23, 42, 0.32); animation: wb-entrar 0.16s ease-out; }
 @keyframes wb-entrar { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
 
 .wb-cabeza { display: flex; align-items: center; gap: 10px; padding: 12px 10px 12px 14px; background: var(--wb-verde-oscuro); color: white; flex-shrink: 0; }
@@ -113,5 +113,13 @@
   .wb-raiz { right: 12px; bottom: 12px; }
   .wb-panel { position: fixed; inset: 0; width: auto; height: auto; border-radius: 0; }
   .wb-raiz:has(.wb-panel) .wb-boton { display: none; }
+  .wb-estirar, .wb-tamano { display: none; }
 }
 @media print { .wb-raiz { display: none; } }
+
+/* Tamaño a gusto de cada persona: el texto acompaña al tamaño elegido y la ventana se estira desde la esquina */
+.wb-globo { font-size: var(--wb-letra, 0.9rem); }
+.wb-redactar textarea { font-size: var(--wb-letra, 0.9rem); }
+.wb-estirar { position: absolute; top: 0; left: 0; z-index: 5; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; border-top-left-radius: 16px; }
+.wb-estirar::after { content: ""; position: absolute; top: 4px; left: 4px; width: 8px; height: 8px; border-top: 2px solid rgba(255, 255, 255, 0.75); border-left: 2px solid rgba(255, 255, 255, 0.75); border-top-left-radius: 4px; }
+.wb-estirar:hover::after { border-color: white; }

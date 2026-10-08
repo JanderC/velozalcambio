@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, MessageCircle, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, Maximize2, MessageCircle, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
 import { ApiError } from "../../api/client";
+import { useTamanoBurbuja } from "./useTamanoBurbuja";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
 import { useStreamWhatsapp } from "../../modules/whatsapp/useStreamWhatsapp";
@@ -52,6 +53,7 @@ export function BurbujaWhatsapp() {
 
 function Burbuja() {
   const [abierta, setAbierta] = useState(false);
+  const tamano = useTamanoBurbuja();
   const [chats, setChats] = useState<ChatWa[]>([]);
   const [lineas, setLineas] = useState<ConexionWa[]>([]);
   const [filtroLinea, setFiltroLinea] = useState<LineaWa | null>(null);
@@ -265,7 +267,9 @@ function Burbuja() {
   return (
     <div className="wb-raiz">
       {abierta && (
-        <section className="wb-panel" role="dialog" aria-label="Chats de WhatsApp">
+        <section className="wb-panel" role="dialog" aria-label="Chats de WhatsApp" style={tamano.estilo}>
+          {/* Se estira desde esta esquina: crece hacia arriba y hacia la izquierda, y queda guardado */}
+          <span className="wb-estirar" onPointerDown={tamano.alEmpezarAEstirar} title="Arrastrá para agrandar o achicar la ventana" aria-hidden="true" />
           {chat ? (
             // ---------- Una conversación ----------
             <>
@@ -278,6 +282,9 @@ function Burbuja() {
                   <strong>{chat.nombre}</strong>
                   <span>{chat.esGrupo ? `Grupo · línea ${chat.nombreLinea}` : `+${chat.telefono} · línea ${chat.nombreLinea}`}</span>
                 </div>
+                <button className="wb-icono wb-tamano" onClick={tamano.pasarAlSiguiente} title={`Cambiar el tamaño de la ventana (pasa a ${tamano.siguiente}). También se estira desde la esquina de arriba a la izquierda.`} aria-label={`Cambiar el tamaño de la ventana a ${tamano.siguiente}`}>
+                  <Maximize2 size={15} />
+                </button>
                 <Link className="wb-icono" to="/whatsapp" title="Abrir el módulo de WhatsApp" aria-label="Abrir el módulo de WhatsApp">
                   <ExternalLink size={16} />
                 </Link>
@@ -453,6 +460,9 @@ function Burbuja() {
                   <strong>WhatsApp</strong>
                   <span>{totalSinLeer > 0 ? `${totalSinLeer} ${totalSinLeer === 1 ? "mensaje sin leer" : "mensajes sin leer"}` : conectado ? "Al día" : "Reconectando…"}</span>
                 </div>
+                <button className="wb-icono wb-tamano" onClick={tamano.pasarAlSiguiente} title={`Cambiar el tamaño de la ventana (pasa a ${tamano.siguiente}). También se estira desde la esquina de arriba a la izquierda.`} aria-label={`Cambiar el tamaño de la ventana a ${tamano.siguiente}`}>
+                  <Maximize2 size={15} />
+                </button>
                 <Link className="wb-icono" to="/whatsapp" title="Abrir el módulo de WhatsApp" aria-label="Abrir el módulo de WhatsApp">
                   <ExternalLink size={16} />
                 </Link>
