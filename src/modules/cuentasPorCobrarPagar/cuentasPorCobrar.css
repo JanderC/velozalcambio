@@ -115,3 +115,8 @@
 .cxc-transf-ok { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 10px 12px; border-radius: 8px; background: #e8f6ec; color: #166534; font-size: 0.9rem; }
 .cxc-transf-hecho .cc-reporte-acciones { align-items: center; }
 .cxc-transf-hecho .cxc-transf-wa { margin-left: 0; padding: 10px 14px; font-size: 0.86rem; }
+
+/* Cliente nuevo: el primer movimiento es opcional y se anota ahí mismo */
+.cc-modal label.cxc-con-movimiento { flex-direction: row; align-items: center; gap: 8px; width: fit-content; font-weight: 600; color: var(--color-navy); cursor: pointer; }
+.cxc-primer-mov { display: grid; gap: 10px; padding: 12px; border: 1px solid #d7dbe2; border-radius: 10px; background: #f8fafc; }
+.cxc-transf-total { color: #374151; }

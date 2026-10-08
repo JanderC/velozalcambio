@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
-import { crearCuentaCorriente, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { crearCuentaCorriente, registrarMovimientoCC, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import type { Moneda } from "../../api/monedas.api";
 import { formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
 import { SIN_GRUPO, dinero } from "./cobrar";
@@ -19,7 +19,11 @@ export function conPuntos(escrito: string) {
   return formatearMonto(entero || "0") + (coma === -1 ? "" : `,${decimal}`);
 }
 
-/** Registrar un cliente de Cuentas por Cobrar: nombre, teléfono, grupo, moneda y cuánto debe. */
+/**
+ * Registrar un cliente de Cuentas por Cobrar: nombre, teléfono y grupo, igual que en Cuentas Corrientes. La cuenta se
+ * lleva en pesos y cada movimiento puede ir con cantidad × tasa (dólares, bolívares…), así que no se elige moneda.
+ * Si se quiere, el primer movimiento se anota acá mismo.
+ */
 export function NuevoClienteCobrarModal({
   grupos,
   grupoInicial,
@@ -39,18 +43,18 @@ export function NuevoClienteCobrarModal({
   const [grupo, setGrupo] = useState(elegibles.includes(grupoInicial) ? grupoInicial : (elegibles[0] ?? NUEVO));
   const [grupoNuevo, setGrupoNuevo] = useState("");
   const cop = monedas.find((m) => m.codigo === "COP");
-  const [monedaId, setMonedaId] = useState<number | "">(cop?.id ?? monedas[0]?.id ?? "");
-  const [monto, setMonto] = useState("");
+  // El primer movimiento (opcional): referencia, y el monto directo o cantidad × tasa
+  const [conMovimiento, setConMovimiento] = useState(false);
+  const [referencia, setReferencia] = useState("");
+  const [cantidad, setCantidad] = useState("");
   const [tasa, setTasa] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const moneda = monedas.find((m) => m.id === monedaId);
-  const esOtraMoneda = !!moneda && moneda.codigo !== "COP";
-  const nMonto = monto.trim() ? (leerNumero(monto)?.replace(/^-/, "") ?? null) : null;
+  const nCantidad = cantidad.trim() ? (leerNumero(cantidad)?.replace(/^-/, "") ?? null) : null;
   const nTasa = tasa.trim() ? (leerNumero(tasa)?.replace(/^-/, "") ?? null) : null;
-  const tasaValida = !!nTasa && /[1-9]/.test(nTasa);
-  const equivalente = esOtraMoneda && nMonto && tasaValida ? multiplicarDecimales(nMonto, nTasa!, 0) : null;
+  const conTasa = !!nTasa && /[1-9]/.test(nTasa);
+  const total = nCantidad && /[1-9]/.test(nCantidad) ? (conTasa ? multiplicarDecimales(nCantidad, nTasa!, 0) : nCantidad) : null;
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -58,22 +62,35 @@ export function NuevoClienteCobrarModal({
     const grupoFinal = grupo === NUEVO ? grupoNuevo.trim() : grupo;
     if (nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
     if (!grupoFinal) return setError("Escribí el nombre del grupo nuevo.");
-    if (monedaId === "") return setError("Elegí la moneda.");
-    if (monto.trim() && !nMonto) return setError("El monto no es un número válido.");
-    if (esOtraMoneda && tasa.trim() && !tasaValida) return setError("La tasa a pesos no es un número válido.");
+    if (!cop) return setError("No se pudo cargar la moneda. Cerrá y volvé a abrir.");
+    if (conMovimiento) {
+      if (!total) return setError("Escribí el monto del movimiento (o quitá el movimiento para registrar solo el cliente).");
+      if (tasa.trim() && !conTasa) return setError("La tasa no es un número válido.");
+    }
     setEnviando(true);
     try {
-      onCreado(
-        await crearCuentaCorriente({
-          nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE", telefono: telefono.trim() || undefined },
-          modulo: "POR_COBRAR",
-          grupoCobro: grupoFinal,
-          monedaId,
-          saldoInicial: nMonto && /[1-9]/.test(nMonto) ? nMonto : undefined,
-          // en otra moneda, la tasa a pesos con la que se muestra el "Monto COP"
-          ...(esOtraMoneda && tasaValida && cop ? { monedaCobroId: cop.id, tasaCobro: nTasa! } : {}),
-        })
-      );
+      const cuenta = await crearCuentaCorriente({
+        nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE", telefono: telefono.trim() || undefined },
+        modulo: "POR_COBRAR",
+        grupoCobro: grupoFinal,
+        monedaId: cop.id,
+      });
+      if (conMovimiento && total) {
+        try {
+          await registrarMovimientoCC({
+            terceroId: cuenta.tercero_id,
+            canalId: cuenta.canal_id,
+            monedaId: cuenta.moneda_id,
+            tipo: "CARGO",
+            descripcion: referencia.trim() || "Saldo por cobrar",
+            ...(conTasa ? { cantidadBase: nCantidad!, tasa: nTasa! } : { monto: nCantidad! }),
+          });
+        } catch (err) {
+          // el cliente ya quedó creado: se avisa y el movimiento se anota desde su hoja
+          window.alert(`El cliente quedó registrado, pero el movimiento no se pudo anotar (${err instanceof ApiError ? err.message : "error de conexión"}). Anotalo desde su hoja.`);
+        }
+      }
+      onCreado(cuenta);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar el cliente.");
     } finally {
@@ -109,41 +126,47 @@ export function NuevoClienteCobrarModal({
             <input value={grupoNuevo} onChange={(e) => setGrupoNuevo(e.target.value)} placeholder="ej. Proveedores" maxLength={60} autoComplete="off" />
           </label>
         )}
-        <div className="cxc-form-fila">
-          <label>
-            Moneda
-            <select value={monedaId} onChange={(e) => setMonedaId(e.target.value ? Number(e.target.value) : "")}>
-              {monedas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre} ({m.codigo})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Monto por cobrar
-            <input value={monto} onChange={(e) => setMonto(conPuntos(e.target.value))} inputMode="decimal" placeholder="0" autoComplete="off" />
-          </label>
-        </div>
-        {esOtraMoneda && (
-          <label>
-            Tasa a pesos (1 {moneda!.codigo} = cuántos pesos)
-            <input value={tasa} onChange={(e) => setTasa(e.target.value)} inputMode="decimal" placeholder="ej. 2.950" autoComplete="off" />
+
+        <label className="cxc-con-movimiento">
+          <input type="checkbox" checked={conMovimiento} onChange={(e) => setConMovimiento(e.target.checked)} />
+          Anotarle un movimiento de una vez
+        </label>
+        {conMovimiento && (
+          <div className="cxc-primer-mov">
+            <label>
+              Referencia (qué se le está cobrando)
+              <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="ej. Préstamo, Venta de Zelle, Cerveza…" maxLength={120} autoComplete="off" />
+            </label>
+            <div className="cxc-form-fila">
+              <label>
+                {conTasa ? "Cantidad" : "Monto (o cantidad)"}
+                <input value={cantidad} onChange={(e) => setCantidad(conPuntos(e.target.value))} inputMode="decimal" placeholder="0" autoComplete="off" />
+              </label>
+              <label>
+                Tasa (opcional)
+                <input value={tasa} onChange={(e) => setTasa(e.target.value)} inputMode="decimal" placeholder="ej. 3.050" autoComplete="off" />
+              </label>
+            </div>
             <small>
-              {equivalente
-                ? `${dinero(nMonto!, moneda!.codigo)} × ${formatearMonto(nTasa!)} = ${dinero(equivalente, "COP")} COP`
-                : "Con la tasa, el cliente entra en el total en pesos. Se puede dejar vacía y ponerla después."}
+              {total
+                ? conTasa
+                  ? `${formatearMonto(nCantidad!)} × ${formatearMonto(nTasa!)} = ${dinero(total, "COP")} por cobrar`
+                  : `${dinero(total, "COP")} por cobrar`
+                : "Como en Cuentas Corrientes: el monto en pesos, o la cantidad (dólares, bolívares…) con su tasa."}
             </small>
-          </label>
+          </div>
         )}
-        <p className="cc-modal-nota">Queda con ese saldo por cobrar. Los abonos y los cargos nuevos se anotan después en su hoja.</p>
+
+        <p className="cc-modal-nota">
+          {conMovimiento ? "El cliente queda registrado con ese movimiento en su hoja." : "Queda registrado sin saldo. Los cargos y abonos se anotan en su hoja, con cantidad × tasa igual que en Cuentas Corrientes."}
+        </p>
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">
           <button type="button" className="cc-btn-secundario" onClick={onCerrar}>
             Cancelar
           </button>
           <button type="submit" className="cc-guardar" disabled={enviando}>
-            {enviando ? "Guardando…" : "Registrar cliente"}
+            {enviando ? "Guardando…" : conMovimiento ? "Registrar cliente y movimiento" : "Registrar cliente"}
           </button>
         </div>
       </form>

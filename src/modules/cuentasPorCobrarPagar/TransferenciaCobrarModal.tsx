@@ -4,7 +4,7 @@ import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { crearCuentaCorriente, getEstadoCuenta, registrarMovimientoCC, subirComprobanteMovimiento, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import type { Moneda } from "../../api/monedas.api";
-import { leerNumero } from "../../utils/montos";
+import { formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
 import { alAbrirWhatsApp, enlaceWhatsApp, telefonoWhatsApp } from "../../utils/whatsapp";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte } from "../cuentasCorrientes/imagenReporte";
 import { leerComprobante } from "../cuentasCorrientes/ocrComprobante";
@@ -53,8 +53,8 @@ export function TransferenciaCobrarModal({
   const [telefono, setTelefono] = useState("");
   const [grupo, setGrupo] = useState(elegibles.find((g) => g === "Préstamos") ?? elegibles[0] ?? NUEVO);
   const [grupoNuevo, setGrupoNuevo] = useState("");
-  const [monedaId, setMonedaId] = useState<number | "">(cop?.id ?? monedas[0]?.id ?? "");
   const [monto, setMonto] = useState("");
+  const [tasa, setTasa] = useState(""); // opcional: la transferencia fue en otra moneda (cantidad × tasa = pesos)
   const [metodo, setMetodo] = useState(METODOS[0]!);
   const [otroMetodo, setOtroMetodo] = useState("");
   const [referencia, setReferencia] = useState("");
@@ -78,7 +78,12 @@ export function TransferenciaCobrarModal({
     if (q.length < 2 || elegida) return [];
     return cuentas.filter((c) => sinAcentos(c.tercero_nombre).includes(q)).slice(0, 5);
   }, [cuentas, nombre, elegida]);
-  const monedaCodigo = elegida ? elegida.moneda_codigo : (monedas.find((m) => m.id === monedaId)?.codigo ?? "COP");
+  const monedaCodigo = elegida ? elegida.moneda_codigo : "COP";
+  const nMontoEscrito = leerNumero(monto)?.replace(/^-/, "") ?? null;
+  const nTasa = tasa.trim() ? (leerNumero(tasa)?.replace(/^-/, "") ?? null) : null;
+  const conTasa = !!nTasa && /[1-9]/.test(nTasa);
+  // lo que queda debiendo, en la moneda de la cuenta
+  const total = nMontoEscrito && /[1-9]/.test(nMontoEscrito) ? (conTasa ? multiplicarDecimales(nMontoEscrito, nTasa!, monedaCodigo === "COP" ? 0 : 2) : nMontoEscrito) : null;
 
   async function cargarCaptura(imagen: File) {
     setCaptura(imagen);
@@ -137,14 +142,15 @@ export function TransferenciaCobrarModal({
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const nMonto = leerNumero(monto)?.replace(/^-/, "") ?? null;
+    const nMonto = total;
     const metodoFinal = metodo === "Otro" ? otroMetodo.trim() : metodo;
     const grupoFinal = grupo === NUEVO ? grupoNuevo.trim() : grupo;
     if (nombre.trim().length < 2) return setError("Escribí el nombre del cliente al que se le hizo la transferencia.");
     if (!nMonto || !/[1-9]/.test(nMonto)) return setError("Escribí el monto de la transferencia.");
     if (!metodoFinal) return setError("Escribí el método de pago.");
     if (!elegida && !grupoFinal) return setError("Escribí el nombre del grupo nuevo.");
-    if (!elegida && monedaId === "") return setError("Elegí la moneda.");
+    if (tasa.trim() && !conTasa) return setError("La tasa no es un número válido.");
+    if (!elegida && !cop) return setError("No se pudo cargar la moneda. Cerrá y volvé a abrir.");
     // mismo nombre que un cliente que ya está: es ese (no se crea dos veces)
     const existente = elegida ?? cuentas.find((c) => sinAcentos(c.tercero_nombre) === sinAcentos(nombre)) ?? null;
     setEnviando(true);
@@ -155,14 +161,14 @@ export function TransferenciaCobrarModal({
           nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE", telefono: telefono.trim() || undefined },
           modulo: "POR_COBRAR",
           grupoCobro: grupoFinal,
-          monedaId: monedaId as number,
+          monedaId: cop!.id,
         }));
       const creado = await registrarMovimientoCC({
         terceroId: cuenta.tercero_id,
         canalId: cuenta.canal_id,
         monedaId: cuenta.moneda_id,
         tipo: "CARGO",
-        monto: nMonto,
+        ...(conTasa ? { cantidadBase: nMontoEscrito!, tasa: nTasa! } : { monto: nMonto }),
         descripcion: `${metodoFinal === "Efectivo" ? "Entrega en efectivo" : `Transferencia ${metodoFinal}`}${referencia.trim() ? ` · ${referencia.trim()}` : ""}`,
       });
       // la captura queda guardada con el movimiento; si falla la subida, el movimiento igual quedó
@@ -335,29 +341,17 @@ export function TransferenciaCobrarModal({
               Teléfono (para compartirle el reporte por WhatsApp)
               <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="ej. 314 349 8481" inputMode="tel" autoComplete="off" />
             </label>
-            <div className="cxc-form-fila">
-              <label>
-                Grupo
-                <select value={grupo} onChange={(e) => setGrupo(e.target.value)}>
-                  {elegibles.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                  <option value={NUEVO}>+ Crear un grupo nuevo…</option>
-                </select>
-              </label>
-              <label>
-                Moneda
-                <select value={monedaId} onChange={(e) => setMonedaId(e.target.value ? Number(e.target.value) : "")}>
-                  {monedas.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.nombre} ({m.codigo})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <label>
+              Grupo
+              <select value={grupo} onChange={(e) => setGrupo(e.target.value)}>
+                {elegibles.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+                <option value={NUEVO}>+ Crear un grupo nuevo…</option>
+              </select>
+            </label>
             {grupo === NUEVO && (
               <label>
                 Nombre del grupo nuevo
@@ -369,14 +363,23 @@ export function TransferenciaCobrarModal({
 
         <div className="cxc-form-fila">
           <label>
-            Monto transferido ({monedaCodigo})
+            {conTasa ? "Cantidad transferida" : `Monto transferido (${monedaCodigo})`}
             <input value={monto} onChange={(e) => setMonto(conPuntos(e.target.value))} inputMode="decimal" placeholder="ej. 100.000" autoComplete="off" />
           </label>
           <label>
-            Referencia de la transferencia
-            <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Número de comprobante" autoComplete="off" />
+            Tasa (opcional)
+            <input value={tasa} onChange={(e) => setTasa(e.target.value)} inputMode="decimal" placeholder="si fue en dólares, bolívares…" autoComplete="off" />
           </label>
         </div>
+        {conTasa && total && (
+          <small className="cxc-transf-total">
+            {formatearMonto(nMontoEscrito!)} × {formatearMonto(nTasa!)} = <b>{dinero(total, monedaCodigo)}</b> por cobrar
+          </small>
+        )}
+        <label>
+          Referencia de la transferencia
+          <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Número de comprobante" autoComplete="off" />
+        </label>
 
         <div className="cxc-transf-metodo">
           <span>Método de pago</span>
