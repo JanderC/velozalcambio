@@ -289,6 +289,12 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
             onActualizar={cargar}
             onVolver={() => setSeleccionadaId(null)}
             medio={enConfirmaciones ? (canales.find((c) => c.id === canalId) ?? null) : null}
+            // el movimiento se entregó en otra moneda: se abre la cuenta del mismo cliente en esa moneda (buscándolo por nombre)
+            onAbrirCuenta={(id) => {
+              setBuscar(seleccionada.tercero_nombre);
+              setSeleccionadaId(id);
+              void cargar();
+            }}
           />
         ) : enConfirmaciones && puedeCrear ? (
           // Confirmaciones: sin cliente abierto, el formulario para registrar uno nuevo está siempre a la vista

@@ -10,6 +10,7 @@ import {
   type MovimientoConNumero,
   cerrarDiaCuenta,
   configurarCobroCuenta,
+  crearCuentaCorriente,
   descargarExcelEstadoCuenta,
   getCanales,
   getEstadoCuenta,
@@ -109,6 +110,7 @@ export function HojaCuenta({
   onActualizar,
   onVolver,
   medio = null,
+  onAbrirCuenta,
 }: {
   cuenta: CuentaCorrienteResumen;
   onActualizar: () => void;
@@ -116,6 +118,8 @@ export function HojaCuenta({
   // Confirmaciones: el medio elegido arriba para el próximo movimiento. El cliente se registra una sola vez y cada
   // movimiento lleva su medio (hoy por Nequi, mañana por Bancolombia). Sin elegir, va el medio con que se registró.
   medio?: { id: number; nombre: string } | null;
+  // Confirmaciones: el movimiento se entregó en otra moneda y quedó en la cuenta del cliente en esa moneda: se abre esa
+  onAbrirCuenta?: (cuentaId: number) => void;
 }) {
   const { usuario } = useAuth();
   const puedeAnular = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
@@ -844,6 +848,7 @@ export function HojaCuenta({
           medioElegido={medio}
           saldo={estado?.cuenta.saldo_actual ?? cuenta.saldo_actual}
           referencias={referencias}
+          onOtraCuenta={onAbrirCuenta}
           onGuardado={(abono) => {
             void cargar();
             onActualizar();
@@ -866,6 +871,7 @@ function FilaNueva({
   saldo,
   referencias,
   onGuardado,
+  onOtraCuenta,
 }: {
   cuenta: CuentaCorrienteResumen;
   medioElegido?: { id: number; nombre: string } | null;
@@ -873,6 +879,7 @@ function FilaNueva({
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
   onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string }) => void;
+  onOtraCuenta?: (cuentaId: number) => void;
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
@@ -905,6 +912,14 @@ function FilaNueva({
   const [esPorcentaje, setEsPorcentaje] = useState(clienteConComision); // comisión: cantidad x % (o cantidad - %) en vez de cantidad x tasa
   // Movimiento hecho en la moneda de cobro (ej. pagó en pesos una cuenta en dólares): cantidad ÷ tasa
   const [enCobro, setEnCobro] = useState(iniciaEnCobro);
+  // Confirmaciones, "Se entrega en": llega en una moneda y se le entrega en otra (USDT × tasa = bolívares), igual que
+  // al crear el cliente. Si no es la moneda de esta cuenta, el movimiento queda en la cuenta del mismo cliente en esa
+  // moneda (se le abre sola si no la tiene). Abrir cuentas lo hacen el admin y el asesor.
+  const { usuario } = useAuth();
+  const puedeElegirEntrega = enConfirmaciones && (usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR");
+  const [entregaEn, setEntregaEn] = useState(cuenta.moneda_codigo);
+  const otraMoneda = puedeElegirEntrega && entregaEn !== cuenta.moneda_codigo;
+  const codigoMonto = otraMoneda ? entregaEn : cuenta.moneda_codigo;
   const [montoDirecto, setMontoDirecto] = useState("");
   const [masOpciones, setMasOpciones] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -1030,7 +1045,7 @@ function FilaNueva({
   const MONEDA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "USD", ZELLE: "USD" };
   const delMedio = MONEDA_DEL_MEDIO[medioMov.nombre];
   const codigoDivision =
-    cobroCodigo ?? (enConfirmaciones ? (delMedio && delMedio !== cuenta.moneda_codigo ? delMedio : cuenta.moneda_codigo === "COP" ? "VES" : "COP") : null);
+    (otraMoneda ? null : cobroCodigo) ?? (enConfirmaciones ? (delMedio && delMedio !== codigoMonto ? delMedio : codigoMonto === "COP" ? "VES" : "COP") : null);
   function activarCobro() {
     if (enCobro) return;
     setEnCobro(true);
@@ -1041,7 +1056,7 @@ function FilaNueva({
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
   const pendientes = useRef(0);
-  const decimales = Number(cuenta.moneda_decimales ?? 0);
+  const decimales = otraMoneda ? (entregaEn === "COP" ? 0 : 2) : Number(cuenta.moneda_decimales ?? 0);
 
   useEffect(() => {
     if (!conCaja || cajas.length > 0) return;
@@ -1127,22 +1142,24 @@ function FilaNueva({
     monto = sinSigno(nDirecto);
   }
   const montoConSigno = monto && /[1-9]/.test(monto) ? (resta ? `-${monto}` : monto) : null;
-  const totalNuevo = montoConSigno ? sumarDecimales(saldo, montoConSigno) : null;
+  // el total corrido es el de esta cuenta: si el movimiento va a la cuenta en otra moneda, acá no cambia
+  const totalNuevo = montoConSigno && !otraMoneda ? sumarDecimales(saldo, montoConSigno) : null;
 
   // Lo que se mueve en la caja: la plata de verdad. Una venta de 403 USD saca 403 USD; un abono en pesos mete esos pesos.
   const monedaExtranjera =
-    conTasa && !esPorcentaje && !enCobro && nCantidad && nTasa && cuenta.moneda_codigo === "COP" ? monedaDeLaTasa(nTasa, referencia) : null;
+    conTasa && !esPorcentaje && !enCobro && nCantidad && nTasa && codigoMonto === "COP" ? monedaDeLaTasa(nTasa, referencia) : null;
   const movimientoCaja = !monto
     ? null
     : enCobro && cobroCodigo && nCantidad
       ? { codigo: cobroCodigo, cantidad: sinSigno(nCantidad) }
       : monedaExtranjera && nCantidad
         ? { codigo: monedaExtranjera as string, cantidad: sinSigno(nCantidad) }
-        : { codigo: cuenta.moneda_codigo, cantidad: monto };
+        : { codigo: codigoMonto, cantidad: monto };
   // lo que resta entra a la caja: un abono, o en Confirmaciones una Venta (nos pagan); una Compra o una suma sale
   const entraACaja = sentidoCaja === "auto" ? resta : sentidoCaja === "entra";
   const monedaCaja = movimientoCaja ? monedas.find((m) => m.codigo === movimientoCaja.codigo) : undefined;
-  const simbolo = cuenta.moneda_codigo === "COP" ? "$" : "";
+  const monedaEntrega = monedas.find((m) => m.codigo === entregaEn);
+  const simbolo = codigoMonto === "COP" ? "$" : "";
 
   function alCambiarReferencia(valor: string) {
     setReferencia(valor);
@@ -1187,6 +1204,7 @@ function FilaNueva({
     if (conTasa && esPorcentaje && comisionDescuenta && Number(nEscrita) >= 100) return setError("La comisión tiene que ser menor al 100%.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
+    if (otraMoneda && !monedaEntrega) return setError(`No encuentro la moneda ${entregaEn} para entregar.`);
     if (conCaja && cajaId === "") return setError(cajaObligatoria ? "Elegí qué caja alimenta este movimiento." : "Elegí la caja o banco que también se mueve.");
     if (conCaja && !monedaCaja) return setError(`No encuentro la moneda ${movimientoCaja?.codigo ?? ""} para mover la caja.`);
     for (const numero of numerosMovimiento) {
@@ -1211,12 +1229,13 @@ function FilaNueva({
       }
     }
     // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
-    const tasaCobroNueva = enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
+    const tasaCobroNueva = !otraMoneda && enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
     const adjuntas = imagenesAdjuntas;
     setImagenesAdjuntas([]);
     setAvisoLectura(null);
-    const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro };
+    const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro, entregaEn };
     setEnCobro(iniciaEnCobro);
+    setEntregaEn(cuenta.moneda_codigo);
     setSentidoCaja("auto");
     if (conCaja && cajaId !== "") {
       try {
@@ -1226,9 +1245,10 @@ function FilaNueva({
       }
     }
     // La tasa que queda para el próximo: la nueva si se marcó mantenerla; si no, la que venía puesta
-    const tasaQueQueda = tasaModificada ? (mantenerTasa ? nEscrita! : recientes.tasaHabitual) : null;
-    const tasaSiguiente = tasaModificada && mantenerTasa ? formatearMonto(nEscrita!) : tasaPuesta;
-    setRecientes((r) => (tasaModificada && mantenerTasa ? { ...r, tasaHabitual: nEscrita! } : r));
+    // (la tasa de un movimiento que se entrega en otra moneda no es la habitual de esta cuenta)
+    const tasaQueQueda = tasaModificada && !otraMoneda ? (mantenerTasa ? nEscrita! : recientes.tasaHabitual) : null;
+    const tasaSiguiente = tasaModificada && mantenerTasa && !otraMoneda ? formatearMonto(nEscrita!) : tasaPuesta;
+    setRecientes((r) => (tasaModificada && mantenerTasa && !otraMoneda ? { ...r, tasaHabitual: nEscrita! } : r));
     setMantenerTasa(true);
     setComisionIncluida(false);
     setSinComision(false);
@@ -1273,7 +1293,14 @@ function FilaNueva({
     };
     pendientes.current++;
     setEnviando(true);
-    const turno = cola.current.then(() => registrarMovimientoCC(datos));
+    let otraCuentaId: number | null = null;
+    const turno = cola.current.then(async () => {
+      if (!otraMoneda) return registrarMovimientoCC(datos);
+      // se entrega en otra moneda: va a la cuenta de Confirmaciones del mismo cliente en esa moneda (se abre si no la tiene)
+      const destino = await crearCuentaCorriente({ terceroId: cuenta.tercero_id, canalId: cuenta.canal_id, modulo: "CAJA", monedaId: monedaEntrega!.id, usarExistente: true });
+      otraCuentaId = destino.id;
+      return registrarMovimientoCC({ ...datos, canalId: destino.canal_id, monedaId: destino.moneda_id });
+    });
     cola.current = turno.catch(() => {});
     try {
       const creado = await turno;
@@ -1293,6 +1320,12 @@ function FilaNueva({
       cargarRecientes();
       // operación con comisión descontada: el aviso lleva lo que el cliente envió en total y el %
       const envio = esPorcentaje && comisionDescuenta && nCantidad && nEscrita ? { enviado: sinSigno(nCantidad), comision: nEscrita } : {};
+      if (otraCuentaId !== null) {
+        // quedó en la otra cuenta del cliente: se abre esa, que es donde está el movimiento (y desde ahí se le avisa)
+        onGuardado();
+        onOtraCuenta?.(otraCuentaId);
+        return;
+      }
       onGuardado(
         datos.estadoConfirmacion === "EN_PROCESO"
           ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso", ...envio }
@@ -1318,6 +1351,7 @@ function FilaNueva({
         setResta(escrito.resta);
         setEsPorcentaje(escrito.esPorcentaje);
         setEnCobro(escrito.enCobro);
+        setEntregaEn(escrito.entregaEn);
       }
     } finally {
       pendientes.current--;
@@ -1358,6 +1392,23 @@ function FilaNueva({
           Medio de este movimiento: <strong>{medioDelCliente}</strong>
           {medioCambiado ? " (elegido arriba)" : " · para registrarlo por otro medio, elegilo en los botones de arriba"}
         </p>
+      )}
+      {puedeElegirEntrega && !esPorcentaje && monedas.length > 0 && (
+        <label className={`cc-entrega-en ${otraMoneda ? "otra" : ""}`}>
+          Se entrega en
+          <select value={entregaEn} onChange={(e) => setEntregaEn(e.target.value)} aria-label="Moneda en la que se le entrega al cliente">
+            {monedas.map((m) => (
+              <option key={m.id} value={m.codigo}>
+                {m.nombre} ({m.codigo})
+              </option>
+            ))}
+          </select>
+          <small>
+            {otraMoneda
+              ? `Cantidad ${enCobro ? "÷" : "×"} tasa = total en ${entregaEn}. Queda en la cuenta en ${entregaEn} de ${cuenta.tercero_nombre} (se le abre sola si no la tiene) y se abre esa hoja.`
+              : "Llega en una moneda y se entrega en otra (ej. USDT × tasa = bolívares): elegí acá en cuál se le entrega."}
+          </small>
+        </label>
       )}
       <div className="cc-nueva-campos">
         <label className="cc-c-fecha">
@@ -1457,7 +1508,7 @@ function FilaNueva({
                 className={enCobro ? "activo" : ""}
                 onClick={activarCobro}
                 aria-pressed={enCobro}
-                title={`Lo que llega en ${codigoDivision} se divide por la tasa y queda en ${cuenta.moneda_codigo}`}
+                title={`Lo que llega en ${codigoDivision} se divide por la tasa y queda en ${codigoMonto}`}
               >
                 Dividir ÷
               </button>
@@ -1480,7 +1531,7 @@ function FilaNueva({
         <label className="cc-c-num monto">
           Monto
           {conTasa ? (
-            <output className={`cc-resultado ${resta ? "cc-neg" : ""}`}>{monto ? `${resta ? "- " : ""}${simbolo}${formatearMonto(monto)}` : "—"}</output>
+            <output className={`cc-resultado ${resta ? "cc-neg" : ""}`}>{monto ? `${resta ? "- " : ""}${simbolo}${formatearMonto(monto)}${otraMoneda ? ` ${entregaEn}` : ""}` : "—"}</output>
           ) : (
             <input value={montoDirecto} onChange={(e) => setMontoDirecto(e.target.value)} inputMode="decimal" placeholder="sin tasa: monto directo" autoComplete="off" />
           )}
@@ -1595,7 +1646,7 @@ function FilaNueva({
             {formatearMonto(sinSigno(nCantidad))} {codigoDivision} ÷ {formatearMonto(nEscrita)} ={" "}
             <strong>
               {simbolo}
-              {formatearMonto(monto)} {cuenta.moneda_codigo}
+              {formatearMonto(monto)} {codigoMonto}
             </strong>{" "}
             en la contabilidad
           </span>
