@@ -4,6 +4,7 @@ import { SearchBar } from "../../components/common/SearchBar";
 import { ModuleCard } from "../../components/common/ModuleCard";
 import { MODULOS } from "./modulos.config";
 import { useAuth } from "../../auth/useAuth";
+import { useFavoritos } from "../../hooks/useFavoritos";
 
 const ROL_LABEL: Record<string, string> = {
   ADMIN: "Administrador",
@@ -17,17 +18,23 @@ const ORDEN_CATEGORIAS = ["Operación diaria", "Gestión financiera", "Configura
 export function LauncherPage() {
   const { usuario } = useAuth();
   const [busqueda, setBusqueda] = useState("");
+  const { favoritos } = useFavoritos();
 
   const grupos = useMemo(() => {
     if (!usuario) return [];
     const visibles = MODULOS.filter(
       (m) => m.rolesPermitidos.includes(usuario.rol) && m.titulo.toLowerCase().includes(busqueda.toLowerCase())
     );
-    return ORDEN_CATEGORIAS.map((categoria) => ({
-      categoria,
-      modulos: visibles.filter((m) => m.categoria === categoria),
-    })).filter((g) => g.modulos.length > 0);
-  }, [usuario, busqueda]);
+    // Arriba de todo, los favoritos del usuario en el orden en que los marcó
+    const marcados = favoritos.map((id) => visibles.find((m) => m.id === id)).filter((m): m is (typeof MODULOS)[number] => !!m);
+    return [
+      { categoria: "Favoritos", modulos: marcados },
+      ...ORDEN_CATEGORIAS.map((categoria) => ({
+        categoria,
+        modulos: visibles.filter((m) => m.categoria === categoria),
+      })),
+    ].filter((g) => g.modulos.length > 0);
+  }, [usuario, busqueda, favoritos]);
 
   return (
     <div className="launcher-page">
@@ -37,7 +44,7 @@ export function LauncherPage() {
         <div>
           <h1>Panel de módulos</h1>
           <p>
-            Hola, <strong>{usuario ? ROL_LABEL[usuario.rol] : ""}</strong> — elegí un módulo para continuar.
+            Hola, <strong>{usuario ? ROL_LABEL[usuario.rol] : ""}</strong> — elegí un módulo para continuar. Con la estrella lo dejás en favoritos.
           </p>
         </div>
         <SearchBar value={busqueda} onChange={setBusqueda} />

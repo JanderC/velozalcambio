@@ -55,6 +55,34 @@ body {
 }
 .app-header-volver:hover { border-color: var(--color-gold); color: var(--color-gold); background: rgba(244, 215, 81, 0.08); }
 
+/* Favoritos: la estrella del módulo abierto y los accesos rápidos a los que el usuario marcó */
+.app-header-estrella {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: transparent; color: rgba(255, 255, 255, 0.6);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.app-header-estrella:hover, .app-header-estrella.activa { border-color: var(--color-gold); color: var(--color-gold); }
+.app-header-estrella:hover { background: rgba(244, 215, 81, 0.08); }
+.app-header-favoritos {
+  position: relative; z-index: 1; flex: 1; min-width: 0; margin: 0 16px;
+  display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none;
+}
+.app-header-favoritos::-webkit-scrollbar { display: none; }
+.app-header-favorito {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 6px 12px; border-radius: 20px; text-decoration: none; white-space: nowrap;
+  color: rgba(255, 255, 255, 0.82); background: rgba(255, 255, 255, 0.07);
+  font-family: "Inter", sans-serif; font-size: 0.8rem; font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.app-header-favorito:hover { background: rgba(244, 215, 81, 0.16); color: var(--color-gold); }
+.app-header-favorito.actual { background: var(--color-gold); color: var(--color-navy-dark); font-weight: 600; }
+@media (max-width: 1100px) {
+  .app-header-favorito span { display: none; }
+  .app-header-favorito { padding: 7px 9px; }
+}
+
 .app-header-user { display: flex; align-items: center; gap: 16px; font-family: "Inter", sans-serif; position: relative; z-index: 1; }
 .app-header-role {
   font-size: 0.8rem; font-weight: 600; color: var(--color-navy-dark);
@@ -109,8 +137,20 @@ body {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; margin-bottom: 8px;
 }
 
+.module-card-caja { --acento: #F4D751; position: relative; display: flex; }
+.module-card-caja .module-card { flex: 1; width: 100%; }
+.module-card-estrella {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent;
+  color: rgba(255, 255, 255, 0.35); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.module-card-estrella:hover { color: var(--color-gold); background: rgba(244, 215, 81, 0.12); transform: scale(1.1); }
+.module-card-estrella.activa { color: var(--color-gold); }
+.module-card-caja:hover .module-card-estrella { transform: translateY(-5px); }
+.module-card-caja:hover .module-card-estrella:hover { transform: translateY(-5px) scale(1.1); }
+
 .module-card {
-  --acento: #F4D751;
   position: relative; overflow: hidden;
   border: none; border-left: 4px solid var(--acento); border-radius: 10px;
   padding: 22px 22px 18px;
@@ -126,7 +166,7 @@ body {
     115deg, rgba(244, 215, 81, 0.04) 0px, rgba(244, 215, 81, 0.04) 1.5px, transparent 1.5px, transparent 26px
   );
 }
-.module-card:hover {
+.module-card:hover, .module-card-caja:hover .module-card {
   transform: translateY(-5px);
   box-shadow: 0 14px 26px -6px color-mix(in srgb, var(--acento) 45%, transparent), 0 4px 10px rgba(11,14,19,0.3);
 }
@@ -675,4 +715,5 @@ body {
   .app-header { padding: 10px 16px; }
   .app-header-title, .app-header-role { display: none; }
   .app-header-volver { margin-left: 10px; }
+  .app-header-favoritos { margin: 0 8px; }
 }
