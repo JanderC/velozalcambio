@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, HandCoins, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, HandCoins, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
@@ -12,6 +12,7 @@ import { compartirImagen, copiarImagen, descargarBlob } from "../cuentasCorrient
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import { SIN_GRUPO, detalleMoneda, dinero, enPesos, fechaDeHoy, grupoDe, gruposDe, mensajeDeCobro, mismoGrupo, totalEnPesos, totalesPorMoneda } from "./cobrar";
 import { NuevoClienteCobrarModal } from "./NuevoClienteCobrarModal";
+import { TransferenciaCobrarModal } from "./TransferenciaCobrarModal";
 import { generarReporteCobrar } from "./reporteCobrar";
 import "./cuentasPorCobrar.css";
 
@@ -31,6 +32,7 @@ export function CuentasPorCobrarPagarPage() {
   const [buscar, setBuscar] = useState("");
   const [abiertaId, setAbiertaId] = useState<number | null>(null);
   const [creandoEn, setCreandoEn] = useState<string | null>(null); // el grupo donde se está creando un cliente
+  const [transfiriendo, setTransfiriendo] = useState(false); // registrar una transferencia que le hicimos a alguien
   const [reporte, setReporte] = useState<{ blob: Blob; url: string } | null>(null);
   const [generando, setGenerando] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -160,7 +162,12 @@ export function CuentasPorCobrarPagarPage() {
         </div>
         <div className="cxc-hero-acciones">
           {puedeEditar && (
-            <button type="button" className="cxc-btn-oro" onClick={() => setCreandoEn(grupos[0] ?? "")}>
+            <button type="button" className="cxc-btn-oro" onClick={() => setTransfiriendo(true)} title="Le hicimos una transferencia a alguien: se pega la captura y queda en su cuenta por cobrar">
+              <ArrowUpRight size={17} /> Registrar transferencia
+            </button>
+          )}
+          {puedeEditar && (
+            <button type="button" className="cxc-btn-claro" onClick={() => setCreandoEn(grupos[0] ?? "")}>
               <UserPlus size={17} /> Nuevo cliente
             </button>
           )}
@@ -302,6 +309,17 @@ export function CuentasPorCobrarPagarPage() {
             setCreandoEn(null);
             void cargar();
           }}
+        />
+      )}
+
+      {transfiriendo && (
+        <TransferenciaCobrarModal
+          cuentas={todas}
+          grupos={grupos}
+          monedas={monedas}
+          onRegistrada={() => void cargar()}
+          onAbrirHoja={(id) => setAbiertaId(id)}
+          onCerrar={() => setTransfiriendo(false)}
         />
       )}
 

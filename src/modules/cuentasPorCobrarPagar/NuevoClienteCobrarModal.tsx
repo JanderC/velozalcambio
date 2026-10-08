@@ -9,7 +9,7 @@ import { SIN_GRUPO, dinero } from "./cobrar";
 const NUEVO = "__nuevo__";
 
 /** Lo que se va escribiendo en un monto, con los puntos de miles puestos solos: "1500" -> "1.500". Decimales con coma. */
-function conPuntos(escrito: string) {
+export function conPuntos(escrito: string) {
   let t = escrito.replace(/[^\d.,]/g, "");
   if (!t.includes(",") && t.endsWith(".")) t = `${t.slice(0, -1)},`;
   const coma = t.indexOf(",");

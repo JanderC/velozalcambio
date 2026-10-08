@@ -89,3 +89,29 @@
   .cxc-wa a { width: 36px; height: 36px; }
   .cxc-form-fila { grid-template-columns: 1fr; }
 }
+
+/* ---------- Registrar una transferencia que le hicimos a un cliente ---------- */
+.cxc-transf-soltar { display: grid; justify-items: center; gap: 6px; padding: 22px 16px; border: 2px dashed #9fb3c8; border-radius: 12px; background: #f5f8fb; color: var(--color-navy); font: inherit; cursor: pointer; text-align: center; }
+.cxc-transf-soltar:hover { border-color: var(--color-navy); background: #eaf1f8; }
+.cxc-transf-soltar strong { font-size: 0.95rem; }
+.cxc-transf-soltar span { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #4b5563; }
+.cxc-transf-captura { position: relative; display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid #cfe3d4; border-radius: 12px; background: #f1faf3; }
+.cxc-transf-captura img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid #d7dbe2; flex-shrink: 0; background: white; }
+.cxc-transf-captura > div { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.cxc-transf-captura strong { font-size: 0.9rem; color: #166534; }
+.cxc-transf-captura span { font-size: 0.8rem; color: #4b5563; }
+.cxc-transf-captura .cc-btn-secundario { padding: 5px 12px; font-size: 0.8rem; }
+.cxc-transf-quitar { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; display: grid; place-items: center; border: none; border-radius: 50%; background: rgba(0, 0, 0, 0.08); color: #374151; cursor: pointer; }
+.cxc-transf-cliente { display: inline-flex; align-items: center; gap: 5px; }
+.cxc-transf-cliente.si { color: #166534; font-weight: 600; }
+.cxc-transf-sugeridos { display: grid; gap: 4px; padding: 8px; border: 1px solid #d7dbe2; border-radius: 10px; background: #fafbfc; }
+.cxc-transf-sugeridos > span { font-size: 0.78rem; color: #6b7280; padding: 0 4px 2px; }
+.cxc-transf-sugeridos button { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 10px; border: none; border-radius: 7px; background: white; font: inherit; font-size: 0.88rem; text-align: left; cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); }
+.cxc-transf-sugeridos button:hover { background: #eaf1f8; }
+.cxc-transf-sugeridos i { font-style: normal; font-size: 0.78rem; color: #6b7280; white-space: nowrap; }
+.cxc-transf-metodo { display: grid; gap: 6px; }
+.cxc-transf-metodo > span { font-size: 0.82rem; font-weight: 600; color: #374151; }
+.cxc-transf-metodo .cc-chips { flex-wrap: wrap; }
+.cxc-transf-ok { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 10px 12px; border-radius: 8px; background: #e8f6ec; color: #166534; font-size: 0.9rem; }
+.cxc-transf-hecho .cc-reporte-acciones { align-items: center; }
+.cxc-transf-hecho .cxc-transf-wa { margin-left: 0; padding: 10px 14px; font-size: 0.86rem; }
