@@ -460,3 +460,8 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-nueva label.cc-entrega-en select { border: 2px solid var(--color-navy); font-weight: 700; color: var(--color-navy); background: #eaf1f8; padding: 6px 10px; }
 .cc-nueva label.cc-entrega-en small { font-weight: 400; color: #6b7280; flex: 1; min-width: 220px; }
 .cc-nueva label.cc-entrega-en.otra small { color: #1a7f37; font-weight: 600; }
+
+/* Confirmaciones: el medio del movimiento se elige dentro del formulario (en el teléfono no se ven los botones de arriba) */
+.cc-medio-mov-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+.cc-medio-mov-elegir > span { font-size: 0.84rem; font-weight: 600; color: #374151; }
+.cc-medio-mov-elegir .cc-chips button { padding: 7px 14px; font-size: 0.84rem; }

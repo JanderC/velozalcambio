@@ -101,6 +101,17 @@ function Monto({ valor, simbolo = "$" }: { valor: string; simbolo?: string }) {
   return <span className={negativo ? "cc-neg" : ""}>{negativo ? `- ${simbolo}${formatearMonto(valor.slice(1))}` : `${simbolo}${formatearMonto(valor)}`}</span>;
 }
 
+// Confirmaciones: en qué moneda se entrega lo que entra por cada medio (Western Union llega en dólares y se paga en pesos)
+const ENTREGA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "COP", ZELLE: "USD" };
+/** "WESTERN_UNION" -> "Western Union". */
+const nombreDeMedio = (nombre: string) =>
+  nombre === "SIN_BANCO"
+    ? ""
+    : nombre
+        .toLowerCase()
+        .replace(/_/g, " ")
+        .replace(/(^|\s)\S/g, (l) => l.toUpperCase());
+
 /**
  * La hoja de una cuenta, igual que el Excel: FECHA · REFERENCIA · CANTIDAD · TASA · MONTO · TOTAL,
  * con el saldo pendiente arriba y una fila para cargar el siguiente movimiento.
@@ -110,6 +121,8 @@ export function HojaCuenta({
   onActualizar,
   onVolver,
   medio = null,
+  medios = [],
+  onElegirMedio,
   onAbrirCuenta,
 }: {
   cuenta: CuentaCorrienteResumen;
@@ -118,6 +131,10 @@ export function HojaCuenta({
   // Confirmaciones: el medio elegido arriba para el próximo movimiento. El cliente se registra una sola vez y cada
   // movimiento lleva su medio (hoy por Nequi, mañana por Bancolombia). Sin elegir, va el medio con que se registró.
   medio?: { id: number; nombre: string } | null;
+  // Confirmaciones: los medios disponibles y cómo elegir uno ("" = el medio con que se registró el cliente). Van también
+  // dentro del formulario del movimiento, porque en el teléfono los botones de arriba no se ven con la hoja abierta.
+  medios?: { id: number; nombre: string }[];
+  onElegirMedio?: (id: number | "") => void;
   // Confirmaciones: el movimiento se entregó en otra moneda y quedó en la cuenta del cliente en esa moneda: se abre esa
   onAbrirCuenta?: (cuentaId: number) => void;
 }) {
@@ -848,6 +865,8 @@ export function HojaCuenta({
           medioElegido={medio}
           saldo={estado?.cuenta.saldo_actual ?? cuenta.saldo_actual}
           referencias={referencias}
+          medios={medios}
+          onElegirMedio={onElegirMedio}
           onOtraCuenta={onAbrirCuenta}
           onGuardado={(abono) => {
             void cargar();
@@ -870,6 +889,8 @@ function FilaNueva({
   medioElegido = null,
   saldo,
   referencias,
+  medios = [],
+  onElegirMedio,
   onGuardado,
   onOtraCuenta,
 }: {
@@ -879,6 +900,8 @@ function FilaNueva({
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
   onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string }) => void;
+  medios?: { id: number; nombre: string }[];
+  onElegirMedio?: (id: number | "") => void;
   onOtraCuenta?: (cuentaId: number) => void;
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
@@ -914,10 +937,14 @@ function FilaNueva({
   const [enCobro, setEnCobro] = useState(iniciaEnCobro);
   // Confirmaciones, "Se entrega en": llega en una moneda y se le entrega en otra (USDT × tasa = bolívares), igual que
   // al crear el cliente. Si no es la moneda de esta cuenta, el movimiento queda en la cuenta del mismo cliente en esa
-  // moneda (se le abre sola si no la tiene). Abrir cuentas lo hacen el admin y el asesor.
-  const { usuario } = useAuth();
-  const puedeElegirEntrega = enConfirmaciones && (usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR");
-  const [entregaEn, setEntregaEn] = useState(cuenta.moneda_codigo);
+  // moneda (se le abre sola si no la tiene). El cliente se registra una vez con una moneda, pero puede hacer la
+  // operación que quiera: al elegir otro medio viene puesta la moneda de ese medio (Bancolombia y Nequi, pesos).
+  const puedeElegirEntrega = enConfirmaciones;
+  const entregaPorDefecto = enConfirmaciones && medioCambiado ? (ENTREGA_DEL_MEDIO[medioMov.nombre] ?? cuenta.moneda_codigo) : cuenta.moneda_codigo;
+  const [entregaEn, setEntregaEn] = useState(entregaPorDefecto);
+  useEffect(() => {
+    setEntregaEn(entregaPorDefecto);
+  }, [entregaPorDefecto]);
   const otraMoneda = puedeElegirEntrega && entregaEn !== cuenta.moneda_codigo;
   const codigoMonto = otraMoneda ? entregaEn : cuenta.moneda_codigo;
   const [montoDirecto, setMontoDirecto] = useState("");
@@ -1235,7 +1262,7 @@ function FilaNueva({
     setAvisoLectura(null);
     const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro, entregaEn };
     setEnCobro(iniciaEnCobro);
-    setEntregaEn(cuenta.moneda_codigo);
+    setEntregaEn(entregaPorDefecto);
     setSentidoCaja("auto");
     if (conCaja && cajaId !== "") {
       try {
@@ -1387,13 +1414,33 @@ function FilaNueva({
         </button>
       </div>
       {/* Confirmaciones: con qué medio entra este movimiento. El cliente es el mismo aunque cambie de medio. */}
-      {enConfirmaciones && medioMov.nombre !== "SIN_BANCO" && (
-        <p className={`cc-medio-mov ${medioCambiado ? "cambiado" : ""}`}>
-          Medio de este movimiento: <strong>{medioDelCliente}</strong>
-          {medioCambiado ? " (elegido arriba)" : " · para registrarlo por otro medio, elegilo en los botones de arriba"}
-        </p>
+      {enConfirmaciones && medios.length > 0 && onElegirMedio ? (
+        <div className="cc-medio-mov-elegir">
+          <span>Medio de este movimiento</span>
+          <div className="cc-chips" role="radiogroup" aria-label="Medio de este movimiento">
+            {/* el medio con que se registró el cliente va primero; los demás, para registrarle una operación por otro medio */}
+            <button type="button" role="radio" aria-checked={!medioCambiado} className={!medioCambiado ? "activo" : ""} onClick={() => onElegirMedio("")}>
+              {nombreDeMedio(cuenta.canal_nombre) || "Medio del cliente"}
+            </button>
+            {medios
+              .filter((m) => m.id !== cuenta.canal_id)
+              .map((m) => (
+                <button type="button" key={m.id} role="radio" aria-checked={medioMov.id === m.id} className={medioMov.id === m.id ? "activo" : ""} onClick={() => onElegirMedio(m.id)}>
+                  {nombreDeMedio(m.nombre)}
+                </button>
+              ))}
+          </div>
+        </div>
+      ) : (
+        enConfirmaciones &&
+        medioMov.nombre !== "SIN_BANCO" && (
+          <p className={`cc-medio-mov ${medioCambiado ? "cambiado" : ""}`}>
+            Medio de este movimiento: <strong>{medioDelCliente}</strong>
+            {medioCambiado ? " (elegido arriba)" : " · para registrarlo por otro medio, elegilo en los botones de arriba"}
+          </p>
+        )
       )}
-      {puedeElegirEntrega && !esPorcentaje && monedas.length > 0 && (
+      {puedeElegirEntrega && monedas.length > 0 && (
         <label className={`cc-entrega-en ${otraMoneda ? "otra" : ""}`}>
           Se entrega en
           <select value={entregaEn} onChange={(e) => setEntregaEn(e.target.value)} aria-label="Moneda en la que se le entrega al cliente">
@@ -1405,8 +1452,8 @@ function FilaNueva({
           </select>
           <small>
             {otraMoneda
-              ? `Cantidad ${enCobro ? "÷" : "×"} tasa = total en ${entregaEn}. Queda en la cuenta en ${entregaEn} de ${cuenta.tercero_nombre} (se le abre sola si no la tiene) y se abre esa hoja.`
-              : "Llega en una moneda y se entrega en otra (ej. USDT × tasa = bolívares): elegí acá en cuál se le entrega."}
+              ? `El total queda en ${entregaEn}, en la cuenta en ${entregaEn} de ${cuenta.tercero_nombre} (se le abre sola si no la tiene). Al agregar se abre esa hoja.`
+              : `El cliente está registrado en ${cuenta.moneda_codigo}, pero se le puede entregar en otra moneda: elegila acá.`}
           </small>
         </label>
       )}

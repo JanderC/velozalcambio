@@ -289,6 +289,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
             onActualizar={cargar}
             onVolver={() => setSeleccionadaId(null)}
             medio={enConfirmaciones ? (canales.find((c) => c.id === canalId) ?? null) : null}
+            medios={enConfirmaciones ? bancosConfirmaciones : []}
+            onElegirMedio={setCanalId}
             // el movimiento se entregó en otra moneda: se abre la cuenta del mismo cliente en esa moneda (buscándolo por nombre)
             onAbrirCuenta={(id) => {
               setBuscar(seleccionada.tercero_nombre);
