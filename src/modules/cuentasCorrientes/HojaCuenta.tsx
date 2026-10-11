@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -14,6 +14,7 @@ import {
   descargarExcelEstadoCuenta,
   getCanales,
   getEstadoCuenta,
+  getMovimientosCuentaCorriente,
   getTasasRecientes,
   getUrlComprobante,
   subirComprobanteMovimiento,
@@ -52,6 +53,14 @@ const CLAVE_ULTIMA_CAJA = "cc-ultima-caja";
 
 // La referencia lleva quién envió la transferencia: "Venta de Zelle · Juan Pérez"
 const SEPARADOR_PERSONA = " · ";
+/** Para comparar textos sin que importen mayúsculas, acentos ni espacios de más. */
+const textoLlano = (t: string) =>
+  t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /** Teléfono como lo pide wa.me: solo dígitos y con código de país (celular colombiano o venezolano sin él -> se le agrega). */
 function telefonoWhatsApp(telefono: string | null) {
@@ -302,6 +311,21 @@ export function HojaCuenta({
     await entregarReporte(await generarImagenReporte(tramo, simbolo, titulo, cierres.length > 1 ? "Abonado en este cierre" : undefined), `cierre-${dia}${cierres.length > 1 ? `-${i + 1}` : ""}.png`);
   }
   const cierresDelDia = estado?.cierres ?? [];
+
+  // Buscador de la hoja: por nombre, referencia, cuenta o monto, entre los movimientos del día que se está viendo
+  const [buscarMov, setBuscarMov] = useState("");
+  const movimientosVisibles = useMemo(() => {
+    const todos = estado?.movimientos ?? [];
+    const q = textoLlano(buscarMov);
+    if (!q) return todos;
+    const digitos = q.replace(/[^\d]/g, "");
+    return todos.filter((m) => {
+      if (textoLlano(`${m.descripcion ?? m.tipo} ${m.cuenta_destino ?? ""}`).includes(q)) return true;
+      // por monto o cantidad: se comparan solo los dígitos ("813.313" encuentra 813313)
+      const numeros = [m.monto, m.cantidad_base ?? ""].map((v) => v.replace(/^-/, "").replace(/\.?0+$/, "").replace(/[^\d]/g, ""));
+      return digitos.length >= 2 && numeros.some((v) => v.includes(digitos));
+    });
+  }, [estado, buscarMov]);
 
   // Cierre diario: deja anotado el saldo con el que cerró el día y manda el reporte del día como imagen
   async function cerrarDia() {
@@ -636,6 +660,15 @@ export function HojaCuenta({
               ))}
           </select>
         )}
+        <label className="cc-buscar-mov" title="Busca entre los movimientos de este día: por nombre, referencia o monto">
+          <Search size={14} />
+          <input value={buscarMov} onChange={(e) => setBuscarMov(e.target.value)} placeholder="Buscar movimiento…" aria-label="Buscar un movimiento de este día" />
+          {buscarMov && (
+            <button type="button" onClick={() => setBuscarMov("")} aria-label="Quitar la búsqueda">
+              <X size={13} />
+            </button>
+          )}
+        </label>
         {(telefono || esConfirmaciones) && (
           <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeSaldo)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeSaldo)} target="_blank" rel="noreferrer" title={!telefono ? "Sin teléfono registrado: al abrir WhatsApp elegís el contacto" : ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
             <MessageCircle size={14} /> {esConfirmaciones ? (variasOperaciones ? `Enviar las ${operacionesJuntas.length} operaciones` : ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
@@ -818,7 +851,16 @@ export function HojaCuenta({
                 </td>
               </tr>
             )}
-            {estado?.movimientos.map((m) => (
+            {!cargando && !!estado?.movimientos.length && buscarMov.trim() !== "" && (
+              <tr>
+                <td colSpan={7} className="cc-tabla-aviso cc-tabla-busqueda">
+                  {movimientosVisibles.length === 0
+                    ? `Ningún movimiento de este día coincide con "${buscarMov.trim()}".`
+                    : `${movimientosVisibles.length} de ${estado.movimientos.length} movimientos coinciden con "${buscarMov.trim()}". Las sumas de abajo son de todo el día.`}
+                </td>
+              </tr>
+            )}
+            {movimientosVisibles.map((m) => (
               <tr key={m.id} className={m.anulado ? "cc-anulado" : ""} title={`Cargado por ${m.usuario_nombre}`}>
                 <td>{fechaCorta(m.fecha)}</td>
                 <td className={Number(m.monto) < 0 && !m.anulado ? "cc-ref-abono" : ""}>
@@ -935,6 +977,9 @@ export function HojaCuenta({
     </div>
   );
 }
+
+// Lo que hace falta de un movimiento ya cargado para saber si es la misma transferencia
+type MovimientoIgual = { descripcion: string | null; fecha: string; cantidad_base: string | null; monto: string; anulado?: boolean; reverso_de_id?: number | null };
 
 function FilaNueva({
   cuenta,
@@ -1304,6 +1349,35 @@ function FilaNueva({
         const aviso = `${avisoRepetido(ya, numero)} No se puede registrar dos veces: el movimiento NO se generó.`;
         window.alert(`Referencia repetida\n\n${aviso}`);
         return setError(aviso);
+      }
+    }
+
+    // Misma persona que envía y mismo monto que un movimiento ya cargado en esta cuenta: puede ser la misma
+    // transferencia. Se avisa y quien carga decide si la agrega igual (dos envíos iguales también pasan).
+    const quienEnvia = textoLlano(persona);
+    if (quienEnvia.length >= 3) {
+      const valores = [conTasa && nCantidad ? sinSigno(nCantidad) : null, monto].filter((v): v is string => !!v).map(Number);
+      const igual = await getMovimientosCuentaCorriente(cuenta.id)
+        .then((lista) =>
+          (lista as (MovimientoIgual)[])
+            .reverse()
+            .find(
+              (m) =>
+                !m.anulado &&
+                !m.reverso_de_id &&
+                !!m.descripcion &&
+                textoLlano((m.descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "")) === quienEnvia &&
+                valores.some((v) => v === Math.abs(Number(m.cantidad_base ?? NaN)) || v === Math.abs(Number(m.monto)))
+            )
+        )
+        .catch(() => undefined); // sin conexión para consultar: no se frena la carga
+      if (igual) {
+        const cuanto = igual.cantidad_base ? formatearMonto(sinSigno(igual.cantidad_base)) : `${simbolo}${formatearMonto(sinSigno(igual.monto))}`;
+        const agregar = window.confirm(
+          `Posible transferencia repetida\n\nYa hay un movimiento de "${persona.trim()}" por ${cuanto} en esta cuenta:\n"${igual.descripcion}" del ${fechaCorta(igual.fecha)}.\n\n` +
+            `¿Agregarla de todos modos?\nAceptar: se agrega (es otra transferencia). Cancelar: no se agrega.`
+        );
+        if (!agregar) return setError(`No se agregó: ya había un movimiento de "${persona.trim()}" por ${cuanto} del ${fechaCorta(igual.fecha)}.`);
       }
     }
 

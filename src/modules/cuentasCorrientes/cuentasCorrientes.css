@@ -443,6 +443,12 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
   .cc-form-acciones button { flex: 1; padding: 13px; }
 }
 
+/* Buscador de movimientos del día, al lado de cerrar y enviar */
+.cc-buscar-mov { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid #cfd6e0; border-radius: 16px; background: white; color: #6b7280; }
+.cc-buscar-mov input { width: 150px; border: none; outline: none; background: transparent; font: inherit; font-size: 0.82rem; color: #111827; }
+.cc-buscar-mov:focus-within { border-color: var(--color-navy); }
+.cc-buscar-mov button { display: grid; place-items: center; border: none; background: none; color: #6b7280; cursor: pointer; padding: 0; }
+.cc-tabla-busqueda { background: #fff8e1; color: #7a5b00; font-weight: 600; }
 /* Varios cierres en el día: elegir de cuál se comparte el reporte */
 .cc-cierres-elegir { padding: 5px 8px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; color: #374151; font: inherit; font-size: 0.8rem; cursor: pointer; }
 /* Reporte por rango de fechas */
