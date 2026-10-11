@@ -7,6 +7,7 @@ import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
+import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
 const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
@@ -99,6 +100,15 @@ export function NuevaCuentaModal({
   const [movDestino, setMovDestino] = useState("USD"); // a qué moneda se lleva lo que llega al dividir: cualquiera de las del sistema
   // ...y al multiplicar por la tasa: pesos por defecto, pero también bolívares u otra (USDT × tasa = Bs)
   const [movDestinoTasa, setMovDestinoTasa] = useState("COP");
+  // ...y con comisión: viene la moneda del medio, pero el cliente puede pedir otra (null = la del medio)
+  const [movDestinoComision, setMovDestinoComision] = useState<string | null>(null);
+  // La operación: se elige de la lista (Compra o Venta de pesos, bolívares, dólares…) o queda la del medio ("Compra Zelle")
+  const [movOperacion, setMovOperacion] = useState("");
+  function cambiarOperacion(valor: string) {
+    setMovOperacion(valor);
+    if (/^\s*compra/i.test(valor)) setMovResta(false);
+    else if (/^\s*venta/i.test(valor)) setMovResta(true);
+  }
   const [movResta, setMovResta] = useState(false);
   const [movCantidad, setMovCantidad] = useState("");
   const [movValor, setMovValor] = useState(""); // la tasa o el % de comisión
@@ -122,6 +132,7 @@ export function NuevaCuentaModal({
   useEffect(() => {
     if (!nombreMedio) return;
     cambiarFormula(nombreMedio === "BANCOLOMBIA" || nombreMedio === "NEQUI" ? "comision" : "tasa");
+    setMovDestinoComision(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nombreMedio]);
   const [movPersona, setMovPersona] = useState("");
@@ -148,9 +159,9 @@ export function NuevaCuentaModal({
   // lo que multiplica a la cantidad: la tasa, o lo que queda tras la comisión (4% -> 0.96)
   const movFactor = !nMovValor || movFormula === "dividir" ? null : movFormula === "comision" ? factorDeComision(nMovValor, movIncluida) : nMovValor;
   // por tasa la cuenta queda en la moneda elegida en "Llevar a" (pesos por defecto); con comisión (o sin tasa), en la del total
-  const codigoCuenta = movFormula === "dividir" ? movDestino : movFormula === "tasa" && movFactor ? movDestinoTasa : codigoTotal;
+  const codigoCuenta = movFormula === "dividir" ? movDestino : movFormula === "tasa" && movFactor ? movDestinoTasa : movFormula === "comision" ? (movDestinoComision ?? codigoTotal) : codigoTotal;
   // la moneda a la que se lleva, según la fórmula elegida
-  const destinoElegido = movFormula === "dividir" ? movDestino : movDestinoTasa;
+  const destinoElegido = movFormula === "dividir" ? movDestino : movFormula === "comision" ? (movDestinoComision ?? codigoTotal) : movDestinoTasa;
   const movMonto = !nMovCantidad
     ? null
     : movFormula === "dividir"
@@ -309,7 +320,7 @@ export function NuevaCuentaModal({
             tipo: movResta ? "ABONO" : "CARGO",
             // la referencia sale del medio: "Compra Zelle" o "Venta Zelle"
             descripcion:
-              `${movResta ? "Venta" : "Compra"} ${etiquetaMedio}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
+              `${movOperacion.trim() || `${movResta ? "Venta" : "Compra"} ${etiquetaMedio}`}${movPersonaCompleta ? ` · ${movPersonaCompleta}` : ""}` +
               // lo que se movió de verdad queda anotado: (82.500 COP a 3.280)
               (movFormula === "dividir" ? ` (${formatearMonto(nMovCantidad!)} ${codigoMedio} a ${formatearMonto(nMovValor!)})` : ""),
             // Western y Zelle pueden quedar pendientes (tardan en verificarse); las demás compras entran confirmadas y pasan a Taquilla
@@ -337,6 +348,7 @@ export function NuevaCuentaModal({
           setMovResta(false);
           setMovSinComision(false);
           setMovCantidad("");
+          setMovOperacion("");
           setMovValor(movFormula === "comision" ? movValor.replace(/%/g, "").trim() : "");
           setMovPersona("");
           setMovMtcn("");
@@ -543,6 +555,15 @@ export function NuevaCuentaModal({
                   : `${imagenesAdjuntas.length} capturas cargadas: los montos están sumados y se guardan juntas con el movimiento.`}
               </p>
             )}
+            <label className="cc-primer-mov-operacion">
+              Operación
+              <input list="cc-operaciones-nuevo" value={movOperacion} onChange={(e) => cambiarOperacion(e.target.value)} placeholder={`${movResta ? "Venta" : "Compra"}${etiquetaMedio ? ` ${etiquetaMedio}` : ""} (se pone sola)`} autoComplete="off" />
+              <datalist id="cc-operaciones-nuevo">
+                {OPERACIONES_CONFIRMACIONES.map((o) => (
+                  <option key={o} value={o} />
+                ))}
+              </datalist>
+            </label>
             <div className="cc-primer-mov-opciones">
               {/* Compra: le compramos al cliente lo que nos pasa (nos resta pesos o dólares). Venta: le vendemos bolívares o dólares (nos aumenta el saldo en pesos). */}
               <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Compra o venta">
@@ -564,10 +585,10 @@ export function NuevaCuentaModal({
                   Comisión %
                 </button>
               </div>
-              {movFormula !== "comision" && (
+              {(
                 <label className="cc-primer-mov-destino">
-                  Se entrega en
-                  <select value={destinoElegido} onChange={(e) => (movFormula === "dividir" ? setMovDestino : setMovDestinoTasa)(e.target.value)}>
+                  ¿Qué moneda quiere el cliente? Se entrega en
+                  <select value={destinoElegido} onChange={(e) => (movFormula === "dividir" ? setMovDestino : movFormula === "comision" ? setMovDestinoComision : setMovDestinoTasa)(e.target.value)}>
                     {/* todas las monedas, menos la que ya trae el medio (no habría nada que convertir) */}
                     {monedas
                       // al dividir no se lista la moneda del medio (no habría nada que dividir); al multiplicar sí,

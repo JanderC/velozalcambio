@@ -102,7 +102,7 @@ function Monto({ valor, simbolo = "$" }: { valor: string; simbolo?: string }) {
 }
 
 // Confirmaciones: las operaciones que se hacen, iguales para todos los clientes (no lo último que se le escribió a cada uno)
-const OPERACIONES_CONFIRMACIONES = ["Compra", "Venta"].flatMap((sentido) => ["pesos", "bolívares", "dólares", "USDT", "euros"].map((moneda) => `${sentido} de ${moneda}`));
+export const OPERACIONES_CONFIRMACIONES = ["Compra", "Venta"].flatMap((sentido) => ["pesos", "bolívares", "dólares", "USDT", "euros"].map((moneda) => `${sentido} de ${moneda}`));
 // Confirmaciones: en qué moneda se entrega lo que entra por cada medio (Western Union llega en dólares y se paga en pesos)
 const ENTREGA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "COP", ZELLE: "USD" };
 /** "WESTERN_UNION" -> "Western Union". */
