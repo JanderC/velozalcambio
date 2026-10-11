@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -311,6 +311,31 @@ export function HojaCuenta({
     await entregarReporte(await generarImagenReporte(tramo, simbolo, titulo, cierres.length > 1 ? "Abonado en este cierre" : undefined), `cierre-${dia}${cierres.length > 1 ? `-${i + 1}` : ""}.png`);
   }
   const cierresDelDia = estado?.cierres ?? [];
+
+  // Calculadora de ayuda: se marcan movimientos y va sumando lo marcado; con una meta escrita dice cuánto se lleva y
+  // cuánto falta. Es solo una cuenta aparte para quien trabaja: no guarda nada ni toca saldos, cierres o reportes.
+  const [marcados, setMarcados] = useState<Set<number>>(new Set());
+  const [meta, setMeta] = useState("");
+  const [metaEn, setMetaEn] = useState<"cantidad" | "monto" | null>(null); // null: se elige sola
+  useEffect(() => {
+    setMarcados(new Set()); // otro día: se empieza de cero
+  }, [dia]);
+  const marcables = (estado?.movimientos ?? []).filter((m) => !m.anulado);
+  const delaSeleccion = marcables.filter((m) => marcados.has(m.id));
+  const sumaCantidad = delaSeleccion.reduce((suma, m) => (m.cantidad_base ? sumarDecimales(suma, m.cantidad_base) : suma), "0");
+  const sumaMonto = delaSeleccion.reduce((suma, m) => sumarDecimales(suma, m.monto), "0");
+  const hayCantidades = delaSeleccion.some((m) => !!m.cantidad_base);
+  const comparaEn = metaEn ?? (hayCantidades ? "cantidad" : "monto");
+  const llevo = comparaEn === "cantidad" ? sumaCantidad : sumaMonto;
+  const nMeta = meta.trim() ? (leerNumero(meta)?.replace(/^-/, "") ?? null) : null;
+  const falta = nMeta ? sumarDecimales(nMeta, llevo.startsWith("-") ? llevo.slice(1) : `-${llevo}`) : null;
+  function marcar(id: number) {
+    setMarcados((actual) => {
+      const nuevo = new Set(actual);
+      if (!nuevo.delete(id)) nuevo.add(id);
+      return nuevo;
+    });
+  }
 
   // Buscador de la hoja: por nombre, referencia, cuenta o monto, entre los movimientos del día que se está viendo
   const [buscarMov, setBuscarMov] = useState("");
@@ -814,11 +839,86 @@ export function HojaCuenta({
           <p className="cc-cierre-aviso pendiente">Hubo movimientos después del último cierre de este día: hacé otro cierre para enviarle al cliente solo lo nuevo.</p>
         ))}
 
+      {delaSeleccion.length > 0 && (
+        <aside className="cc-calculadora" aria-label="Calculadora de lo marcado">
+          <div className="cc-calculadora-cabeza">
+            <strong>
+              <Calculator size={15} /> Calculadora · {delaSeleccion.length} {delaSeleccion.length === 1 ? "movimiento marcado" : "movimientos marcados"}
+            </strong>
+            <button type="button" onClick={() => setMarcados(new Set())}>
+              Quitar marcas
+            </button>
+          </div>
+          <div className="cc-calculadora-sumas">
+            {hayCantidades && (
+              <span>
+                Suma de cantidades <b>{formatearMonto(sumaCantidad)}</b>
+              </span>
+            )}
+            <span>
+              Suma de montos{" "}
+              <b>
+                <Monto valor={sumaMonto} simbolo={simbolo} />
+              </b>
+            </span>
+          </div>
+          <div className="cc-calculadora-meta">
+            <label>
+              ¿Cuánto tengo que completar?
+              <input value={meta} onChange={(e) => setMeta(e.target.value)} inputMode="decimal" placeholder="ej. 10.000" autoComplete="off" />
+            </label>
+            {hayCantidades && (
+              <div className="cc-chips" role="radiogroup" aria-label="Contra qué se compara">
+                <button type="button" role="radio" aria-checked={comparaEn === "cantidad"} className={comparaEn === "cantidad" ? "activo" : ""} onClick={() => setMetaEn("cantidad")}>
+                  en cantidad
+                </button>
+                <button type="button" role="radio" aria-checked={comparaEn === "monto"} className={comparaEn === "monto" ? "activo" : ""} onClick={() => setMetaEn("monto")}>
+                  en monto
+                </button>
+              </div>
+            )}
+            {nMeta && falta && (
+              <span className={`cc-calculadora-resultado ${falta.startsWith("-") ? "pasado" : /[1-9]/.test(falta) ? "" : "justo"}`}>
+                Llevo <b>{formatearMonto(llevo)}</b> de {formatearMonto(nMeta)} ·{" "}
+                {falta.startsWith("-") ? (
+                  <>
+                    me pasé por <b>{formatearMonto(falta.slice(1))}</b>
+                  </>
+                ) : /[1-9]/.test(falta) ? (
+                  <>
+                    faltan <b>{formatearMonto(falta)}</b>
+                  </>
+                ) : (
+                  <b>completo ✓</b>
+                )}
+              </span>
+            )}
+          </div>
+          <small>Es solo una ayuda para ir contando: no cambia el saldo ni los reportes.</small>
+        </aside>
+      )}
       <div className="cc-tabla-scroll">
         <table className="cc-tabla">
           <thead>
             <tr>
-              <th>Fecha</th>
+              <th>
+                <label className="cc-marca" title="Marcar o desmarcar todos los que se ven, para sumarlos en la calculadora">
+                  <input
+                    type="checkbox"
+                    checked={movimientosVisibles.some((m) => !m.anulado) && movimientosVisibles.filter((m) => !m.anulado).every((m) => marcados.has(m.id))}
+                    onChange={(e) => {
+                      const ids = movimientosVisibles.filter((m) => !m.anulado).map((m) => m.id);
+                      setMarcados((actual) => {
+                        const nuevo = new Set(actual);
+                        for (const id of ids) e.target.checked ? nuevo.add(id) : nuevo.delete(id);
+                        return nuevo;
+                      });
+                    }}
+                    aria-label="Marcar todos los movimientos que se ven"
+                  />
+                  Fecha
+                </label>
+              </th>
               <th>Referencia</th>
               <th className="num">Cantidad</th>
               <th className="num">Tasa</th>
@@ -861,8 +961,17 @@ export function HojaCuenta({
               </tr>
             )}
             {movimientosVisibles.map((m) => (
-              <tr key={m.id} className={m.anulado ? "cc-anulado" : ""} title={`Cargado por ${m.usuario_nombre}`}>
-                <td>{fechaCorta(m.fecha)}</td>
+              <tr key={m.id} className={m.anulado ? "cc-anulado" : marcados.has(m.id) ? "cc-fila-marcada" : ""} title={`Cargado por ${m.usuario_nombre}`}>
+                <td>
+                  {m.anulado ? (
+                    fechaCorta(m.fecha)
+                  ) : (
+                    <label className="cc-marca">
+                      <input type="checkbox" checked={marcados.has(m.id)} onChange={() => marcar(m.id)} aria-label={`Marcar "${m.descripcion ?? m.tipo}" para sumarlo`} />
+                      {fechaCorta(m.fecha)}
+                    </label>
+                  )}
+                </td>
                 <td className={Number(m.monto) < 0 && !m.anulado ? "cc-ref-abono" : ""}>
                   {m.descripcion ?? m.tipo}
                   {m.anulado && !m.reverso_de_id && <em> (anulado)</em>}

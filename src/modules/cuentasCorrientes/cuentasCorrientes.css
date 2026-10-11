@@ -443,6 +443,23 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
   .cc-form-acciones button { flex: 1; padding: 13px; }
 }
 
+/* Calculadora de ayuda: se marcan movimientos y los va sumando */
+.cc-marca { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font: inherit; }
+.cc-marca input { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--color-navy); }
+.cc-tabla tr.cc-fila-marcada td { background: #fff8e1; }
+.cc-calculadora { position: sticky; top: 8px; z-index: 4; display: grid; gap: 8px; margin: 0 0 10px; padding: 12px 14px; border: 2px solid var(--color-gold); border-radius: 12px; background: #fffdf3; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
+.cc-calculadora-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cc-calculadora-cabeza strong { display: inline-flex; align-items: center; gap: 6px; color: var(--color-navy-dark); font-size: 0.9rem; }
+.cc-calculadora-cabeza button { border: none; background: none; color: #6b7280; font: inherit; font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
+.cc-calculadora-sumas { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.88rem; color: #374151; }
+.cc-calculadora-sumas b { font-size: 1.05rem; color: var(--color-navy-dark); margin-left: 4px; }
+.cc-calculadora-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cc-calculadora-meta label { display: inline-flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 600; color: #374151; }
+.cc-calculadora-meta input { width: 130px; padding: 7px 10px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.9rem; text-align: right; }
+.cc-calculadora-resultado { padding: 6px 12px; border-radius: 8px; background: #fff4e0; color: #7a5b00; font-size: 0.9rem; }
+.cc-calculadora-resultado.justo { background: #e8f6ec; color: #1a7f37; }
+.cc-calculadora-resultado.pasado { background: #fdf0ee; color: #b3261e; }
+.cc-calculadora small { color: #8a93a3; font-size: 0.74rem; }
 /* Buscador de movimientos del día, al lado de cerrar y enviar */
 .cc-buscar-mov { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid #cfd6e0; border-radius: 16px; background: white; color: #6b7280; }
 .cc-buscar-mov input { width: 150px; border: none; outline: none; background: transparent; font: inherit; font-size: 0.82rem; color: #111827; }
