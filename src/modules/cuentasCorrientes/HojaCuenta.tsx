@@ -317,9 +317,31 @@ export function HojaCuenta({
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
   const [meta, setMeta] = useState("");
   const [metaEn, setMetaEn] = useState<"cantidad" | "monto" | null>(null); // null: se elige sola
+  // Lo marcado y la meta quedan guardados en este navegador, por cliente y por día: al volver a entrar sigue la cuenta
+  // por donde iba. (Se guarda recién cuando ya se leyó lo de ese cliente y día, para no pisarlo con lo del anterior.)
+  const claveCalculadora = `cc-calculadora-${cuenta.id}-${dia}`;
+  const [calculadoraLeida, setCalculadoraLeida] = useState("");
   useEffect(() => {
-    setMarcados(new Set()); // otro día: se empieza de cero
-  }, [dia]);
+    let guardado: { ids?: unknown; meta?: unknown; metaEn?: unknown } = {};
+    try {
+      guardado = JSON.parse(localStorage.getItem(claveCalculadora) ?? "{}") ?? {};
+    } catch {
+      // sin almacenamiento o dato roto: se empieza de cero
+    }
+    setMarcados(new Set(Array.isArray(guardado.ids) ? guardado.ids.filter((x): x is number => typeof x === "number") : []));
+    setMeta(typeof guardado.meta === "string" ? guardado.meta : "");
+    setMetaEn(guardado.metaEn === "cantidad" || guardado.metaEn === "monto" ? guardado.metaEn : null);
+    setCalculadoraLeida(claveCalculadora);
+  }, [claveCalculadora]);
+  useEffect(() => {
+    if (calculadoraLeida !== claveCalculadora) return;
+    try {
+      if (marcados.size === 0 && !meta.trim()) localStorage.removeItem(claveCalculadora);
+      else localStorage.setItem(claveCalculadora, JSON.stringify({ ids: [...marcados], meta, metaEn }));
+    } catch {
+      // no es grave: solo no se recuerda
+    }
+  }, [marcados, meta, metaEn, calculadoraLeida, claveCalculadora]);
   const marcables = (estado?.movimientos ?? []).filter((m) => !m.anulado);
   const delaSeleccion = marcables.filter((m) => marcados.has(m.id));
   const sumaCantidad = delaSeleccion.reduce((suma, m) => (m.cantidad_base ? sumarDecimales(suma, m.cantidad_base) : suma), "0");
@@ -845,7 +867,10 @@ export function HojaCuenta({
             <strong>
               <Calculator size={15} /> Calculadora · {delaSeleccion.length} {delaSeleccion.length === 1 ? "movimiento marcado" : "movimientos marcados"}
             </strong>
-            <button type="button" onClick={() => setMarcados(new Set())}>
+            <button type="button" onClick={() => {
+              setMarcados(new Set());
+              setMeta("");
+            }} title="Borra las marcas y la meta guardadas de este día">
               Quitar marcas
             </button>
           </div>
@@ -894,7 +919,7 @@ export function HojaCuenta({
               </span>
             )}
           </div>
-          <small>Es solo una ayuda para ir contando: no cambia el saldo ni los reportes.</small>
+          <small>Es solo una ayuda para ir contando: no cambia el saldo ni los reportes. Queda guardada en este equipo: al volver a entrar a este cliente sigue como la dejaste.</small>
         </aside>
       )}
       <div className="cc-tabla-scroll">
