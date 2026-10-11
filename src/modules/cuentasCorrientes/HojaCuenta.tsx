@@ -101,6 +101,8 @@ function Monto({ valor, simbolo = "$" }: { valor: string; simbolo?: string }) {
   return <span className={negativo ? "cc-neg" : ""}>{negativo ? `- ${simbolo}${formatearMonto(valor.slice(1))}` : `${simbolo}${formatearMonto(valor)}`}</span>;
 }
 
+// Confirmaciones: las operaciones que se hacen, iguales para todos los clientes (no lo último que se le escribió a cada uno)
+const OPERACIONES_CONFIRMACIONES = ["Compra", "Venta"].flatMap((sentido) => ["pesos", "bolívares", "dólares", "USDT", "euros"].map((moneda) => `${sentido} de ${moneda}`));
 // Confirmaciones: en qué moneda se entrega lo que entra por cada medio (Western Union llega en dólares y se paga en pesos)
 const ENTREGA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "COP", ZELLE: "USD" };
 /** "WESTERN_UNION" -> "Western Union". */
@@ -1044,7 +1046,7 @@ function FilaNueva({
 
   // La referencia más usada con esta persona y la tasa de la cuenta vienen puestas: solo se llenan casilleros vacíos
   const tasaPuesta = recientes.tasaHabitual ? formatearMonto(recientes.tasaHabitual) : "";
-  const referenciaPuesta = recientes.referenciaFrecuente ?? "";
+  const referenciaPuesta = enConfirmaciones ? "" : (recientes.referenciaFrecuente ?? "");
   useEffect(() => {
     setTasa((t) => (t.trim() || esPorcentaje || enCobro ? t : tasaPuesta));
     setReferencia((r) => {
@@ -1084,6 +1086,14 @@ function FilaNueva({
   const cola = useRef<Promise<unknown>>(Promise.resolve());
   const pendientes = useRef(0);
   const decimales = otraMoneda ? (entregaEn === "COP" ? 0 : 2) : Number(cuenta.moneda_decimales ?? 0);
+
+  // Confirmaciones: las monedas hacen falta para elegir en cuál se le entrega (antes solo se cargaban al marcar la caja)
+  useEffect(() => {
+    if (!enConfirmaciones) return;
+    getMonedas()
+      .then(setMonedas)
+      .catch(() => {});
+  }, [enConfirmaciones]);
 
   useEffect(() => {
     if (!conCaja || cajas.length > 0) return;
@@ -1193,6 +1203,7 @@ function FilaNueva({
     // "Abono ..." resta, igual que en el Excel donde va en negativo
     if (restaSegunReferencia(valor)) setResta(true);
     else if (enConfirmaciones && /^\s*compra/i.test(valor)) setResta(false);
+    else if (enConfirmaciones && /^\s*venta/i.test(valor)) setResta(true);
     if (/comisi[oó]n/i.test(valor) && !esPorcentaje) activarPorcentaje();
   }
 
@@ -1440,20 +1451,21 @@ function FilaNueva({
           </p>
         )
       )}
-      {puedeElegirEntrega && monedas.length > 0 && (
+      {puedeElegirEntrega && (
         <label className={`cc-entrega-en ${otraMoneda ? "otra" : ""}`}>
-          Se entrega en
+          ¿Qué moneda quiere el cliente? Se entrega en
           <select value={entregaEn} onChange={(e) => setEntregaEn(e.target.value)} aria-label="Moneda en la que se le entrega al cliente">
             {monedas.map((m) => (
               <option key={m.id} value={m.codigo}>
                 {m.nombre} ({m.codigo})
               </option>
             ))}
+            {!monedas.some((m) => m.codigo === entregaEn) && <option value={entregaEn}>{entregaEn}</option>}
           </select>
           <small>
             {otraMoneda
               ? `El total queda en ${entregaEn}, en la cuenta en ${entregaEn} de ${cuenta.tercero_nombre} (se le abre sola si no la tiene). Al agregar se abre esa hoja.`
-              : `El cliente está registrado en ${cuenta.moneda_codigo}, pero se le puede entregar en otra moneda: elegila acá.`}
+              : `Está registrado en ${cuenta.moneda_codigo}, pero puede pedir otra: elegila acá y la cuenta (× tasa o ÷ dividir) queda en esa moneda.`}
           </small>
         </label>
       )}
@@ -1474,7 +1486,7 @@ function FilaNueva({
             autoComplete="off"
           />
           <datalist id="cc-referencias">
-            {referencias.map((r) => (
+            {(enConfirmaciones ? OPERACIONES_CONFIRMACIONES : referencias).map((r) => (
               <option key={r} value={r} />
             ))}
           </datalist>
