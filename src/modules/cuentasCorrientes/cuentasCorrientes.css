@@ -443,6 +443,8 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
   .cc-form-acciones button { flex: 1; padding: 13px; }
 }
 
+/* Varios cierres en el día: elegir de cuál se comparte el reporte */
+.cc-cierres-elegir { padding: 5px 8px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; color: #374151; font: inherit; font-size: 0.8rem; cursor: pointer; }
 /* Reporte por rango de fechas */
 .cc-rango-enlace { background: none; border: none; padding: 4px 2px; color: #4b5563; font-size: 0.8rem; text-decoration: underline; cursor: pointer; font-family: inherit; }
 .cc-rango-enlace:hover { color: #12305a; }

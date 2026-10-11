@@ -62,6 +62,7 @@ export interface FilaEstadoCuenta {
   estado_confirmacion: "EN_PROCESO" | "CONFIRMADA" | null;
   tiene_comprobante: boolean; // tiene guardada la imagen del comprobante
   pagado_en: string | null; // cuándo se le pagó en Taquilla
+  created_at: string; // cuándo se cargó (la fecha del movimiento puede ser otra)
   comision_descontada: boolean; // la tasa es el factor (0.96) de una comisión descontada: se muestra -4%
   comision_incluida: boolean; // el % ya venía sumado en lo enviado: factor 1/1,06, se muestra +6%
   monto: string;
@@ -76,6 +77,8 @@ export interface EstadoCuenta {
   cuenta: CuentaCorrienteResumen;
   // Cierre de ese día, si ya se cerró
   cierre: { saldo_final: string; created_at: string; usuario_nombre: string } | null;
+  // Todos los cierres hechos ese día, en orden (puede haber varios)
+  cierres?: { id: number; saldo_final: string; created_at: string; usuario_nombre: string }[];
   // Lo que el cliente envió (la cantidad de cada compra, antes de tasa o comisión): en el día, en toda la cuenta
   // y cuánto de eso todavía no se le pagó
   enviado: string;

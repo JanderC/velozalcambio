@@ -281,6 +281,28 @@ export function HojaCuenta({
     }
   }
 
+  // En un día puede haber varios cierres. El reporte de un cierre lleva solo los movimientos cargados después del
+  // cierre anterior y hasta ese cierre, y termina en el saldo con el que se cerró. Por defecto, el último.
+  async function compartirCierre(de: EstadoCuenta, cual?: number) {
+    const cierres = de.cierres ?? [];
+    const i = cual ?? cierres.length - 1;
+    const cierre = cierres[i];
+    // sin la lista de cierres (servidor todavía sin actualizar): el reporte del día completo, como antes
+    if (!cierre) return entregarReporte(await generarImagenReporte(de, simbolo, `Cierre del día ${fechaDelDia(dia)}`), `cierre-${dia}.png`);
+    const desde = i > 0 ? new Date(cierres[i - 1]!.created_at).getTime() : -Infinity;
+    const hasta = new Date(cierre.created_at).getTime();
+    const delCierre = de.movimientos.filter((m) => {
+      const cargado = new Date(m.created_at).getTime();
+      return cargado > desde && cargado <= hasta;
+    });
+    const hora = new Date(cierre.created_at).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" });
+    // con un solo cierre en el día es "el cierre del día"; con varios, se numeran
+    const titulo = cierres.length > 1 ? `Cierre ${i + 1} del día ${fechaDelDia(dia)} · ${hora}` : `Cierre del día ${fechaDelDia(dia)}`;
+    const tramo: EstadoCuenta = { ...de, movimientos: delCierre, saldoFinal: cierre.saldo_final };
+    await entregarReporte(await generarImagenReporte(tramo, simbolo, titulo, cierres.length > 1 ? "Abonado en este cierre" : undefined), `cierre-${dia}${cierres.length > 1 ? `-${i + 1}` : ""}.png`);
+  }
+  const cierresDelDia = estado?.cierres ?? [];
+
   // Cierre diario: deja anotado el saldo con el que cerró el día y manda el reporte del día como imagen
   async function cerrarDia() {
     setCerrando(true);
@@ -288,8 +310,8 @@ export function HojaCuenta({
       const cerrado = await cerrarDiaCuenta(cuenta.id, dia);
       setEstado(cerrado);
       setError(null);
-      // el cierre sale con la fecha de su día, aunque se haga después (ej. el de ayer cerrado hoy)
-      await entregarReporte(await generarImagenReporte(cerrado, simbolo, `Cierre del día ${fechaDelDia(dia)}`), `cierre-${dia}.png`);
+      // sale el reporte de ESTE cierre: solo lo que entró desde el cierre anterior (el día completo está en "Compartir reporte")
+      await compartirCierre(cerrado);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -584,8 +606,36 @@ export function HojaCuenta({
           )}
         </span>
         <button className="cc-cerrar-dia" onClick={cerrarDia} disabled={!estado || cerrando} title="Cierra el día y comparte el reporte como imagen">
-          <Lock size={14} /> {cerrando ? "Cerrando…" : estado?.cierre ? "Volver a cerrar y enviar" : "Cerrar día y enviar"}
+          <Lock size={14} /> {cerrando ? "Cerrando…" : estado?.cierre ? "Hacer otro cierre y enviar" : "Cerrar día y enviar"}
         </button>
+        {/* Los cierres ya hechos ese día: se puede volver a compartir el reporte de cualquiera (el último, por defecto) */}
+        {estado && cierresDelDia.length === 1 && (
+          <button className="cc-rango-enlace" onClick={() => void compartirCierre(estado).catch((e) => setError((e as Error).message))} title="Vuelve a compartir el reporte del cierre ya hecho">
+            Compartir el cierre
+          </button>
+        )}
+        {estado && cierresDelDia.length > 1 && (
+          <select
+            className="cc-cierres-elegir"
+            value=""
+            onChange={(e) => {
+              if (e.target.value !== "") void compartirCierre(estado, Number(e.target.value)).catch((err) => setError((err as Error).message));
+            }}
+            aria-label="Compartir el reporte de uno de los cierres del día"
+            title="Cada cierre lleva solo lo que entró desde el cierre anterior"
+          >
+            <option value="">Compartir un cierre ({cierresDelDia.length})…</option>
+            {cierresDelDia
+              .map((c, i) => ({ c, i }))
+              .reverse()
+              .map(({ c, i }) => (
+                <option key={c.id} value={i}>
+                  Cierre {i + 1} · {new Date(c.created_at).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" })}
+                  {i === cierresDelDia.length - 1 ? " (el último)" : ""}
+                </option>
+              ))}
+          </select>
+        )}
         {(telefono || esConfirmaciones) && (
           <a className="cc-whatsapp" href={enlaceWhatsApp(telefono, mensajeSaldo)} onClick={(e) => alAbrirWhatsApp(e, telefono, mensajeSaldo)} target="_blank" rel="noreferrer" title={!telefono ? "Sin teléfono registrado: al abrir WhatsApp elegís el contacto" : ultimaOperacion ? "Abrir WhatsApp con el mensaje de la última operación de este día, listo para enviar" : "Abrir WhatsApp con el saldo listo para enviar"}>
             <MessageCircle size={14} /> {esConfirmaciones ? (variasOperaciones ? `Enviar las ${operacionesJuntas.length} operaciones` : ultimaOperacion ? "Enviar última operación" : "Enviar saldo") : "Enviar saldo"}
@@ -604,8 +654,8 @@ export function HojaCuenta({
             <Send size={14} /> Enviar desde el vinculado
           </button>
         )}
-        <button className="cc-descargar cc-compartir" onClick={compartir} disabled={!estado} title="Compartir una imagen con los movimientos">
-          <Share2 size={14} /> Compartir reporte
+        <button className="cc-descargar cc-compartir" onClick={compartir} disabled={!estado} title="Compartir una imagen con todos los movimientos del día (todos los cierres)">
+          <Share2 size={14} /> {cierresDelDia.length > 0 ? "Compartir todo el día" : "Compartir reporte"}
         </button>
         <button className="cc-rango-enlace" onClick={() => setRango({ desde: dia, hasta: dia })} title="Generar el reporte de varios días: desde qué día hasta qué día">
           Por rango de fechas
@@ -725,10 +775,10 @@ export function HojaCuenta({
               ? " "
               : ` el ${fechaCorta(estado.cierre.created_at)} `}
             a las {new Date(estado.cierre.created_at).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" })} por{" "}
-            {estado.cierre.usuario_nombre}.
+            {estado.cierre.usuario_nombre}.{cierresDelDia.length > 1 ? ` Van ${cierresDelDia.length} cierres hoy: cada reporte lleva solo lo de ese cierre.` : ""}
           </p>
         ) : (
-          <p className="cc-cierre-aviso pendiente">Hubo movimientos después del cierre de este día: volvé a cerrarlo para enviar el reporte actualizado.</p>
+          <p className="cc-cierre-aviso pendiente">Hubo movimientos después del último cierre de este día: hacé otro cierre para enviarle al cliente solo lo nuevo.</p>
         ))}
 
       <div className="cc-tabla-scroll">
