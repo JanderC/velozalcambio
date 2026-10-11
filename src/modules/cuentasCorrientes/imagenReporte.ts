@@ -29,8 +29,6 @@ interface LineaCuadro {
 }
 
 export type MonedaTasa = "USD" | "USDT" | "EUR" | "VES";
-const NOMBRE_MONEDA: Record<MonedaTasa, string> = { USD: "dólares", USDT: "USDT", EUR: "euros", VES: "bolívares" };
-const cantidadTexto = (cantidad: string, moneda: MonedaTasa) => (moneda === "VES" ? `Bs. ${formatearMonto(cantidad)}` : `${formatearMonto(cantidad)} ${moneda}`);
 
 // A qué moneda corresponde una tasa en pesos: primero por la referencia del movimiento, si no por su tamaño
 // (un dólar vale miles de pesos; un bolívar, unos pocos).
@@ -46,9 +44,7 @@ export function monedaDeLaTasa(tasa: string, referencia = ""): MonedaTasa | null
 }
 
 /**
- * El cuadrito de abajo. Las tasas cambian de un movimiento a otro, así que no se convierte todo con una sola:
- * por cada moneda va una línea por tasa (3 USD × 3.100 = $9.300) y al final el total de esa moneda, en cantidad y en pesos.
- * Las ventas y los abonos van en líneas aparte.
+ * El cuadrito de abajo: solo para una cuenta en otra moneda, su saldo pendiente llevado a pesos.
  */
 function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaCuadro[] } {
   // Cuenta en otra moneda: su saldo en pesos, al valor de esa moneda
@@ -60,33 +56,8 @@ function lineasDelCuadro(estado: EstadoCuenta): { titulo: string; lineas: LineaC
       lineas: [{ texto: `En pesos, 1 ${estado.cuenta.moneda_codigo} = $${formatearMonto(valor)}`, monto: multiplicarDecimales(estado.saldoFinal, valor, 0), prefijo: "$", total: true }],
     };
   }
-  const grupos = new Map<string, { moneda: MonedaTasa; tasa: string; abono: boolean; cantidad: string; pesos: string }>();
-  for (const m of estado.movimientos) {
-    // Solo lo que se movió en otra moneda: los abonos y demás movimientos en pesos ya están en la tabla
-    if (m.anulado || !m.tasa || m.tasa_es_porcentaje || !m.cantidad_base) continue;
-    const moneda = monedaDeLaTasa(m.tasa, m.descripcion ?? "");
-    if (!moneda) continue;
-    const abono = m.monto.startsWith("-");
-    const clave = `${moneda}|${Number(m.tasa)}|${abono}`;
-    const g = grupos.get(clave) ?? { moneda, tasa: m.tasa, abono, cantidad: "0", pesos: "0" };
-    g.cantidad = sumarDecimales(g.cantidad, m.cantidad_base);
-    g.pesos = sumarDecimales(g.pesos, m.monto);
-    grupos.set(clave, g);
-  }
-  const lineas: LineaCuadro[] = [];
-  for (const moneda of ["USD", "USDT", "EUR", "VES"] as const) {
-    const deLaMoneda = [...grupos.values()].filter((g) => g.moneda === moneda).sort((a, b) => Number(a.abono) - Number(b.abono) || Number(a.tasa) - Number(b.tasa));
-    if (deLaMoneda.length === 0) continue;
-    let cantidad = "0";
-    let pesos = "0";
-    for (const g of deLaMoneda) {
-      cantidad = sumarDecimales(cantidad, g.cantidad);
-      pesos = sumarDecimales(pesos, g.pesos);
-      lineas.push({ texto: `${g.cantidad.startsWith("-") ? "- " : ""}${cantidadTexto(g.cantidad.replace(/^-/, ""), moneda)} × ${formatearMonto(g.tasa)}`, monto: g.pesos, prefijo: "$" });
-    }
-    lineas.push({ texto: `Total ${NOMBRE_MONEDA[moneda]}: ${cantidad.startsWith("-") ? "- " : ""}${cantidadTexto(cantidad.replace(/^-/, ""), moneda)}`, monto: pesos, prefijo: "$", total: true });
-  }
-  return { titulo: "Por moneda y tasa", lineas };
+  // En pesos no va cuadro: el reporte termina en el saldo pendiente (el resumen "Por moneda y tasa" se quitó a pedido)
+  return { titulo: "", lineas: [] };
 }
 
 /** Es un abono si la referencia lo dice; si no dice nada (ni abono ni venta), cuando resta. */
