@@ -1303,13 +1303,32 @@ function FilaNueva({
   const MONEDA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "USD", ZELLE: "USD" };
   const delMedio = MONEDA_DEL_MEDIO[medioMov.nombre];
   const codigoDivision =
-    (otraMoneda ? null : cobroCodigo) ?? (enConfirmaciones ? (delMedio && delMedio !== codigoMonto ? delMedio : codigoMonto === "COP" ? "VES" : "COP") : null);
+    (otraMoneda ? null : cobroCodigo) ??
+    (enConfirmaciones
+      ? delMedio && delMedio !== codigoMonto
+        ? delMedio
+        : codigoMonto === "COP"
+          ? "VES"
+          : "COP"
+      : // Cuentas Corrientes y por Cobrar: una cuenta en dólares (u otra moneda) puede recibir pesos, que se dividen por la tasa
+        // y quedan en la moneda de la cuenta (500.000 COP ÷ 3.900 = 128,21 USD)
+        cuenta.moneda_codigo !== "COP"
+        ? "COP"
+        : null);
+  // La última tasa con la que se dividió en esta cuenta queda recordada en este equipo
+  const claveTasaDividir = `cc-tasa-dividir-${cuenta.id}`;
   function activarCobro() {
     if (enCobro) return;
     setEnCobro(true);
     setEsPorcentaje(false);
     // viene la tasa de cobro de la cuenta; sin ella se escribe (lo que había era una tasa de multiplicar o un %)
-    setTasa(cuenta.tasa_cobro ? formatearMonto(cuenta.tasa_cobro) : "");
+    let recordada = "";
+    try {
+      recordada = localStorage.getItem(claveTasaDividir) ?? "";
+    } catch {
+      // sin almacenamiento: se escribe
+    }
+    setTasa(cuenta.tasa_cobro ? formatearMonto(cuenta.tasa_cobro) : recordada);
   }
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
@@ -1517,6 +1536,13 @@ function FilaNueva({
 
     // La fila se limpia ya, para poder seguir cargando la siguiente sin esperar al servidor.
     // Si el guardado falla, se devuelve lo escrito (salvo que ya se esté escribiendo otra).
+    if (conTasa && enCobro && !cuenta.tasa_cobro) {
+      try {
+        localStorage.setItem(claveTasaDividir, tasa.trim());
+      } catch {
+        // no es grave: solo no se recuerda
+      }
+    }
     if (conTasa && esPorcentaje) {
       try {
         localStorage.setItem(CLAVE_ULTIMA_COMISION, tasa.replace(/%/g, "").trim());
