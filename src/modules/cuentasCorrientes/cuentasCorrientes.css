@@ -494,3 +494,13 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-medio-mov-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
 .cc-medio-mov-elegir > span { font-size: 0.84rem; font-weight: 600; color: #374151; }
 .cc-medio-mov-elegir .cc-chips button { padding: 7px 14px; font-size: 0.84rem; }
+
+/* Cuentas Corrientes: la moneda en que llega el movimiento, y si se convierte o se lleva aparte */
+.cc-moneda-mov { display: grid; gap: 8px; margin: 0 0 10px; }
+.cc-moneda-mov > label { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; width: fit-content; font-size: 0.84rem; font-weight: 600; color: #374151; }
+.cc-moneda-mov select { padding: 6px 10px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; font: inherit; font-size: 0.88rem; }
+.cc-moneda-mov.otra select { border: 2px solid var(--color-navy); font-weight: 700; color: var(--color-navy); background: #eaf1f8; }
+.cc-moneda-mov-opciones { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #d7dbe2; border-radius: 10px; background: #f8fafc; }
+.cc-moneda-mov-opciones label { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; font-size: 0.84rem; font-weight: 400; color: #374151; cursor: pointer; }
+.cc-moneda-mov-opciones input { margin-top: 3px; accent-color: var(--color-navy); }
+.cc-moneda-mov-opciones b { color: var(--color-navy-dark); }

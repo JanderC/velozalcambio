@@ -139,7 +139,14 @@ export function CuentasPorCobrarPagarPage() {
         {error && <p className="cxc-error">{error}</p>}
         <div className="cc-layout con-hoja cxc-hoja">
           {/* la hoja se vuelve a montar al pagar, para que muestre el abono recién anotado */}
-          <HojaCuenta key={`${abierta.id}-${pagosHechos}`} cuenta={abierta} onActualizar={cargar} onVolver={() => setAbiertaId(null)} />
+          <HojaCuenta
+            key={`${abierta.id}-${pagosHechos}`}
+            cuenta={abierta}
+            onActualizar={cargar}
+            onVolver={() => setAbiertaId(null)}
+            // el movimiento se llevó aparte, en otra moneda: se abre la cuenta de este cliente en esa moneda
+            onAbrirCuenta={(id) => void cargar().then(() => setAbiertaId(id))}
+          />
         </div>
         {pagando && (
           <PagoTotalCobrarModal
