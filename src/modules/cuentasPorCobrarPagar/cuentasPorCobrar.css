@@ -120,3 +120,16 @@
 .cc-modal label.cxc-con-movimiento { flex-direction: row; align-items: center; gap: 8px; width: fit-content; font-weight: 600; color: var(--color-navy); cursor: pointer; }
 .cxc-primer-mov { display: grid; gap: 10px; padding: 12px; border: 1px solid #d7dbe2; border-radius: 10px; background: #f8fafc; }
 .cxc-transf-total { color: #374151; }
+
+/* ---------- Pagar todo: el cliente salda su cuenta ---------- */
+.cxc-wa { white-space: nowrap; }
+.cxc-wa a, .cxc-wa button { display: inline-grid; vertical-align: middle; }
+.cxc-wa button { place-items: center; width: 30px; height: 30px; margin-right: 6px; border: none; border-radius: 8px; color: #14406f; background: #e6eef7; cursor: pointer; }
+.cxc-wa button:hover { background: #14406f; color: white; }
+.cxc-pagar-todo { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border: none; border-radius: 10px; background: #1a7f37; color: white; font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.cxc-pagar-todo:hover { background: #166534; }
+.cxc-pago-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0; padding: 14px 16px; border-radius: 12px; background: #e8f6ec; color: #166534; font-size: 0.92rem; }
+.cxc-pago-total strong { font-family: "Space Grotesk", sans-serif; font-size: 1.5rem; }
+@media (max-width: 720px) {
+  .cxc-wa button { width: 36px; height: 36px; }
+}

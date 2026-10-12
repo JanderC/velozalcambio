@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowUpRight, HandCoins, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CircleCheckBig, HandCoins, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
@@ -13,6 +13,7 @@ import "../cuentasCorrientes/cuentasCorrientes.css";
 import { SIN_GRUPO, detalleMoneda, dinero, enPesos, fechaDeHoy, grupoDe, gruposDe, mensajeDeCobro, mismoGrupo, totalEnPesos, totalesPorMoneda } from "./cobrar";
 import { NuevoClienteCobrarModal } from "./NuevoClienteCobrarModal";
 import { TransferenciaCobrarModal } from "./TransferenciaCobrarModal";
+import { PagoTotalCobrarModal } from "./PagoTotalCobrarModal";
 import { generarReporteCobrar } from "./reporteCobrar";
 import "./cuentasPorCobrar.css";
 
@@ -33,6 +34,10 @@ export function CuentasPorCobrarPagarPage() {
   const [abiertaId, setAbiertaId] = useState<number | null>(null);
   const [creandoEn, setCreandoEn] = useState<string | null>(null); // el grupo donde se está creando un cliente
   const [transfiriendo, setTransfiriendo] = useState(false); // registrar una transferencia que le hicimos a alguien
+  const [pagandoId, setPagandoId] = useState<number | null>(null); // el cliente que paga todo lo que debe
+  const [pagosHechos, setPagosHechos] = useState(0); // al pagar con la hoja abierta, la hoja se vuelve a cargar
+  const pagando = pagandoId !== null ? ((cuentas ?? []).find((c) => c.id === pagandoId) ?? null) : null;
+  const debe = (c: CuentaCorrienteResumen) => !c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual);
   const [reporte, setReporte] = useState<{ blob: Blob; url: string } | null>(null);
   const [generando, setGenerando] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -111,6 +116,11 @@ export function CuentasPorCobrarPagarPage() {
           <button type="button" className="cxc-volver" onClick={() => setAbiertaId(null)}>
             <ArrowLeft size={16} /> Volver a Cuentas por Cobrar
           </button>
+          {puedeEditar && debe(abierta) && (
+            <button type="button" className="cxc-pagar-todo" onClick={() => setPagandoId(abierta.id)} title="El cliente paga todo lo que debe: se anota el abono por el saldo completo">
+              <CircleCheckBig size={16} /> Pagar todo ({dinero(abierta.saldo_actual, abierta.moneda_codigo)})
+            </button>
+          )}
           {puedeEditar && (
             <label>
               Grupo
@@ -128,8 +138,20 @@ export function CuentasPorCobrarPagarPage() {
         </div>
         {error && <p className="cxc-error">{error}</p>}
         <div className="cc-layout con-hoja cxc-hoja">
-          <HojaCuenta key={abierta.id} cuenta={abierta} onActualizar={cargar} onVolver={() => setAbiertaId(null)} />
+          {/* la hoja se vuelve a montar al pagar, para que muestre el abono recién anotado */}
+          <HojaCuenta key={`${abierta.id}-${pagosHechos}`} cuenta={abierta} onActualizar={cargar} onVolver={() => setAbiertaId(null)} />
         </div>
+        {pagando && (
+          <PagoTotalCobrarModal
+            cuenta={pagando}
+            onCerrar={() => setPagandoId(null)}
+            onPagado={() => {
+              setPagandoId(null);
+              setPagosHechos((v) => v + 1);
+              void cargar();
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -232,6 +254,19 @@ export function CuentasPorCobrarPagarPage() {
                           </td>
                           <td className={`num ${pesos?.startsWith("-") ? "favor" : ""}`}>{pesos === null ? <span className="cxc-sin-tasa">sin tasa</span> : dinero(pesos, "COP")}</td>
                           <td className="cxc-wa">
+                            {puedeEditar && debe(c) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPagandoId(c.id);
+                                }}
+                                title={`Pagar todo: ${c.tercero_nombre} paga los ${dinero(c.saldo_actual, c.moneda_codigo)} que debe`}
+                                aria-label={`Registrar que ${c.tercero_nombre} paga todo lo que debe`}
+                              >
+                                <CircleCheckBig size={16} />
+                              </button>
+                            )}
                             <a
                               href={enlaceWhatsApp(telefono, mensaje)}
                               onClick={(e) => {
@@ -307,6 +342,17 @@ export function CuentasPorCobrarPagarPage() {
           onCerrar={() => setCreandoEn(null)}
           onCreado={() => {
             setCreandoEn(null);
+            void cargar();
+          }}
+        />
+      )}
+
+      {pagando && (
+        <PagoTotalCobrarModal
+          cuenta={pagando}
+          onCerrar={() => setPagandoId(null)}
+          onPagado={() => {
+            setPagandoId(null);
             void cargar();
           }}
         />
