@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Plus, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -28,6 +28,7 @@ import {
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
+import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { Modal } from "../../components/common/Modal";
@@ -152,6 +153,9 @@ export function HojaCuenta({
 }) {
   const { usuario } = useAuth();
   const puedeAnular = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
+  // Corregir un movimiento mal cargado: solo el administrador, en Cuentas Corrientes y Cuentas por Cobrar
+  const puedeEditarMovimientos = usuario?.rol === "ADMIN" && cuenta.modulo !== "CAJA";
+  const [movimientoEditado, setMovimientoEditado] = useState<FilaEstadoCuenta | null>(null);
   // La hoja es diaria: se ve y se cierra un día a la vez
   const [dia, setDia] = useState(hoyBogota());
   // Opcional: ver varios días juntos (ayer y hoy, la semana…). Se elige desde qué día; el de arriba es hasta cuál.
@@ -815,6 +819,19 @@ export function HojaCuenta({
           </div>
         </div>
       )}
+      {movimientoEditado && (
+        <EditarMovimientoModal
+          movimiento={movimientoEditado}
+          monedaCodigo={cuenta.moneda_codigo}
+          decimales={Number(cuenta.moneda_decimales ?? 0)}
+          onCerrar={() => setMovimientoEditado(null)}
+          onGuardado={() => {
+            setMovimientoEditado(null);
+            void cargar();
+            onActualizar();
+          }}
+        />
+      )}
       {imagenComprobante && (
         <Modal titulo="Comprobante" ancho="ancho" onCerrar={() => setImagenComprobante(null)}>
           <div className="cc-reporte">
@@ -1027,6 +1044,9 @@ export function HojaCuenta({
                 <td className={Number(m.monto) < 0 && !m.anulado ? "cc-ref-abono" : ""}>
                   {m.descripcion ?? m.tipo}
                   {m.anulado && !m.reverso_de_id && <em> (anulado)</em>}
+                  {m.editado_en && (
+                    <em title={`Editado por ${m.editado_por_nombre ?? "un administrador"} el ${fechaCorta(m.editado_en)}`}> (editado)</em>
+                  )}
                   {m.cuenta_destino && <span className="cc-cuenta-destino-chip">→ {m.cuenta_destino}</span>}
                   {m.tiene_comprobante && (
                     <button type="button" className="cc-ver-comprobante" onClick={() => verComprobante(m.id)} title="Ver la imagen del comprobante">
@@ -1066,6 +1086,11 @@ export function HojaCuenta({
                       title="Enviarle la confirmación al cliente"
                     >
                       <MessageCircle size={14} />
+                    </button>
+                  )}
+                  {puedeEditarMovimientos && !m.anulado && !m.reverso_de_id && (
+                    <button onClick={() => setMovimientoEditado(m)} aria-label={`Editar ${m.descripcion ?? m.tipo}`} title="Editar este movimiento (corrige el saldo)">
+                      <Pencil size={14} />
                     </button>
                   )}
                   {puedeAnular && !m.anulado && (

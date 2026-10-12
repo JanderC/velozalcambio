@@ -504,3 +504,12 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-moneda-mov-opciones label { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; font-size: 0.84rem; font-weight: 400; color: #374151; cursor: pointer; }
 .cc-moneda-mov-opciones input { margin-top: 3px; accent-color: var(--color-navy); }
 .cc-moneda-mov-opciones b { color: var(--color-navy-dark); }
+
+/* Editar un movimiento (administrador) */
+.cc-editar-mov-fila { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; }
+.cc-editar-mov-fila.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cc-editar-mov .cc-resultado { display: block; padding: 9px 10px; border: 1px dashed #cfd6e0; border-radius: 6px; background: #f2f4f7; font-weight: 700; text-align: right; }
+.cc-editar-mov .cc-c-signo button:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 600px) {
+  .cc-editar-mov-fila, .cc-editar-mov-fila.tres { grid-template-columns: minmax(0, 1fr); }
+}

@@ -71,6 +71,9 @@ export interface FilaEstadoCuenta {
   reverso_de_id: number | null;
   movimiento_caja_id: number | null;
   usuario_nombre: string;
+  // si un administrador lo corrigió: cuándo y quién
+  editado_en?: string | null;
+  editado_por_nombre?: string | null;
 }
 
 export interface EstadoCuenta {
@@ -296,6 +299,11 @@ interface RegistrarMovimientoInput {
 
 export function registrarMovimientoCC(data: RegistrarMovimientoInput) {
   return api.post<{ movimiento: { id: number }; saldoNuevo: string }>("/cuentas-corrientes/movimientos", data);
+}
+
+/** Corregir un movimiento mal cargado (solo administradores). Lo que no se manda queda como está; null lo vacía. */
+export function editarMovimientoCC(movimientoId: number, cambios: { descripcion?: string; fecha?: string; cuentaDestino?: string | null; cantidadBase?: string | null; tasa?: string | null; monto?: string }) {
+  return api.put<{ id: number; monto: string; cambio: string }>(`/cuentas-corrientes/movimientos/${movimientoId}`, cambios);
 }
 
 /** Guarda la imagen del comprobante con el movimiento ya creado. */
