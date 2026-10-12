@@ -443,6 +443,10 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
   .cc-form-acciones button { flex: 1; padding: 13px; }
 }
 
+/* Ver varios días: el "desde" va antes de la fecha de siempre, que pasa a ser el "hasta" */
+.cc-dia-desde { gap: 8px; font-size: 0.84rem; font-weight: 600; color: #374151; }
+.cc-dia-desde label { display: inline-flex; align-items: center; gap: 6px; }
+.cc-dia-desde input { border-color: var(--color-navy); }
 /* Calculadora de ayuda: se marcan movimientos y los va sumando */
 .cc-marca { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font: inherit; }
 .cc-marca input { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--color-navy); }

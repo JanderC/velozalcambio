@@ -153,6 +153,11 @@ export function HojaCuenta({
   const puedeAnular = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
   // La hoja es diaria: se ve y se cierra un día a la vez
   const [dia, setDia] = useState(hoyBogota());
+  // Opcional: ver varios días juntos (ayer y hoy, la semana…). Se elige desde qué día; el de arriba es hasta cuál.
+  // null = la hoja de un solo día, como siempre.
+  const [desdeElegido, setDesdeElegido] = useState<string | null>(null);
+  const desde = desdeElegido && desdeElegido < dia ? desdeElegido : dia;
+  const enRango = desde !== dia;
   const [cerrando, setCerrando] = useState(false);
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
   const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
@@ -195,14 +200,14 @@ export function HojaCuenta({
 
   const cargar = useCallback(async () => {
     try {
-      setEstado(await getEstadoCuenta(cuenta.id, { desde: dia, hasta: dia }));
+      setEstado(await getEstadoCuenta(cuenta.id, { desde, hasta: dia }));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setCargando(false);
     }
-  }, [cuenta.id, dia]);
+  }, [cuenta.id, dia, desde]);
 
   useEffect(() => {
     setCargando(true);
@@ -259,7 +264,9 @@ export function HojaCuenta({
   async function compartir() {
     if (!estado) return;
     try {
-      await entregarReporte(await generarImagenReporte(estado, simbolo, `Movimientos del día ${fechaDelDia(dia)}`), `movimientos-${dia}.png`);
+      // con varios días a la vista, el reporte es de ese rango
+      if (enRango) await entregarReporte(await generarImagenReporte(estado, simbolo, `Movimientos del ${fechaDelDia(desde)} al ${fechaDelDia(dia)}`, "Abonado en el período"), `movimientos-${desde}-a-${dia}.png`);
+      else await entregarReporte(await generarImagenReporte(estado, simbolo, `Movimientos del día ${fechaDelDia(dia)}`), `movimientos-${dia}.png`);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -393,7 +400,7 @@ export function HojaCuenta({
   async function descargar() {
     setDescargando(true);
     try {
-      await descargarExcelEstadoCuenta(cuenta.id, { desde: dia, hasta: dia }, `Cuenta ${cuenta.tercero_nombre} ${dia}.xlsx`);
+      await descargarExcelEstadoCuenta(cuenta.id, { desde, hasta: dia }, `Cuenta ${cuenta.tercero_nombre} ${enRango ? `${desde} a ${dia}` : dia}.xlsx`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -662,6 +669,16 @@ export function HojaCuenta({
       )}
 
       <div className="cc-periodos" aria-label="Día">
+        {/* Opcional: desde qué día se ve la hoja. Con esto puesto, la fecha de al lado es "hasta". */}
+        {desdeElegido !== null && (
+          <span className="cc-dia cc-dia-desde">
+            <label>
+              Desde
+              <input type="date" value={desdeElegido} max={dia} onChange={(e) => e.target.value && setDesdeElegido(e.target.value)} aria-label="Desde qué día" />
+            </label>
+            <span>hasta</span>
+          </span>
+        )}
         <span className="cc-dia">
           <button onClick={() => setDia(moverDia(dia, -1))} aria-label="Día anterior" title="Día anterior">
             <ChevronLeft size={16} />
@@ -676,7 +693,16 @@ export function HojaCuenta({
             </button>
           )}
         </span>
-        <button className="cc-cerrar-dia" onClick={cerrarDia} disabled={!estado || cerrando} title="Cierra el día y comparte el reporte como imagen">
+        {desdeElegido === null ? (
+          <button className="cc-rango-enlace" onClick={() => setDesdeElegido(moverDia(dia, -1))} title="Ver varios días juntos: se elige desde qué día (viene puesto desde ayer) y el reporte sale de ese rango">
+            Ver varios días
+          </button>
+        ) : (
+          <button className="cc-rango-enlace" onClick={() => setDesdeElegido(null)} title="Volver a la hoja de un solo día">
+            Ver un solo día
+          </button>
+        )}
+        <button className="cc-cerrar-dia" onClick={cerrarDia} disabled={!estado || cerrando || enRango} title={enRango ? "El cierre es de un solo día: tocá \"Ver un solo día\" para cerrar" : "Cierra el día y comparte el reporte como imagen"}>
           <Lock size={14} /> {cerrando ? "Cerrando…" : estado?.cierre ? "Hacer otro cierre y enviar" : "Cerrar día y enviar"}
         </button>
         {/* Los cierres ya hechos ese día: se puede volver a compartir el reporte de cualquiera (el último, por defecto) */}
@@ -735,7 +761,7 @@ export function HojaCuenta({
           </button>
         )}
         <button className="cc-descargar cc-compartir" onClick={compartir} disabled={!estado} title="Compartir una imagen con todos los movimientos del día (todos los cierres)">
-          <Share2 size={14} /> {cierresDelDia.length > 0 ? "Compartir todo el día" : "Compartir reporte"}
+          <Share2 size={14} /> {enRango ? "Compartir estos días" : cierresDelDia.length > 0 ? "Compartir todo el día" : "Compartir reporte"}
         </button>
         <button className="cc-rango-enlace" onClick={() => setRango({ desde: dia, hasta: dia })} title="Generar el reporte de varios días: desde qué día hasta qué día">
           Por rango de fechas
@@ -972,7 +998,7 @@ export function HojaCuenta({
             {!cargando && estado?.movimientos.length === 0 && (
               <tr>
                 <td colSpan={7} className="cc-tabla-aviso">
-                  Sin movimientos este día.
+                  {enRango ? "Sin movimientos en esos días." : "Sin movimientos este día."}
                 </td>
               </tr>
             )}
@@ -1062,14 +1088,14 @@ export function HojaCuenta({
                 </tr>
               )}
               <tr>
-                <td colSpan={4}>Sumas del día</td>
+                <td colSpan={4}>{enRango ? "Sumas del período" : "Sumas del día"}</td>
                 <td className="num">
                   <Monto valor={estado.sumas} simbolo={simbolo} />
                 </td>
                 <td colSpan={2} />
               </tr>
               <tr>
-                <td colSpan={4}>Abonos del día</td>
+                <td colSpan={4}>{enRango ? "Abonos del período" : "Abonos del día"}</td>
                 <td className="num">
                   <Monto valor={estado.abonos} simbolo={simbolo} />
                 </td>
