@@ -306,6 +306,11 @@ export function editarMovimientoCC(movimientoId: number, cambios: { descripcion?
   return api.put<{ id: number; monto: string; cambio: string }>(`/cuentas-corrientes/movimientos/${movimientoId}`, cambios);
 }
 
+/** Vuelve a activar un movimiento anulado (solo administradores): se quita su contrario y vuelve a contar en el saldo. */
+export function reactivarMovimientoCC(movimientoId: number) {
+  return api.post<{ id: number; reactivado: true }>(`/cuentas-corrientes/movimientos/${movimientoId}/reactivar`);
+}
+
 /** Guarda la imagen del comprobante con el movimiento ya creado. */
 export function subirComprobanteMovimiento(movimientoId: number, imagen: File) {
   const formData = new FormData();

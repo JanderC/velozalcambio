@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -22,6 +22,7 @@ import {
   guardarTasaHabitual,
   type TasasRecientes,
   registrarMovimientoCC,
+  reactivarMovimientoCC,
   type CuentaCorrienteResumen,
   type EstadoCuenta,
   type FilaEstadoCuenta,
@@ -156,6 +157,23 @@ export function HojaCuenta({
   // Corregir un movimiento mal cargado: solo el administrador, en Cuentas Corrientes y Cuentas por Cobrar
   const puedeEditarMovimientos = usuario?.rol === "ADMIN" && cuenta.modulo !== "CAJA";
   const [movimientoEditado, setMovimientoEditado] = useState<FilaEstadoCuenta | null>(null);
+  // Un movimiento anulado se puede volver a activar (se quita su contrario) y, si hace falta, corregirlo ahí mismo
+  async function reactivar(m: FilaEstadoCuenta, paraEditar: boolean) {
+    const nombre = m.descripcion ?? m.tipo;
+    const pregunta = paraEditar
+      ? `"${nombre}" está anulado. Para editarlo hay que volver a activarlo: se quita el movimiento contrario y vuelve a contar en el saldo.\n\n¿Reactivarlo y editarlo?`
+      : `¿Volver a activar "${nombre}"? Se quita el movimiento contrario de la anulación y vuelve a contar en el saldo.`;
+    if (!window.confirm(pregunta)) return;
+    try {
+      await reactivarMovimientoCC(m.id);
+      setError(null);
+      await cargar();
+      onActualizar();
+      if (paraEditar) setMovimientoEditado({ ...m, anulado: false });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   // La hoja es diaria: se ve y se cierra un día a la vez
   const [dia, setDia] = useState(hoyBogota());
   // Opcional: ver varios días juntos (ayer y hoy, la semana…). Se elige desde qué día; el de arriba es hasta cuál.
@@ -1088,9 +1106,18 @@ export function HojaCuenta({
                       <MessageCircle size={14} />
                     </button>
                   )}
-                  {puedeEditarMovimientos && !m.anulado && !m.reverso_de_id && (
-                    <button onClick={() => setMovimientoEditado(m)} aria-label={`Editar ${m.descripcion ?? m.tipo}`} title="Editar este movimiento (corrige el saldo)">
+                  {puedeEditarMovimientos && !m.reverso_de_id && (
+                    <button
+                      onClick={() => (m.anulado ? void reactivar(m, true) : setMovimientoEditado(m))}
+                      aria-label={`Editar ${m.descripcion ?? m.tipo}`}
+                      title={m.anulado ? "Está anulado: se reactiva y se edita" : "Editar este movimiento (corrige el saldo)"}
+                    >
                       <Pencil size={14} />
+                    </button>
+                  )}
+                  {puedeEditarMovimientos && m.anulado && !m.reverso_de_id && (
+                    <button onClick={() => void reactivar(m, false)} aria-label={`Volver a activar ${m.descripcion ?? m.tipo}`} title="Volver a activar este movimiento anulado">
+                      <RotateCcw size={14} />
                     </button>
                   )}
                   {puedeAnular && !m.anulado && (
