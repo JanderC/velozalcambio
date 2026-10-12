@@ -1,27 +1,62 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
+import { getCajas, type Caja } from "../../api/cajas.api";
 import { registrarMovimientoCC, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { dinero } from "./cobrar";
 
 const METODOS = ["Efectivo", "Bancolombia", "Nequi", "Zelle", "Daviplata", "Otro"];
+const SIN_CAJA = "ninguna";
+const CLAVE_ULTIMA_CAJA = "cxc-pago-ultima-caja";
+// Las cajas manejan efectivo en estas monedas
+const MONEDAS_DE_CAJA = ["COP", "USD", "EUR"];
+const GRUPOS: { tipo: Caja["tipo"]; titulo: string }[] = [
+  { tipo: "FISICA", titulo: "Taquillas y cajas" },
+  { tipo: "FUERTE", titulo: "Caja Fuerte" },
+  { tipo: "BANCO", titulo: "Cuentas de la empresa" },
+];
 
 /**
  * El cliente paga todo lo que debe: se le anota un abono por el saldo completo, con el método de pago, y su cuenta
- * queda en cero. Es un movimiento más en su hoja (se puede anular desde ahí como cualquier otro).
+ * queda en cero. Se elige a dónde entra esa plata (una taquilla, la Caja Fuerte, una caja o una cuenta de la empresa)
+ * y esa caja sube por el mismo monto. Es un movimiento más en su hoja (se puede anular desde ahí como cualquier otro).
  */
 export function PagoTotalCobrarModal({ cuenta, onPagado, onCerrar }: { cuenta: CuentaCorrienteResumen; onPagado: () => void; onCerrar: () => void }) {
   const [metodo, setMetodo] = useState(METODOS[0]!);
   const [otroMetodo, setOtroMetodo] = useState("");
   const [referencia, setReferencia] = useState("");
+  const [cajas, setCajas] = useState<Caja[] | null>(null);
+  // "" = todavía no se eligió · SIN_CAJA = no entra a ninguna caja · un id = esa caja
+  const [destino, setDestino] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cajaPuede = MONEDAS_DE_CAJA.includes(cuenta.moneda_codigo);
+
+  useEffect(() => {
+    if (!cajaPuede) return;
+    getCajas()
+      .then((lista) => {
+        const activas = lista.filter((c) => c.activo);
+        setCajas(activas);
+        // viene elegida la última usada, si sigue existiendo
+        try {
+          const ultima = localStorage.getItem(CLAVE_ULTIMA_CAJA) ?? "";
+          if (ultima === SIN_CAJA || activas.some((c) => String(c.id) === ultima)) setDestino((actual) => actual || ultima);
+        } catch {
+          // sin almacenamiento: se elige a mano
+        }
+      })
+      .catch(() => setCajas([]));
+  }, [cajaPuede]);
+
+  const cajaElegida = cajas?.find((c) => String(c.id) === destino) ?? null;
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError(null);
     const metodoFinal = metodo === "Otro" ? otroMetodo.trim() : metodo;
     if (!metodoFinal) return setError("Escribí el método de pago.");
+    if (cajaPuede && destino === "") return setError("Elegí a dónde entra el dinero (o \"No entra a ninguna caja\").");
     setEnviando(true);
     try {
       await registrarMovimientoCC({
@@ -31,8 +66,16 @@ export function PagoTotalCobrarModal({ cuenta, onPagado, onCerrar }: { cuenta: C
         tipo: "ABONO",
         // el saldo completo, en negativo: lo que debía queda en cero
         monto: `-${cuenta.saldo_actual}`,
-        descripcion: `Pago total ${metodoFinal === "Efectivo" ? "en efectivo" : `por ${metodoFinal}`}${referencia.trim() ? ` · ${referencia.trim()}` : ""}`,
+        descripcion:
+          `Pago total ${metodoFinal === "Efectivo" ? "en efectivo" : `por ${metodoFinal}`}` + `${referencia.trim() ? ` · ${referencia.trim()}` : ""}` + `${cajaElegida ? ` (entra a ${cajaElegida.nombre})` : ""}`,
+        // ...y esa misma plata entra a la caja elegida
+        ...(cajaElegida ? { cajaId: cajaElegida.id, montoCaja: cuenta.saldo_actual, monedaCajaId: cuenta.moneda_id } : {}),
       });
+      try {
+        if (destino) localStorage.setItem(CLAVE_ULTIMA_CAJA, destino);
+      } catch {
+        // no es grave: solo no se recuerda
+      }
       onPagado();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar el pago.");
@@ -59,6 +102,36 @@ export function PagoTotalCobrarModal({ cuenta, onPagado, onCerrar }: { cuenta: C
           </div>
           {metodo === "Otro" && <input value={otroMetodo} onChange={(e) => setOtroMetodo(e.target.value)} placeholder="¿Cuál? ej. Banco de Bogotá" maxLength={40} autoComplete="off" aria-label="Otro método de pago" autoFocus />}
         </div>
+        {cajaPuede ? (
+          <label>
+            ¿A dónde entra el dinero?
+            <select value={destino} onChange={(e) => setDestino(e.target.value)} disabled={cajas === null}>
+              <option value="">{cajas === null ? "Cargando las cajas…" : "Elegir taquilla, caja o cuenta…"}</option>
+              {GRUPOS.map((g) => {
+                const delGrupo = (cajas ?? []).filter((c) => c.tipo === g.tipo);
+                return delGrupo.length ? (
+                  <optgroup key={g.tipo} label={g.titulo}>
+                    {delGrupo.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null;
+              })}
+              <option value={SIN_CAJA}>No entra a ninguna caja (solo anotar el pago)</option>
+            </select>
+            <small>
+              {cajaElegida
+                ? `${cajaElegida.nombre} sube ${dinero(cuenta.saldo_actual, cuenta.moneda_codigo)} con este pago.`
+                : destino === SIN_CAJA
+                  ? "Queda anotado el pago en la cuenta del cliente, sin mover ninguna caja."
+                  : "La caja que elijas sube por el monto del pago."}
+            </small>
+          </label>
+        ) : (
+          <p className="cc-modal-nota">Las cajas manejan pesos, dólares y euros: este pago en {cuenta.moneda_codigo} queda anotado en la cuenta del cliente, sin mover ninguna caja.</p>
+        )}
         <label>
           Referencia del pago (opcional)
           <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Número de comprobante, quién pagó…" maxLength={80} autoComplete="off" />
