@@ -115,8 +115,10 @@ function Monto({ valor, simbolo = "$" }: { valor: string; simbolo?: string }) {
 
 // Confirmaciones: las operaciones que se hacen, iguales para todos los clientes (no lo último que se le escribió a cada uno)
 export const OPERACIONES_CONFIRMACIONES = ["Compra", "Venta"].flatMap((sentido) => ["pesos", "bolívares", "dólares", "USDT", "euros"].map((moneda) => `${sentido} de ${moneda}`));
-// Confirmaciones: en qué moneda se entrega lo que entra por cada medio (Western Union llega en dólares y se paga en pesos)
-const ENTREGA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "COP", ZELLE: "USD" };
+// Confirmaciones: al elegir otro medio, la moneda en que se entrega solo cambia sola cuando ese medio se paga en pesos
+// (Bancolombia, Nequi, Western Union). Por USDT, Zelle o Bolívares queda la de la cuenta del cliente: con una tasa de
+// miles el total son pesos, y si se pusiera sola la moneda del medio quedaría anotado como 310.000 USDT. Se elige a mano.
+const ENTREGA_DEL_MEDIO: Record<string, string> = { BANCOLOMBIA: "COP", NEQUI: "COP", WESTERN_UNION: "COP" };
 /** "WESTERN_UNION" -> "Western Union". */
 const nombreDeMedio = (nombre: string) =>
   nombre === "SIN_BANCO"
@@ -1577,6 +1579,15 @@ function FilaNueva({
     if (conTasa && esPorcentaje && comisionDescuenta && Number(nEscrita) >= 100) return setError("La comisión tiene que ser menor al 100%.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
+    // Multiplicar por una tasa de miles da pesos: si el total va a quedar anotado en dólares, USDT o euros, casi seguro
+    // la moneda está mal elegida (100 × 3.100 quedaba como 310.000 USDT). Se frena y se pregunta.
+    if (enConfirmaciones && conTasa && !esPorcentaje && !enCobro && ["USD", "USDT", "EUR"].includes(codigoMonto) && Number(nTasa) >= 500) {
+      const seguir = window.confirm(
+        `Revisá la moneda\n\n${formatearMonto(sinSigno(nCantidad!))} × ${formatearMonto(nTasa!)} = ${formatearMonto(monto!)}, y va a quedar anotado en ${codigoMonto}.\n` +
+          `Con esa tasa el total suele ser en pesos: en "Se entrega en" elegí Pesos (COP).\n\n¿Registrarlo igual como ${formatearMonto(monto!)} ${codigoMonto}?`
+      );
+      if (!seguir) return setError(`No se agregó: el total iba a quedar como ${formatearMonto(monto!)} ${codigoMonto}. Elegí la moneda correcta en "Se entrega en".`);
+    }
     if (otraMoneda && !monedaEntrega) return setError(`No encuentro la moneda ${codigoMonto}.`);
     // en otra moneda y convirtiendo: sin tasa no hay cómo pasarlo a la moneda de la cuenta
     if (movEnOtraMoneda && !aparte && !conTasa) return setError(`Para convertir ${monedaMov} a ${cuenta.moneda_codigo} hace falta la cantidad y la tasa (× o ÷). Si no se quiere convertir, elegí "Llevar aparte en ${monedaMov}".`);
