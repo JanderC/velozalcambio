@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { AlertCircle, Archive, ArchiveRestore, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, Maximize2, MessageCircle, PanelRightClose, PanelRightOpen, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useTamanoBurbuja } from "./useTamanoBurbuja";
+import { MenuChat } from "./MenuChat";
 import { EVENTO_ALTERNAR, ponerEstadoBurbuja, useEstadoBurbuja } from "./burbujaEstado";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
@@ -651,7 +652,7 @@ function Burbuja() {
                   )
                 )}
                 {lista.map((c) => (
-                  <li key={c.jid}>
+                  <li key={c.jid} className="mc-anfitrion">
                     <button onClick={() => void abrirChat(c)} className={c.noLeidos > 0 ? "sin-leer" : ""}>
                       <span className={`wb-avatar ${c.esGrupo ? "grupo" : ""}`}>{c.esGrupo ? <Users size={18} aria-label="Grupo" /> : INICIAL(c.nombre)}</span>
                       <span className="wb-item">
@@ -666,6 +667,8 @@ function Burbuja() {
                         </span>
                       </span>
                     </button>
+                    {/* los tres puntitos del chat: archivar o marcar como leído sin abrirlo */}
+                    <MenuChat nombre={c.nombre} archivado={c.archivado} sinLeer={c.noLeidos} onArchivar={() => void archivar(c)} onLeer={() => void whatsappApi.leer(c.jid).catch(() => {})} />
                   </li>
                 ))}
                 {lista.length === 0 && (

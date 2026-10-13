@@ -1,5 +1,6 @@
 import { Bot, Search, UserRound, Users, X } from "lucide-react";
-import { LINEAS_WA, type ChatWa, type ConexionWa, type FiltroChats, type LineaWa } from "../../../api/whatsapp.api";
+import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type FiltroChats, type LineaWa } from "../../../api/whatsapp.api";
+import { MenuChat } from "../../../components/whatsapp/MenuChat";
 import { fechaLista } from "../utilidades";
 import { EsperandoPorTi } from "./EsperandoPorTi";
 
@@ -107,7 +108,7 @@ export function ListaChats(p: Props) {
 
         <ul className="wa-lista-chats">
           {p.chats.map((c) => (
-            <li key={c.jid}>
+            <li key={c.jid} className="mc-anfitrion">
               <button className={`wa-item ${p.abierto === c.jid ? "activo" : ""}`} onClick={() => p.onAbrir(c.jid)}>
                 <span className={`wa-avatar ${c.necesitaHumano ? "alerta" : ""} ${c.esGrupo ? "grupo" : ""}`}>{c.esGrupo ? <Users size={20} aria-label="Grupo" /> : iniciales(c.nombre)}</span>
                 <span className="wa-item-cuerpo">
@@ -131,6 +132,14 @@ export function ListaChats(p: Props) {
                   </span>
                 </span>
               </button>
+              {/* los tres puntitos del chat: la lista se actualiza sola con el aviso en vivo del servidor */}
+              <MenuChat
+                nombre={c.nombre}
+                archivado={c.archivado}
+                sinLeer={c.noLeidos}
+                onArchivar={() => void whatsappApi.actualizarChat(c.jid, { archivado: !c.archivado }).catch(() => {})}
+                onLeer={() => void whatsappApi.leer(c.jid).catch(() => {})}
+              />
             </li>
           ))}
         </ul>

@@ -1,0 +1,15 @@
+/* Los tres puntitos de cada chat de la lista y su menú (panel del encabezado y módulo de WhatsApp) */
+.mc-anfitrion { position: relative; }
+.mc { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); z-index: 2; }
+.mc-boton { display: grid; place-items: center; width: 30px; height: 30px; border: none; border-radius: 50%; background: white; color: #54656f; cursor: pointer; box-shadow: 0 1px 3px rgba(11, 20, 26, 0.2); opacity: 0; transition: opacity 0.12s ease; }
+/* aparecen al pasar por el chat (o al llegar con el teclado), como en WhatsApp; en pantallas táctiles quedan a la vista */
+.mc-anfitrion:hover .mc-boton, .mc-anfitrion:focus-within .mc-boton, .mc.abierto .mc-boton { opacity: 1; }
+@media (hover: none) {
+  .mc-boton { opacity: 0.85; box-shadow: none; background: transparent; }
+}
+.mc-boton:hover { background: #f0f2f5; color: #111b21; }
+.mc-menu { position: absolute; top: calc(100% + 4px); right: 0; min-width: 210px; display: grid; padding: 6px 0; border-radius: 10px; background: white; box-shadow: 0 6px 22px rgba(11, 20, 26, 0.22); z-index: 5; }
+.mc-menu button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 18px; border: none; background: none; color: #111b21; font: inherit; font-size: 0.9rem; text-align: left; cursor: pointer; white-space: nowrap; }
+.mc-menu button:hover { background: #f5f6f6; }
+.mc-menu svg { color: #54656f; flex-shrink: 0; }
+.mc-menu.arriba { top: auto; bottom: calc(100% + 4px); }
