@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, Maximize2, MessageCircle, PanelRightClose, PanelRightOpen, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, Maximize2, MessageCircle, PanelRightClose, PanelRightOpen, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useTamanoBurbuja } from "./useTamanoBurbuja";
 import { EVENTO_ALTERNAR, ponerEstadoBurbuja, useEstadoBurbuja } from "./burbujaEstado";
@@ -99,6 +99,10 @@ function Burbuja() {
     };
   }, [abierta, ancladoAhora, tamano.ancho]);
   const [chats, setChats] = useState<ChatWa[]>([]);
+  // Los archivados van aparte, como en WhatsApp: una fila "Archivados" arriba de la lista los abre
+  const [archivados, setArchivados] = useState<ChatWa[]>([]);
+  const [verArchivados, setVerArchivados] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [lineas, setLineas] = useState<ConexionWa[]>([]);
   const [filtroLinea, setFiltroLinea] = useState<LineaWa | null>(null);
   const [buscar, setBuscar] = useState("");
@@ -137,6 +141,10 @@ function Burbuja() {
       .then((lista) => setChats(ordenar(lista)))
       .catch(() => {});
     whatsappApi
+      .chats("archivados", "")
+      .then((lista) => setArchivados(ordenar(lista)))
+      .catch(() => {});
+    whatsappApi
       .lineas()
       .then(setLineas)
       .catch(() => {});
@@ -148,6 +156,8 @@ function Burbuja() {
     if (tipo === "chat") {
       const c = datos as ChatWa;
       setChats((lista) => (c.archivado ? lista.filter((x) => x.jid !== c.jid) : ordenar([c, ...lista.filter((x) => x.jid !== c.jid)])));
+      // archivado (acá, o desde el teléfono de esa línea): pasa a la lista de archivados; desarchivado, sale de ahí
+      setArchivados((lista) => (c.archivado ? ordenar([c, ...lista.filter((x) => x.jid !== c.jid)]) : lista.filter((x) => x.jid !== c.jid)));
       setChat((actual) => (actual?.jid === c.jid ? c : actual));
     }
     if (tipo === "mensaje") {
@@ -285,16 +295,34 @@ function Burbuja() {
   }
 
   // ---------- Lo que se muestra ----------
+  // Archivar es de la cuenta de WhatsApp: queda archivado también en el teléfono de esa línea (y al revés)
+  async function archivar(c: ChatWa) {
+    setError(null);
+    try {
+      const r = await whatsappApi.actualizarChat(c.jid, { archivado: !c.archivado });
+      setChats((lista) => (r.archivado ? lista.filter((x) => x.jid !== r.jid) : ordenar([r, ...lista.filter((x) => x.jid !== r.jid)])));
+      setArchivados((lista) => (r.archivado ? ordenar([r, ...lista.filter((x) => x.jid !== r.jid)]) : lista.filter((x) => x.jid !== r.jid)));
+      setChat(null);
+      setAviso(
+        `${r.archivado ? "Chat archivado" : "Chat desarchivado"}` +
+          (r.archivadoEnWhatsapp === false ? ". En el teléfono no se pudo cambiar (línea desconectada o chat sin mensajes): quedó solo acá." : " (también en el teléfono).")
+      );
+      setTimeout(() => setAviso(null), 6000);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo archivar el chat.");
+    }
+  }
+
   const sinLeerDe = useCallback((linea: LineaWa | null) => chats.filter((c) => !linea || c.linea === linea).reduce((s, c) => s + c.noLeidos, 0), [chats]);
   const totalSinLeer = sinLeerDe(null);
   const lista = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     const digitos = q.replace(/\D/g, "");
-    return chats
+    return (verArchivados ? archivados : chats)
       .filter((c) => !filtroLinea || c.linea === filtroLinea)
       .filter((c) => !q || c.nombre.toLowerCase().includes(q) || (digitos.length >= 3 && c.telefono.includes(digitos)) || (c.ultimoMensaje ?? "").toLowerCase().includes(q))
       .sort((a, b) => Number(b.noLeidos > 0) - Number(a.noLeidos > 0) || (b.ultimoMensajeEn ?? "").localeCompare(a.ultimoMensajeEn ?? ""));
-  }, [chats, filtroLinea, buscar]);
+  }, [chats, archivados, verArchivados, filtroLinea, buscar]);
   const lineaDe = (id: LineaWa) => lineas.find((l) => l.linea === id);
   const lineaDelChat = chat ? lineaDe(chat.linea) : undefined;
   const chatSinLinea = !!chat && lineaDelChat?.estado !== "CONECTADO";
@@ -334,6 +362,14 @@ function Burbuja() {
                   <strong>{chat.nombre}</strong>
                   <span>{chat.esGrupo ? `Grupo · línea ${chat.nombreLinea}` : `+${chat.telefono} · línea ${chat.nombreLinea}`}</span>
                 </div>
+                <button
+                  className="wb-icono"
+                  onClick={() => void archivar(chat)}
+                  title={chat.archivado ? "Desarchivar este chat (vuelve a la lista, también en el teléfono)" : "Archivar este chat (también queda archivado en el teléfono)"}
+                  aria-label={chat.archivado ? "Desarchivar este chat" : "Archivar este chat"}
+                >
+                  {chat.archivado ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                </button>
                 <button className="wb-icono wb-letra" onClick={tamano.pasarLetra} title={`Cambiar el tamaño de la letra (pasa a ${tamano.letraSiguiente})`} aria-label={`Cambiar el tamaño de la letra a ${tamano.letraSiguiente}`}>
                   Aa
                 </button>
@@ -585,7 +621,35 @@ function Burbuja() {
                 </p>
               )}
 
+              {aviso && (
+                <p className="wb-aviso-ok" role="status">
+                  {aviso}
+                </p>
+              )}
               <ul className="wb-lista">
+                {/* Como en WhatsApp: los archivados quedan detrás de una fila propia, arriba de la lista */}
+                {verArchivados ? (
+                  <li className="wb-archivados-volver">
+                    <button onClick={() => setVerArchivados(false)}>
+                      <ArrowLeft size={17} />
+                      <strong>Archivados</strong>
+                      <span>volver a los chats</span>
+                    </button>
+                  </li>
+                ) : (
+                  archivados.length > 0 &&
+                  !buscar && (
+                    <li className="wb-archivados-fila">
+                      <button onClick={() => setVerArchivados(true)}>
+                        <span className="wb-archivados-icono">
+                          <Archive size={18} />
+                        </span>
+                        <strong>Archivados</strong>
+                        <b>{archivados.filter((c) => !filtroLinea || c.linea === filtroLinea).length}</b>
+                      </button>
+                    </li>
+                  )
+                )}
                 {lista.map((c) => (
                   <li key={c.jid}>
                     <button onClick={() => void abrirChat(c)} className={c.noLeidos > 0 ? "sin-leer" : ""}>
@@ -606,7 +670,9 @@ function Burbuja() {
                 ))}
                 {lista.length === 0 && (
                   <li className="wb-aviso">
-                    {buscar
+                    {verArchivados && !buscar
+                      ? "No hay chats archivados."
+                      : buscar
                       ? "Ningún chat coincide."
                       : lineas.length > 0 && !lineas.some((l) => l.estado === "CONECTADO")
                         ? "Todavía no hay ninguna línea vinculada. Se vinculan en WhatsApp → Líneas."

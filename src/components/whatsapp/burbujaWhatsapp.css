@@ -143,3 +143,36 @@
 html.wa-anclado body { padding-right: var(--wa-ancho-anclado, 440px); }
 /* las ventanas (modales) se centran en lo que queda libre, sin quedar debajo del panel */
 html.wa-anclado .modal-fondo { right: var(--wa-ancho-anclado, 440px); }
+
+/* ---------- Más parecido a WhatsApp: lista, globos con colita y fondo del chat ---------- */
+.wb-avatar { width: 46px; height: 46px; font-size: calc(1.05rem * var(--wb-escala, 1)); }
+.wb-cabeza .wb-avatar { width: 38px; height: 38px; font-size: calc(0.95rem * var(--wb-escala, 1)); }
+/* la línea que separa los chats arranca después del avatar, y un chat sin leer no tiñe toda la fila */
+.wb-lista button { border-top: none; padding: 0 0 0 14px; gap: 13px; }
+.wb-lista button.sin-leer { background: white; }
+.wb-lista button:hover, .wb-lista button.sin-leer:hover { background: #f5f6f6; }
+.wb-lista .wb-item { padding: 12px 14px 12px 0; border-bottom: 1px solid #e9edef; gap: 4px; }
+.wb-item-fila strong { font-weight: 500; color: #111b21; }
+.wb-lista button.sin-leer strong { font-weight: 700; }
+.wb-lista button.sin-leer time { color: #1fa855; font-weight: 600; }
+.wb-lista button.sin-leer .wb-ultimo { color: #111b21; }
+.wb-contador { background: #25d366; font-weight: 700; }
+/* la fila de Archivados, arriba de la lista */
+.wb-archivados-fila button, .wb-archivados-volver button { align-items: center; gap: 13px; padding: 12px 14px; border-bottom: 1px solid #e9edef; }
+.wb-archivados-icono { display: grid; place-items: center; width: 46px; flex-shrink: 0; color: #008069; }
+.wb-archivados-fila strong, .wb-archivados-volver strong { flex: 1; font-size: calc(0.95rem * var(--wb-escala, 1)); font-weight: 500; color: #111b21; }
+.wb-archivados-fila b { font-size: calc(0.78rem * var(--wb-escala, 1)); font-weight: 600; color: #008069; }
+.wb-archivados-volver button { color: #008069; background: #f0f2f5; }
+.wb-archivados-volver span { font-size: calc(0.76rem * var(--wb-escala, 1)); color: #667781; }
+.wb-aviso-ok { margin: 0; padding: 8px 14px; background: #d9fdd3; color: #0b5b3c; font-size: calc(0.8rem * var(--wb-escala, 1)); flex-shrink: 0; }
+/* el fondo del chat, con la trama clarita de WhatsApp */
+.wb-mensajes { background-color: #efeae2; background-image: radial-gradient(rgba(84, 101, 111, 0.09) 1px, transparent 1.2px), radial-gradient(rgba(84, 101, 111, 0.06) 1px, transparent 1.2px); background-size: 22px 22px, 22px 22px; background-position: 0 0, 11px 11px; padding: 10px 16px 12px; }
+/* los globos, con su colita: el del cliente a la izquierda, el nuestro a la derecha */
+.wb-globo { border-radius: 7.5px; box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13); padding: 6px 9px 5px; }
+.wb-fila:not(.mia) .wb-globo { border-top-left-radius: 0; }
+.wb-fila.mia .wb-globo { border-top-right-radius: 0; }
+.wb-globo::before { content: ""; position: absolute; top: 0; width: 8px; height: 13px; }
+.wb-fila:not(.mia) .wb-globo::before { left: -8px; background: white; clip-path: polygon(100% 0, 0 0, 100% 100%); }
+.wb-fila.mia .wb-globo::before { right: -8px; background: #d9fdd3; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.wb-globo.error::before { background: #fde8e8; }
+.wb-dia { text-transform: uppercase; letter-spacing: 0.02em; border-radius: 7.5px; padding: 5px 12px; box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13); }

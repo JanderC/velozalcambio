@@ -217,8 +217,9 @@ export const whatsappApi = {
   // Un sticker del negocio ("pago", "pagos-y-salvos"): sale como sticker de WhatsApp
   enviarSticker: (jid: string, sticker: string, respondeA?: string | null) =>
     api.post<{ id: string }>(`/whatsapp/chats/${j(jid)}/sticker`, { sticker, ...(respondeA ? { respondeA } : {}) }),
+  // al archivar, archivadoEnWhatsapp dice si también quedó archivado en el teléfono de esa línea (false: solo acá)
   actualizarChat: (jid: string, cambios: { nombreGuardado?: string | null; archivado?: boolean; terceroId?: number | null }) =>
-    api.put<ChatWa>(`/whatsapp/chats/${j(jid)}`, cambios),
+    api.put<ChatWa & { archivadoEnWhatsapp?: boolean }>(`/whatsapp/chats/${j(jid)}`, cambios),
   devolverAlBot: (jid: string) => api.post<ChatWa>(`/whatsapp/chats/${j(jid)}/devolver-bot`),
   tomar: (jid: string) => api.post<ChatWa>(`/whatsapp/chats/${j(jid)}/tomar`),
   instruccion: (jid: string, texto: string) => api.post<{ enviado: string }>(`/whatsapp/chats/${j(jid)}/instruccion`, { texto }),

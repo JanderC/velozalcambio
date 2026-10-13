@@ -384,3 +384,14 @@
 /* Grupos */
 .wa-avatar.grupo { background: #d5e3f5; color: #1e4f8a; display: grid; place-items: center; }
 .wa-remitente { color: #1e4f8a; font-weight: 700; }
+
+/* ---------- Más parecido a WhatsApp: fondo del chat con su trama y globos con colita ---------- */
+.wa-mensajes { background-color: #efeae2; background-image: radial-gradient(rgba(84, 101, 111, 0.09) 1px, transparent 1.2px), radial-gradient(rgba(84, 101, 111, 0.06) 1px, transparent 1.2px); background-size: 22px 22px, 22px 22px; background-position: 0 0, 11px 11px; }
+.wa-burbuja { border-radius: 7.5px; }
+.wa-fila.suya .wa-burbuja { border-top-left-radius: 0; }
+.wa-fila.mia .wa-burbuja { border-top-right-radius: 0; }
+.wa-fila .wa-burbuja::before { content: ""; position: absolute; top: 0; width: 8px; height: 13px; background: inherit; }
+.wa-fila.suya .wa-burbuja::before { left: -8px; clip-path: polygon(100% 0, 0 0, 100% 100%); }
+.wa-fila.mia .wa-burbuja::before { right: -8px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.wa-dia { text-transform: uppercase; letter-spacing: 0.02em; border-radius: 7.5px; }
+.wa-item-nombre { color: #111b21; }
