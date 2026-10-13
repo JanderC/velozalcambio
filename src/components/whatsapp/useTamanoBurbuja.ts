@@ -76,7 +76,7 @@ export function useTamanoBurbuja() {
 
   // Estirar: la burbuja está pegada abajo a la derecha, así que crece hacia arriba y hacia la izquierda
   const alEmpezarAEstirar = useCallback(
-    (e: PointerEvent<HTMLElement>) => {
+    (e: PointerEvent<HTMLElement>, haciaAbajo = false) => {
       const panel = e.currentTarget.parentElement;
       if (!panel) return;
       e.preventDefault();
@@ -89,7 +89,8 @@ export function useTamanoBurbuja() {
       const alMover = (m: globalThis.PointerEvent) => {
         ultimo = {
           ancho: Math.round(Math.max(MIN_ANCHO, Math.min(window.innerWidth - 40, caja.width + (x0 - m.clientX)))),
-          alto: Math.round(Math.max(MIN_ALTO, Math.min(window.innerHeight - 110, caja.height + (y0 - m.clientY)))),
+          // colgado del encabezado crece hacia abajo; flotando abajo, hacia arriba
+          alto: Math.round(Math.max(MIN_ALTO, Math.min(window.innerHeight - 80, caja.height + (haciaAbajo ? m.clientY - y0 : y0 - m.clientY)))),
         };
         setTamano(ultimo);
       };
@@ -107,5 +108,5 @@ export function useTamanoBurbuja() {
   );
 
   const estilo = { "--wb-ancho": `${tamano.ancho}px`, "--wb-alto": `${tamano.alto}px`, "--wb-escala": LETRAS[letra]!.escala } as CSSProperties;
-  return { estilo, siguiente: siguiente.nombre, pasarAlSiguiente, alEmpezarAEstirar, letraSiguiente: LETRAS[letraSiguiente]!.nombre, pasarLetra };
+  return { estilo, ancho: tamano.ancho, siguiente: siguiente.nombre, pasarAlSiguiente, alEmpezarAEstirar, letraSiguiente: LETRAS[letraSiguiente]!.nombre, pasarLetra };
 }

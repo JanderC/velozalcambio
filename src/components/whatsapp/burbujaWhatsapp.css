@@ -114,6 +114,7 @@
   .wb-panel { position: fixed; inset: 0; width: auto; height: auto; border-radius: 0; }
   .wb-raiz:has(.wb-panel) .wb-boton { display: none; }
   .wb-estirar, .wb-tamano { display: none; }
+  .wb-raiz.arriba .wb-panel { inset: 0; top: 0; right: 0; width: auto; height: auto; border-radius: 0; }
 }
 @media print { .wb-raiz { display: none; } }
 
@@ -125,3 +126,20 @@
 /* el buscador de respuestas rápidas dentro de la burbuja también acompaña */
 .wb-panel .rr-item-usar b { font-size: calc(0.84rem * var(--wb-escala, 1)); }
 .wb-panel .rr-item-usar span { font-size: calc(0.8rem * var(--wb-escala, 1)); }
+
+/* ---------- El panel se abre desde el botón del encabezado: cuelga de arriba a la derecha, sin burbuja flotante ---------- */
+.wb-raiz.arriba { top: 0; right: 0; bottom: auto; }
+.wb-raiz.arriba .wb-panel { position: fixed; top: 64px; right: 14px; bottom: auto; height: min(var(--wb-alto, 680px), calc(100vh - 78px)); animation-name: wb-bajar; }
+@keyframes wb-bajar { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: none; } }
+/* se estira desde la esquina de abajo a la izquierda */
+.wb-raiz.arriba .wb-estirar { top: auto; bottom: 0; cursor: nesw-resize; border-radius: 0 0 0 16px; }
+.wb-raiz.arriba .wb-estirar::after { top: auto; bottom: 4px; border-top: none; border-bottom: 2px solid #9aa5ad; border-left-color: #9aa5ad; border-radius: 0 0 0 4px; }
+.wb-raiz.arriba .wb-estirar:hover::after { border-color: #54656f; }
+
+/* Anclado: una columna a la derecha de punta a punta; el módulo se angosta para hacerle lugar */
+.wb-raiz.anclada .wb-panel { top: 0; right: 0; width: var(--wa-ancho-anclado, 440px); height: 100vh; border-radius: 0; box-shadow: -6px 0 24px rgba(15, 23, 42, 0.18); animation: none; }
+.wb-raiz.anclada .wb-estirar { top: 0; bottom: 0; width: 6px; height: auto; cursor: ew-resize; border-radius: 0; }
+.wb-raiz.anclada .wb-estirar::after { display: none; }
+html.wa-anclado body { padding-right: var(--wa-ancho-anclado, 440px); }
+/* las ventanas (modales) se centran en lo que queda libre, sin quedar debajo del panel */
+html.wa-anclado .modal-fondo { right: var(--wa-ancho-anclado, 440px); }

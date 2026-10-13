@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { CircleDollarSign, LogOut, ChevronLeft, Star } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
 import { useFavoritos } from "../../hooks/useFavoritos";
+import { BotonWhatsappEncabezado } from "../whatsapp/BotonWhatsappEncabezado";
 import { MODULOS } from "../../modules/launcher/modulos.config";
 
 const ROL_LABEL: Record<string, string> = {
@@ -65,6 +66,7 @@ export function Header({ mostrarVolver = true }: { mostrarVolver?: boolean }) {
         </nav>
       )}
       <div className="app-header-user">
+        <BotonWhatsappEncabezado />
         <span className="app-header-role">{usuario ? ROL_LABEL[usuario.rol] : ""}</span>
         <button onClick={cerrarSesion}>
           <LogOut size={14} />

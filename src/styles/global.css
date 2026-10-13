@@ -96,6 +96,13 @@ body {
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .app-header-user button:hover { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+/* WhatsApp en el encabezado: el ícono con los mensajes sin leer abre el panel de chats */
+.app-header-user button.app-header-wa { position: relative; gap: 7px; padding: 7px 13px; border-color: rgba(37, 211, 102, 0.55); color: #7ee2a8; }
+.app-header-user button.app-header-wa:hover, .app-header-user button.app-header-wa.abierto { border-color: #25d366; color: white; background: rgba(37, 211, 102, 0.22); }
+.app-header-user button.app-header-wa.con-nuevos { border-color: #25d366; background: #128c4b; color: white; }
+.app-header-wa b { min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: #e11d48; color: white; font-size: 0.72rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.app-header-wa.late { animation: app-wa-late 0.9s ease-in-out 3; }
+@keyframes app-wa-late { 0%, 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); } 50% { box-shadow: 0 0 0 9px rgba(37, 211, 102, 0); } }
 
 /* ---------- Launcher ---------- */
 .launcher-page { min-height: 100vh; background: #eef0f4; padding-bottom: 40px; }
@@ -716,4 +723,6 @@ body {
   .app-header-title, .app-header-role { display: none; }
   .app-header-volver { margin-left: 10px; }
   .app-header-favoritos { margin: 0 8px; }
+  .app-header-wa-texto { display: none; }
+  .app-header-user { gap: 8px; }
 }

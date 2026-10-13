@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, Maximize2, MessageCircle, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, ClipboardList, Clock, ExternalLink, ImagePlus, Maximize2, MessageCircle, PanelRightClose, PanelRightOpen, Reply, Search, Send, Sticker, Users, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { useTamanoBurbuja } from "./useTamanoBurbuja";
+import { EVENTO_ALTERNAR, ponerEstadoBurbuja, useEstadoBurbuja } from "./burbujaEstado";
 import { useAuth } from "../../auth/useAuth";
 import { LINEAS_WA, whatsappApi, type ChatWa, type ConexionWa, type LineaWa, type MensajeWa } from "../../api/whatsapp.api";
 import { useStreamWhatsapp } from "../../modules/whatsapp/useStreamWhatsapp";
@@ -54,6 +55,49 @@ export function BurbujaWhatsapp() {
 function Burbuja() {
   const [abierta, setAbierta] = useState(false);
   const tamano = useTamanoBurbuja();
+  // El panel se abre desde el botón del encabezado (si la pantalla tiene encabezado; si no, queda el botón flotante)
+  const enEncabezado = useEstadoBurbuja().botones > 0;
+  useEffect(() => {
+    const alternar = () => setAbierta((a) => !a);
+    window.addEventListener(EVENTO_ALTERNAR, alternar);
+    return () => window.removeEventListener(EVENTO_ALTERNAR, alternar);
+  }, []);
+  // Anclado: el panel queda como una columna a la derecha y el módulo se angosta para hacerle lugar (no lo tapa).
+  // Solo en pantallas anchas; en las demás se abre como ventana. Cada persona lo deja como prefiere.
+  const [anclado, setAnclado] = useState(() => {
+    try {
+      return localStorage.getItem("wa-panel-anclado") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [pantallaAncha, setPantallaAncha] = useState(() => window.innerWidth >= 1100);
+  useEffect(() => {
+    const alCambiar = () => setPantallaAncha(window.innerWidth >= 1100);
+    window.addEventListener("resize", alCambiar);
+    return () => window.removeEventListener("resize", alCambiar);
+  }, []);
+  const ancladoAhora = anclado && pantallaAncha && enEncabezado;
+  function alternarAnclado() {
+    setAnclado((a) => {
+      try {
+        localStorage.setItem("wa-panel-anclado", a ? "0" : "1");
+      } catch {
+        // no es grave: solo no se recuerda
+      }
+      return !a;
+    });
+  }
+  useEffect(() => {
+    if (!abierta || !ancladoAhora) return;
+    const raiz = document.documentElement;
+    raiz.classList.add("wa-anclado");
+    raiz.style.setProperty("--wa-ancho-anclado", `${Math.min(tamano.ancho, Math.round(window.innerWidth * 0.5))}px`);
+    return () => {
+      raiz.classList.remove("wa-anclado");
+      raiz.style.removeProperty("--wa-ancho-anclado");
+    };
+  }, [abierta, ancladoAhora, tamano.ancho]);
   const [chats, setChats] = useState<ChatWa[]>([]);
   const [lineas, setLineas] = useState<ConexionWa[]>([]);
   const [filtroLinea, setFiltroLinea] = useState<LineaWa | null>(null);
@@ -264,12 +308,20 @@ function Burbuja() {
     };
   }, [totalSinLeer]);
 
+  useEffect(() => {
+    ponerEstadoBurbuja({ montada: true });
+    return () => ponerEstadoBurbuja({ montada: false, abierta: false, sinLeer: 0, late: false });
+  }, []);
+  useEffect(() => {
+    ponerEstadoBurbuja({ abierta, sinLeer: totalSinLeer, late: recien });
+  }, [abierta, totalSinLeer, recien]);
+
   return (
-    <div className="wb-raiz">
+    <div className={`wb-raiz ${enEncabezado ? "arriba" : ""} ${ancladoAhora ? "anclada" : ""}`}>
       {abierta && (
         <section className="wb-panel" role="dialog" aria-label="Chats de WhatsApp" style={tamano.estilo}>
           {/* Se estira desde esta esquina: crece hacia arriba y hacia la izquierda, y queda guardado */}
-          <span className="wb-estirar" onPointerDown={tamano.alEmpezarAEstirar} title="Arrastrá para agrandar o achicar la ventana" aria-hidden="true" />
+          <span className="wb-estirar" onPointerDown={(e) => tamano.alEmpezarAEstirar(e, enEncabezado)} title="Arrastrá para agrandar o achicar la ventana" aria-hidden="true" />
           {chat ? (
             // ---------- Una conversación ----------
             <>
@@ -285,6 +337,17 @@ function Burbuja() {
                 <button className="wb-icono wb-letra" onClick={tamano.pasarLetra} title={`Cambiar el tamaño de la letra (pasa a ${tamano.letraSiguiente})`} aria-label={`Cambiar el tamaño de la letra a ${tamano.letraSiguiente}`}>
                   Aa
                 </button>
+                {enEncabezado && pantallaAncha && (
+                  <button
+                    className="wb-icono wb-anclar"
+                    onClick={alternarAnclado}
+                    title={anclado ? "Soltar: que vuelva a ser una ventana encima de la pantalla" : "Anclar a la derecha: el módulo se angosta y el chat no tapa nada"}
+                    aria-label={anclado ? "Soltar el panel de WhatsApp" : "Anclar el panel de WhatsApp a la derecha"}
+                    aria-pressed={anclado}
+                  >
+                    {anclado ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+                  </button>
+                )}
                 <button className="wb-icono wb-tamano" onClick={tamano.pasarAlSiguiente} title={`Cambiar el tamaño de la ventana (pasa a ${tamano.siguiente}). También se estira desde la esquina de arriba a la izquierda.`} aria-label={`Cambiar el tamaño de la ventana a ${tamano.siguiente}`}>
                   <Maximize2 size={15} />
                 </button>
@@ -466,6 +529,17 @@ function Burbuja() {
                 <button className="wb-icono wb-letra" onClick={tamano.pasarLetra} title={`Cambiar el tamaño de la letra (pasa a ${tamano.letraSiguiente})`} aria-label={`Cambiar el tamaño de la letra a ${tamano.letraSiguiente}`}>
                   Aa
                 </button>
+                {enEncabezado && pantallaAncha && (
+                  <button
+                    className="wb-icono wb-anclar"
+                    onClick={alternarAnclado}
+                    title={anclado ? "Soltar: que vuelva a ser una ventana encima de la pantalla" : "Anclar a la derecha: el módulo se angosta y el chat no tapa nada"}
+                    aria-label={anclado ? "Soltar el panel de WhatsApp" : "Anclar el panel de WhatsApp a la derecha"}
+                    aria-pressed={anclado}
+                  >
+                    {anclado ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+                  </button>
+                )}
                 <button className="wb-icono wb-tamano" onClick={tamano.pasarAlSiguiente} title={`Cambiar el tamaño de la ventana (pasa a ${tamano.siguiente}). También se estira desde la esquina de arriba a la izquierda.`} aria-label={`Cambiar el tamaño de la ventana a ${tamano.siguiente}`}>
                   <Maximize2 size={15} />
                 </button>
@@ -545,16 +619,18 @@ function Burbuja() {
         </section>
       )}
 
-      <button
-        className={`wb-boton ${totalSinLeer > 0 ? "con-nuevos" : ""} ${recien ? "late" : ""}`}
-        onClick={() => setAbierta((a) => !a)}
-        aria-label={totalSinLeer > 0 ? `WhatsApp: ${totalSinLeer} mensajes sin leer` : "Abrir los chats de WhatsApp"}
-        aria-expanded={abierta}
-        title="Chats de WhatsApp"
-      >
-        {abierta ? <X size={24} /> : <MessageCircle size={26} />}
-        {totalSinLeer > 0 && !abierta && <span className="wb-globito">{totalSinLeer > 99 ? "99+" : totalSinLeer}</span>}
-      </button>
+      {!enEncabezado && (
+        <button
+          className={`wb-boton ${totalSinLeer > 0 ? "con-nuevos" : ""} ${recien ? "late" : ""}`}
+          onClick={() => setAbierta((a) => !a)}
+          aria-label={totalSinLeer > 0 ? `WhatsApp: ${totalSinLeer} mensajes sin leer` : "Abrir los chats de WhatsApp"}
+          aria-expanded={abierta}
+          title="Chats de WhatsApp"
+        >
+          {abierta ? <X size={24} /> : <MessageCircle size={26} />}
+          {totalSinLeer > 0 && !abierta && <span className="wb-globito">{totalSinLeer > 99 ? "99+" : totalSinLeer}</span>}
+        </button>
+      )}
     </div>
   );
 }
