@@ -30,6 +30,7 @@ import {
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
+import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { Modal } from "../../components/common/Modal";
@@ -1211,7 +1212,7 @@ function FilaNueva({
   saldo: string;
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
-  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string }) => void;
+  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string; texto?: string }) => void;
   medios?: { id: number; nombre: string }[];
   onElegirMedio?: (id: number | "") => void;
   onOtraCuenta?: (cuentaId: number) => void;
@@ -1296,6 +1297,10 @@ function FilaNueva({
   // La imagen se guarda con el movimiento al agregarlo, para verla después (en la hoja y en Taquilla)
   // El cliente puede mandar el monto en varias transferencias: se cargan varias capturas, se suman y se guardan juntas
   const [imagenesAdjuntas, setImagenesAdjuntas] = useState<File[]>([]);
+  // Confirmaciones, pago repartido: lo enviado se le entrega en varias monedas (800 USD: 400 en pesos, 400 en bolívares).
+  // Es una casilla chica; sin marcarla el formulario es el de siempre.
+  const [repartido, setRepartido] = useState(false);
+  const [partes, setPartes] = useState<ParteReparto[]>(() => partesIniciales("COP", "VES"));
   async function cargarComprobantes(archivos: File[]) {
     if (!archivos.length) return;
     setError(null);
@@ -1562,9 +1567,102 @@ function FilaNueva({
     return () => document.removeEventListener("paste", alPegar);
   }, []);
 
+  // Lo que llegó: la moneda del medio (USD por Zelle, USDT, bolívares…); si el medio no la define, la de la cuenta
+  const codigoLlega = delMedio ?? cuenta.moneda_codigo;
+  async function guardarRepartido() {
+    if (personaObligatoria && persona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
+    if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
+    if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
+    const cuentas = partes.map((p) => calcularParte(p, codigoLlega));
+    const mala = cuentas.find((c) => c.error);
+    if (mala) return setError(mala.error);
+    if (new Set(partes.map((p) => p.moneda)).size !== partes.length) return setError("Cada moneda va una sola vez en el reparto.");
+    const repartidoTotal = cuentas.reduce((suma, c) => sumarDecimales(suma, c.cantidad!), "0");
+    if (nCantidad && Number(sinSigno(nCantidad)) !== Number(repartidoTotal)) {
+      return setError(`Las partes suman ${formatearMonto(repartidoTotal)} ${codigoLlega} y en Cantidad dice ${formatearMonto(sinSigno(nCantidad))}. Ajustá las partes (o dejá Cantidad vacía).`);
+    }
+    for (const numero of numerosMovimiento) {
+      const ya = (numero === numeroMovimiento ? repetido : null) ?? (await buscarMovimientoPorNumero(numero, canalDelBloqueo).catch(() => null));
+      if (ya) {
+        if (numero === numeroMovimiento) setRepetido(ya);
+        const aviso = `${avisoRepetido(ya, numero)} No se puede registrar dos veces: el movimiento NO se generó.`;
+        window.alert(`Referencia repetida\n\n${aviso}`);
+        return setError(aviso);
+      }
+    }
+    setEnviando(true);
+    const hechas: string[] = [];
+    const signo = resta ? "-" : "";
+    const enProceso = llevaConfirmacion && !confirmada;
+    try {
+      // la misma captura queda guardada en cada parte
+      const imagen = imagenesAdjuntas.length ? await unirImagenes(imagenesAdjuntas).catch(() => null) : null;
+      for (const [i, c] of cuentas.entries()) {
+        const p = partes[i]!;
+        const moneda = monedas.find((m) => m.codigo === p.moneda);
+        if (!moneda) throw new Error(`No encuentro la moneda ${p.moneda}.`);
+        // la parte en la moneda de esta cuenta va acá; las otras, a la cuenta del mismo cliente en esa moneda
+        const destino =
+          p.moneda === cuenta.moneda_codigo
+            ? cuenta
+            : await crearCuentaCorriente({ terceroId: cuenta.tercero_id, canalId: cuenta.canal_id, modulo: "CAJA", monedaId: moneda.id, usarExistente: true });
+        const creado = await registrarMovimientoCC({
+          terceroId: cuenta.tercero_id,
+          canalId: destino.canal_id,
+          monedaId: destino.moneda_id,
+          canalMovimientoId: medioMov.id,
+          tipo: resta ? "ABONO" : "CARGO",
+          descripcion:
+            `${referenciaFinal}${personaCompleta ? `${SEPARADOR_PERSONA}${personaCompleta}` : ""}` +
+            // al dividir, lo que se movió de verdad queda anotado: (400 USD a 3.900)
+            (c.tasa && p.operador === "÷" ? ` (${formatearMonto(c.cantidad!)} ${codigoLlega} a ${formatearMonto(c.tasa)})` : "") +
+            `${SEPARADOR_PERSONA}parte ${i + 1} de ${partes.length}`,
+          fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
+          ...(c.tasa && p.operador === "x" ? { cantidadBase: `${signo}${c.cantidad!}`, tasa: c.tasa } : { monto: `${signo}${c.total!}` }),
+          cuentaDestino: cuentaDestino.trim() || undefined,
+          ...(llevaConfirmacion
+            ? { estadoConfirmacion: confirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) }
+            : confirmadaDirecto
+              ? { estadoConfirmacion: "CONFIRMADA" as const }
+              : {}),
+        });
+        if (imagen) await subirComprobanteMovimiento(creado.movimiento.id, imagen).catch(() => {});
+        hechas.push(dineroEn(c.total!, p.moneda));
+      }
+      // el aviso para el cliente lleva todo junto: lo que envió y lo que recibe en cada moneda
+      const ref = nMtcn ? `MTCN ${nMtcn}` : codigosDeReferencia(persona).join(" / ") || "—";
+      const texto =
+        `Estimado(a), le informamos que ${enProceso ? "la operación está en proceso de confirmación" : resta ? "su compra ha sido registrada" : "la operación ha sido confirmada"}.\n\n` +
+        `Ref: ${ref}\nEnvió: ${dineroEn(repartidoTotal, codigoLlega)}\n${resta ? "Monto" : "Recibe"}: ${hechas.join(" + ")}\n` +
+        (enProceso ? "En breves minutos estará disponible" : resta ? "" : "Disponible para recoger");
+      const descripcionAviso = `${referenciaFinal}${personaCompleta ? `${SEPARADOR_PERSONA}${personaCompleta}` : ""}`;
+      setImagenesAdjuntas([]);
+      setAvisoLectura(null);
+      setRepartido(false);
+      setPartes(partesIniciales("COP", "VES"));
+      setReferencia(referenciaPuesta);
+      setPersona("");
+      setCuentaDestino("");
+      setMtcn("");
+      setConfirmada(false);
+      setCantidad("");
+      onGuardado({ monto: cuentas[0]!.total!, descripcion: descripcionAviso, sentido: enProceso ? "proceso" : resta ? "recibe" : "retiro", texto: texto.trim() });
+    } catch (err) {
+      const mensaje = err instanceof ApiError ? err.message : (err as Error).message || "error de conexión";
+      setError(
+        hechas.length
+          ? `Se registraron ${hechas.length} de ${partes.length} partes (${hechas.join(" + ")}) y la siguiente falló: ${mensaje}. Revisá la hoja del cliente antes de volver a cargar, para no repetir las que ya entraron.`
+          : `No se registró nada: ${mensaje}`
+      );
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (repartido) return guardarRepartido();
     if (!referenciaFinal) {
       return setError(
         persona.trim()
@@ -1880,7 +1978,16 @@ function FilaNueva({
           )}
         </div>
       )}
-      {puedeElegirEntrega && (
+      {enConfirmaciones && (
+        <label className="cc-reparto-check" title="El cliente quiere lo que envió repartido: una parte en pesos, otra en bolívares, etc.">
+          <input type="checkbox" checked={repartido} onChange={(e) => setRepartido(e.target.checked)} />
+          Pago repartido en varias monedas
+        </label>
+      )}
+      {enConfirmaciones && repartido && (
+        <RepartoMonedas llega={codigoLlega} monedas={monedas} partes={partes} totalEnviado={nCantidad ? sinSigno(nCantidad) : null} onCambio={setPartes} />
+      )}
+      {puedeElegirEntrega && !repartido && (
         <label className={`cc-entrega-en ${otraMoneda ? "otra" : ""}`}>
           ¿Qué moneda quiere el cliente? Se entrega en
           <select value={entregaEn} onChange={(e) => setEntregaEn(e.target.value)} aria-label="Moneda en la que se le entrega al cliente">

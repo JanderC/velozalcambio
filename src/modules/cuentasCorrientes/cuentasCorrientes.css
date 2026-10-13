@@ -513,3 +513,24 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 @media (max-width: 600px) {
   .cc-editar-mov-fila, .cc-editar-mov-fila.tres { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Confirmaciones: pago repartido en varias monedas */
+.cc-nueva label.cc-reparto-check { flex-direction: row; align-items: center; gap: 6px; width: fit-content; margin: 0 0 8px; font-size: 0.76rem; font-weight: 500; color: #6b7280; cursor: pointer; }
+.cc-nueva label.cc-reparto-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--color-navy); }
+.cc-reparto { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid #cfd6e0; border-radius: 10px; background: #f8fafc; }
+.cc-reparto-fila { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(150px, 1.2fr) minmax(170px, 1.2fr) minmax(120px, 1fr) auto; gap: 10px; align-items: end; }
+.cc-reparto-fila label { display: grid; gap: 4px; font-size: 0.76rem; font-weight: 600; color: #374151; }
+.cc-reparto-fila input, .cc-reparto-fila select { width: 100%; padding: 8px 9px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; font: inherit; font-size: 0.9rem; }
+.cc-reparto-fila input { text-align: right; }
+.cc-reparto-tasa { display: grid; gap: 4px; }
+.cc-reparto-total { padding: 8px 4px; font-weight: 700; color: var(--color-navy-dark); white-space: nowrap; }
+.cc-reparto-acciones { display: inline-flex; align-items: center; gap: 4px; padding-bottom: 6px; min-width: 28px; }
+.cc-reparto-acciones button { display: inline-grid; place-items: center; padding: 4px 8px; border: none; border-radius: 6px; background: #e6eef7; color: var(--color-navy); font: inherit; font-size: 0.74rem; cursor: pointer; }
+.cc-reparto-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.84rem; color: #1a7f37; }
+.cc-reparto-pie .falta { color: #a8531f; }
+.cc-reparto-agregar { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px dashed #9fb3c8; border-radius: 6px; background: white; color: var(--color-navy); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.cc-reparto small { font-size: 0.74rem; color: #6b7280; }
+@media (max-width: 860px) {
+  .cc-reparto-fila { grid-template-columns: 1fr 1fr; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+  .cc-reparto-tasa, .cc-reparto-total { grid-column: 1 / -1; }
+}
