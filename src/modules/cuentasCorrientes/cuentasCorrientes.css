@@ -543,3 +543,33 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-pago-conf small { flex-basis: 100%; font-size: 0.74rem; color: #6b7280; }
 .cc-pago-conf.otro { border-color: #b7e2c4; background: #f1faf3; }
 .cc-pago-conf.otro small { color: #166534; }
+
+/* Confirmaciones con varias transferencias: el cuadro para armarlas y el desglose en la hoja */
+.cc-varias { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid #b9cbe0; border-radius: 10px; background: #f5f9fd; }
+.cc-varias-fila { display: grid; grid-template-columns: 26px minmax(120px, 1.1fr) minmax(110px, 1fr) minmax(100px, 0.9fr) minmax(190px, 1.3fr) minmax(110px, 0.9fr) auto; gap: 8px; align-items: end; padding: 6px; border-radius: 8px; }
+.cc-varias-fila.activa { background: #eaf2fb; }
+.cc-varias-fila.repetida { background: #fdf0ee; }
+.cc-varias-num { align-self: center; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--color-navy); color: white; font-size: 0.78rem; font-weight: 700; }
+.cc-varias-fila label { display: grid; gap: 3px; font-size: 0.74rem; font-weight: 600; color: #374151; }
+.cc-varias-fila input { width: 100%; padding: 7px 9px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; font: inherit; font-size: 0.9rem; }
+.cc-varias-fila input.num { text-align: right; }
+.cc-varias-formula { display: grid; gap: 3px; }
+.cc-varias-resultado { padding: 7px 2px; font-weight: 700; color: var(--color-navy-dark); white-space: nowrap; }
+.cc-varias-acciones { display: inline-flex; gap: 4px; padding-bottom: 3px; }
+.cc-varias-acciones button { display: inline-flex; align-items: center; gap: 3px; padding: 6px 8px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; color: #374151; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.cc-varias-acciones button.con { border-color: #1a7f37; color: #1a7f37; background: #e8f6ec; }
+.cc-varias-aviso { grid-column: 2 / -1; color: #b3261e; font-size: 0.76rem; }
+.cc-varias-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
+.cc-varias-agregar { display: inline-flex; align-items: center; gap: 4px; padding: 7px 11px; border: 1px dashed #9fb3c8; border-radius: 6px; background: white; color: var(--color-navy); font: inherit; font-size: 0.82rem; cursor: pointer; }
+.cc-varias-total { flex: 1; text-align: right; font-size: 0.88rem; color: #374151; }
+.cc-varias-total b { font-size: 1.05rem; color: var(--color-navy-dark); }
+.cc-varias > small { font-size: 0.74rem; color: #6b7280; }
+.cc-chip-transferencias { margin-left: 6px; padding: 1px 8px; border: 1px solid #9fb3c8; border-radius: 999px; background: #eaf2fb; color: var(--color-navy); font: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer; }
+.cc-fila-transferencias td { background: #f5f9fd; padding: 6px 14px 10px 40px !important; }
+.cc-fila-transferencias ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.84rem; color: #374151; }
+.cc-fila-transferencias li span { color: #4b5563; }
+@media (max-width: 1000px) {
+  .cc-varias-fila { grid-template-columns: 26px 1fr 1fr; }
+  .cc-varias-formula, .cc-varias-resultado { grid-column: 2 / -1; }
+  .cc-varias-acciones { grid-column: 2 / -1; }
+}

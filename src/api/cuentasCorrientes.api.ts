@@ -71,9 +71,27 @@ export interface FilaEstadoCuenta {
   reverso_de_id: number | null;
   movimiento_caja_id: number | null;
   usuario_nombre: string;
+  // Confirmaciones armadas con varias transferencias: cada una con su fórmula y su captura
+  transferencias?: TransferenciaFila[] | null;
+  // por dónde se pagó (en taquilla o por otro método, desde una cuenta de la empresa)
+  pagado_medio?: "EFECTIVO" | "BANCOLOMBIA" | "OTROS" | null;
+  pagado_caja_nombre?: string | null;
+  pagado_caja_tipo?: string | null;
   // si un administrador lo corrigió: cuándo y quién
   editado_en?: string | null;
   editado_por_nombre?: string | null;
+}
+
+export interface TransferenciaFila {
+  id: number;
+  orden: number;
+  referencia: string | null;
+  remitente: string | null;
+  cantidad: string;
+  formula: "TASA" | "DIVIDIR" | "COMISION" | "DIRECTO";
+  valor: string | null;
+  resultado: string;
+  tiene_comprobante: boolean;
 }
 
 export interface EstadoCuenta {
@@ -295,10 +313,12 @@ interface RegistrarMovimientoInput {
   montoCaja?: string; // con signo: + entra a la caja, - sale
   monedaCajaId?: number; // moneda en la que se mueve la caja (si no es la de la cuenta)
   metodoPagoId?: number;
+  // Confirmaciones armadas con varias transferencias
+  transferencias?: { referencia?: string; remitente?: string; cantidad: string; formula: "TASA" | "DIVIDIR" | "COMISION" | "DIRECTO"; valor?: string; resultado: string }[];
 }
 
 export function registrarMovimientoCC(data: RegistrarMovimientoInput) {
-  return api.post<{ movimiento: { id: number }; saldoNuevo: string }>("/cuentas-corrientes/movimientos", data);
+  return api.post<{ movimiento: { id: number }; saldoNuevo: string; transferencias?: { id: number; orden: number }[] }>("/cuentas-corrientes/movimientos", data);
 }
 
 /** Corregir un movimiento mal cargado (solo administradores). Lo que no se manda queda como está; null lo vacía. */
@@ -324,6 +344,16 @@ export function subirComprobanteMovimiento(movimientoId: number, imagen: File) {
 }
 
 /** Enlace temporal para ver la imagen del comprobante de un movimiento. */
+/** La captura de una de las transferencias de una confirmación armada con varias. */
+export function subirComprobanteTransferencia(transferenciaId: number, imagen: File) {
+  const formData = new FormData();
+  formData.append("imagen", imagen);
+  return api.postForm<{ ok: true }>(`/cuentas-corrientes/transferencias/${transferenciaId}/comprobante`, formData);
+}
+export async function getUrlComprobanteTransferencia(transferenciaId: number) {
+  return (await api.get<{ url: string }>(`/cuentas-corrientes/transferencias/${transferenciaId}/comprobante`)).url;
+}
+
 export async function getUrlComprobante(movimientoId: number) {
   return (await api.get<{ url: string }>(`/cuentas-corrientes/movimientos/${movimientoId}/comprobante`)).url;
 }

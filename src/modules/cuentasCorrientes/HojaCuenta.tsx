@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
@@ -18,6 +18,9 @@ import {
   getMovimientosCuentaCorriente,
   getTasasRecientes,
   getUrlComprobante,
+  getUrlComprobanteTransferencia,
+  subirComprobanteTransferencia,
+  type TransferenciaFila,
   subirComprobanteMovimiento,
   guardarTasaHabitual,
   type TasasRecientes,
@@ -32,6 +35,7 @@ import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
+import { VariasTransferencias, calcularTransferencia, transferenciaVacia, type Transferencia } from "./VariasTransferencias";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
@@ -162,6 +166,15 @@ export function HojaCuenta({
   // Corregir un movimiento mal cargado: solo el administrador, en Cuentas Corrientes y Cuentas por Cobrar
   const puedeEditarMovimientos = usuario?.rol === "ADMIN" && cuenta.modulo !== "CAJA";
   const [movimientoEditado, setMovimientoEditado] = useState<FilaEstadoCuenta | null>(null);
+  // los movimientos armados con varias transferencias que tienen el desglose abierto
+  const [desglosados, setDesglosados] = useState<Set<number>>(new Set());
+  async function verCapturaTransferencia(t: TransferenciaFila) {
+    try {
+      setImagenComprobante(await getUrlComprobanteTransferencia(t.id));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   // Un movimiento anulado se puede volver a activar (se quita su contrario) y, si hace falta, corregirlo ahí mismo
   async function reactivar(m: FilaEstadoCuenta, paraEditar: boolean) {
     const nombre = m.descripcion ?? m.tipo;
@@ -1053,7 +1066,8 @@ export function HojaCuenta({
               </tr>
             )}
             {movimientosVisibles.map((m) => (
-              <tr key={m.id} className={m.anulado ? "cc-anulado" : marcados.has(m.id) ? "cc-fila-marcada" : ""} title={`Cargado por ${m.usuario_nombre}`}>
+              <Fragment key={m.id}>
+              <tr className={m.anulado ? "cc-anulado" : marcados.has(m.id) ? "cc-fila-marcada" : ""} title={`Cargado por ${m.usuario_nombre}`}>
                 <td>
                   {m.anulado ? (
                     fechaCorta(m.fecha)
@@ -1076,7 +1090,28 @@ export function HojaCuenta({
                       <IconoImagen size={13} /> comprobante
                     </button>
                   )}
-                  {m.pagado_en && <span className="cc-estado-conf ok">pagada en taquilla</span>}
+                  {m.pagado_en && (
+                    <span className="cc-estado-conf ok">
+                      {m.pagado_caja_tipo === "BANCO" ? `pagada por ${m.pagado_caja_nombre}` : `pagada en ${m.pagado_caja_nombre?.toLowerCase() ?? "taquilla"}${m.pagado_medio && m.pagado_medio !== "EFECTIVO" ? ` (${m.pagado_medio === "BANCOLOMBIA" ? "Bancolombia" : "otro método"})` : ""}`}
+                    </span>
+                  )}
+                  {!!m.transferencias?.length && (
+                    <button
+                      type="button"
+                      className="cc-chip-transferencias"
+                      onClick={() =>
+                        setDesglosados((d) => {
+                          const n = new Set(d);
+                          if (!n.delete(m.id)) n.add(m.id);
+                          return n;
+                        })
+                      }
+                      aria-expanded={desglosados.has(m.id)}
+                      title="Ver cada transferencia de esta confirmación"
+                    >
+                      {m.transferencias.length} transferencias {desglosados.has(m.id) ? "▴" : "▾"}
+                    </button>
+                  )}
                   {!m.anulado && m.estado_confirmacion && (
                     <span className={`cc-estado-conf ${m.estado_confirmacion === "EN_PROCESO" ? "proceso" : "ok"}`}>
                       {m.estado_confirmacion === "EN_PROCESO" ? "pendiente de confirmar" : "confirmada"}
@@ -1132,6 +1167,36 @@ export function HojaCuenta({
                   )}
                 </td>
               </tr>
+              {desglosados.has(m.id) && !!m.transferencias?.length && (
+                <tr className="cc-fila-transferencias">
+                  <td colSpan={7}>
+                    <ol>
+                      {m.transferencias.map((t) => (
+                        <li key={t.id}>
+                          <b>Ref {t.referencia || "—"}</b>
+                          {t.remitente && <span> · {t.remitente}</span>}
+                          <span>
+                            {" · "}
+                            {formatearMonto(t.cantidad)}
+                            {t.formula === "TASA" && t.valor ? ` × ${formatearMonto(t.valor)}` : t.formula === "DIVIDIR" && t.valor ? ` ÷ ${formatearMonto(t.valor)}` : t.formula === "COMISION" && t.valor ? ` − ${formatearMonto(t.valor)}%` : ""}
+                            {" = "}
+                            <b>
+                              {simbolo}
+                              {formatearMonto(t.resultado)}
+                            </b>
+                          </span>
+                          {t.tiene_comprobante && (
+                            <button type="button" className="cc-ver-comprobante" onClick={() => void verCapturaTransferencia(t)}>
+                              <IconoImagen size={13} /> captura
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
           {estado && (
@@ -1302,6 +1367,11 @@ function FilaNueva({
   // Confirmaciones, pago repartido: lo enviado se le entrega en varias monedas (800 USD: 400 en pesos, 400 en bolívares).
   // Es una casilla chica; sin marcarla el formulario es el de siempre.
   const [repartido, setRepartido] = useState(false);
+  // Confirmaciones armadas con varias transferencias: cada una con su monto, su fórmula y su captura
+  const [varias, setVarias] = useState(false);
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([transferenciaVacia()]);
+  const [repetidasVarias, setRepetidasVarias] = useState<Record<string, string>>({});
+  const [cargandoVarias, setCargandoVarias] = useState(false);
   // Confirmaciones: pasa a taquilla (como siempre) o se le paga ya por otro método, desde una cuenta de la empresa
   const [pago, setPago] = useState<PagoElegido>(PAGO_POR_TAQUILLA);
   const [partes, setPartes] = useState<ParteReparto[]>(() => partesIniciales("COP", "VES"));
@@ -1557,6 +1627,8 @@ function FilaNueva({
   // aunque el cursor no esté dentro del formulario
   const pegarImagen = useRef<(imagenes: File[]) => void>(() => {});
   pegarImagen.current = (imagenes) => {
+    // con varias transferencias, cada captura va a su fila (lo maneja ese cuadro)
+    if (varias) return;
     if (!leyendo) void cargarComprobantes(imagenes);
   };
   useEffect(() => {
@@ -1573,6 +1645,128 @@ function FilaNueva({
 
   // Lo que llegó: la moneda del medio (USD por Zelle, USDT, bolívares…); si el medio no la define, la de la cuenta
   const codigoLlega = delMedio ?? cuenta.moneda_codigo;
+  // Las referencias de las transferencias se revisan contra las ya registradas (por el medio de este movimiento)
+  const referenciasVarias = varias ? transferencias.map((t) => t.referencia.trim()).filter((r) => r.length >= 4).join("|") : "";
+  useEffect(() => {
+    if (!referenciasVarias) return setRepetidasVarias({});
+    const t = setTimeout(async () => {
+      const encontradas: Record<string, string> = {};
+      const vistas = new Set<string>();
+      for (const ref of referenciasVarias.split("|")) {
+        const clave = ref.toLowerCase();
+        if (vistas.has(clave)) {
+          encontradas[clave] = `La referencia ${ref} está dos veces en esta lista.`;
+          continue;
+        }
+        vistas.add(clave);
+        const ya = await buscarMovimientoPorNumero(ref, canalDelBloqueo).catch(() => null);
+        if (ya) encontradas[clave] = avisoRepetido(ya, ref);
+      }
+      setRepetidasVarias(encontradas);
+    }, 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referenciasVarias, canalDelBloqueo]);
+
+  async function cargarVarias() {
+    setError(null);
+    const cuentasTr = transferencias.map((t) => calcularTransferencia(t, codigoLlega, codigoMonto));
+    const mala = cuentasTr.find((c) => c.error);
+    if (mala) return setError(mala.error);
+    if (Object.keys(repetidasVarias).length) return setError("Hay una referencia que ya está registrada: corregila antes de cargar.");
+    if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
+    if (otraMoneda && !monedaEntrega) return setError(`No encuentro la moneda ${codigoMonto}.`);
+    const pagarCon = !resta && pago.modo === "otro" ? pago : null;
+    if (pagarCon && !pagarCon.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga (o dejalo en \"Pasa a taquilla\").");
+    if (pagarCon && llevaConfirmacion && !confirmada) return setError("Para pagarla ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
+    const total = cuentasTr.reduce((s, c) => sumarDecimales(s, c.resultado!), "0");
+    const refs = transferencias.map((t) => t.referencia.trim()).filter(Boolean);
+    const remitentes = [...new Set(transferencias.map((t) => t.remitente.trim()).filter(Boolean))];
+    // un resumen antes de registrar: Cargar registra de una vez
+    const resumen = transferencias
+      .map((t, i) => `${i + 1}) Ref ${t.referencia.trim() || "—"} · ${formatearMonto(cuentasTr[i]!.cantidad!)} ${codigoLlega} → ${dineroEn(cuentasTr[i]!.resultado!, codigoMonto)}`)
+      .join("\n");
+    const seguir = window.confirm(
+      `${resta ? "Venta" : "Compra"} con ${transferencias.length} transferencias\n\n${resumen}\n\nTotal: ${dineroEn(total, codigoMonto)}` +
+        `${pagarCon ? `\nSe paga ya por ${pagarCon.nombre}.` : !resta ? "\nPasa a taquilla." : ""}\n\n¿Cargar?`
+    );
+    if (!seguir) return;
+    setCargandoVarias(true);
+    const signo = resta ? "-" : "";
+    const enProceso = llevaConfirmacion && !confirmada;
+    try {
+      const destino = otraMoneda
+        ? await crearCuentaCorriente({ terceroId: cuenta.tercero_id, canalId: cuenta.canal_id, modulo: "CAJA", monedaId: monedaEntrega!.id, usarExistente: true })
+        : cuenta;
+      const quien = [refs.join(" / "), remitentes.join(", "), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
+      const creado = await registrarMovimientoCC({
+        terceroId: cuenta.tercero_id,
+        canalId: destino.canal_id,
+        monedaId: destino.moneda_id,
+        canalMovimientoId: medioMov.id,
+        tipo: resta ? "ABONO" : "CARGO",
+        descripcion: `${referenciaFinal}${quien ? `${SEPARADOR_PERSONA}${quien}` : ""}`,
+        fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
+        monto: `${signo}${total}`,
+        cuentaDestino: cuentaDestino.trim() || undefined,
+        ...(llevaConfirmacion
+          ? { estadoConfirmacion: confirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) }
+          : confirmadaDirecto
+            ? { estadoConfirmacion: "CONFIRMADA" as const }
+            : {}),
+        transferencias: transferencias.map((t, i) => ({
+          referencia: t.referencia.trim() || undefined,
+          remitente: t.remitente.trim() || undefined,
+          cantidad: cuentasTr[i]!.cantidad!,
+          formula: cuentasTr[i]!.formula,
+          valor: cuentasTr[i]!.valor ?? undefined,
+          resultado: cuentasTr[i]!.resultado!,
+        })),
+      });
+      // cada captura con su transferencia
+      const ids = creado.transferencias ?? [];
+      await Promise.all(
+        transferencias.map((t, i) => {
+          const tr = ids.find((x) => x.orden === i + 1);
+          return t.captura && tr ? subirComprobanteTransferencia(tr.id, t.captura).catch(() => {}) : Promise.resolve();
+        })
+      );
+      let pagadaPor: string | null = null;
+      if (pagarCon) {
+        try {
+          await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarCon.cajaId!);
+          pagadaPor = pagarCon.nombre;
+        } catch (e) {
+          setError(`La confirmación quedó registrada, pero no se pudo pagar por ${pagarCon.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);
+        }
+      }
+      // el aviso para el cliente: cada transferencia y el total
+      const lineas = transferencias.map((t, i) => `${i + 1}. Ref ${t.referencia.trim() || "—"} · ${formatearMonto(cuentasTr[i]!.cantidad!)} ${codigoLlega}`).join("\n");
+      const texto =
+        `Estimado(a), le informamos que ${enProceso ? "la operación está en proceso de confirmación" : pagadaPor ? "la operación ha sido confirmada y pagada" : resta ? "su compra ha sido registrada" : "la operación ha sido confirmada"}.\n\n` +
+        `Transferencias:\n${lineas}\n\n${resta ? "Monto" : "Recibe"}: ${dineroEn(total, codigoMonto)}` +
+        (pagadaPor ? `\nPagado por: ${pagadaPor}` : enProceso ? "\nEn breves minutos estará disponible" : resta ? "" : "\nDisponible para recoger");
+      setTransferencias([transferenciaVacia()]);
+      setVarias(false);
+      setPago(PAGO_POR_TAQUILLA);
+      setReferencia(referenciaPuesta);
+      setPersona("");
+      setCuentaDestino("");
+      setMtcn("");
+      setConfirmada(false);
+      if (otraMoneda) {
+        onGuardado();
+        onOtraCuenta?.(destino.id);
+        return;
+      }
+      onGuardado({ monto: total, descripcion: `${referenciaFinal}${SEPARADOR_PERSONA}${refs.join(" / ")}`, sentido: enProceso ? "proceso" : resta ? "recibe" : "retiro", texto });
+    } catch (err) {
+      setError(`No se cargó: ${err instanceof ApiError ? err.message : "error de conexión"}`);
+    } finally {
+      setCargandoVarias(false);
+    }
+  }
+
   async function guardarRepartido() {
     if (personaObligatoria && persona.trim().length < 2) return setError("Si es por Zelle hace falta el nombre de quien envió la transferencia.");
     if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
@@ -1667,6 +1861,7 @@ function FilaNueva({
     e.preventDefault();
     setError(null);
     if (repartido) return guardarRepartido();
+    if (varias) return setError("Con varias transferencias se registra con el botón \"Cargar\" del cuadro de transferencias.");
     if (!referenciaFinal) {
       return setError(
         persona.trim()
@@ -2011,7 +2206,32 @@ function FilaNueva({
           )}
         </div>
       )}
-      {enConfirmaciones && (
+      {enConfirmaciones && !repartido && (
+        <label className="cc-reparto-check" title="El cliente mandó el dinero en varias transferencias: cada una con su monto, su tasa o comisión y su captura">
+          <input
+            type="checkbox"
+            checked={varias}
+            onChange={(e) => {
+              setVarias(e.target.checked);
+              // la primera fila arranca con la tasa o comisión que estaba puesta
+              if (e.target.checked) setTransferencias([transferenciaVacia(esPorcentaje ? "%" : enCobro ? "÷" : "x", tasa)]);
+            }}
+          />
+          Varias transferencias
+        </label>
+      )}
+      {enConfirmaciones && varias && (
+        <VariasTransferencias
+          llega={codigoLlega}
+          queda={codigoMonto}
+          filas={transferencias}
+          onCambio={setTransferencias}
+          repetidas={repetidasVarias}
+          cargando={cargandoVarias}
+          onCargar={() => void cargarVarias()}
+        />
+      )}
+      {enConfirmaciones && !varias && (
         <label className="cc-reparto-check" title="El cliente quiere lo que envió repartido: una parte en pesos, otra en bolívares, etc.">
           <input type="checkbox" checked={repartido} onChange={(e) => setRepartido(e.target.checked)} />
           Pago repartido en varias monedas
