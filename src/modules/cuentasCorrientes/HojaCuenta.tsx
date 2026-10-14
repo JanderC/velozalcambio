@@ -1898,6 +1898,17 @@ function FilaNueva({
     if (conTasa && esPorcentaje && comisionDescuenta && Number(nEscrita) >= 100) return setError("La comisión tiene que ser menor al 100%.");
     if (conTasa && !nCantidad) return setError(esPorcentaje ? "Para la comisión hace falta la cantidad sobre la que se cobra." : "Con tasa hace falta la cantidad.");
     if (!montoConSigno) return setError(conTasa ? "El monto da cero: revisá cantidad y tasa." : "Escribí cantidad y tasa, o el monto directo.");
+    // Un monto desproporcionado casi siempre es una referencia pegada donde va la cantidad (pasó: 256.698.950 × 3 =
+    // $770.096.850). Se frena y se pregunta antes de anotarlo.
+    const montoNumero = Number(sinSigno(montoConSigno));
+    const tope = codigoMonto === "COP" ? 100_000_000 : codigoMonto === "VES" ? 50_000_000 : 50_000;
+    if (montoNumero > tope) {
+      const seguir = window.confirm(
+        `Revisá el monto\n\nEl movimiento va a quedar por ${formatearMonto(sinSigno(montoConSigno))} ${codigoMonto}${nCantidad ? ` (cantidad ${formatearMonto(sinSigno(nCantidad))})` : ""}.\n` +
+          `Es un monto muy grande: ¿no se pegó una referencia donde va la cantidad?\n\n¿Registrarlo igual?`
+      );
+      if (!seguir) return setError("No se agregó: revisá la cantidad (puede que se haya pegado una referencia).");
+    }
     // Multiplicar por una tasa de miles da pesos: si el total va a quedar anotado en dólares, USDT o euros, casi seguro
     // la moneda está mal elegida (100 × 3.100 quedaba como 310.000 USDT). Se frena y se pregunta.
     if (enConfirmaciones && conTasa && !esPorcentaje && !enCobro && ["USD", "USDT", "EUR"].includes(codigoMonto) && Number(nTasa) >= 500) {

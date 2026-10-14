@@ -95,6 +95,8 @@ export interface Taquilla {
   cajaFuerte: { id: number; nombre: string; saldos: { codigo: CodigoTaquilla; monto: string }[] };
   // Ingresos y egresos de ventanilla de esta caja (o de hoy), más los que sigan pendientes
   operaciones: OperacionTaquilla[];
+  // lo que entró o salió de esta caja desde otros módulos (ej. un cliente de Cuentas por Cobrar que pagó en efectivo)
+  deOtrosModulos?: { id: number; tipo: "INGRESO" | "EGRESO"; monto: string; created_at: string; codigo: string; descripcion: string | null; cliente: string; usuario_nombre: string }[];
   // Pagos hechos por Bancolombia (de esta caja abierta, o de hoy si está cerrada): no tocan la caja
   pagosBancolombia: { cantidad: number; totales: { codigo: string; total: string }[] };
   // Lo mismo, los pagados por otros métodos

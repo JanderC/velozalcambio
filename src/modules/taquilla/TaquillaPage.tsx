@@ -420,6 +420,24 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
         )}
       </section>
 
+      {/* Lo que entró o salió de esta caja desde otros módulos: suma o resta en la caja, pero no es de ventanilla */}
+      {!!taquilla?.deOtrosModulos?.length && (
+        <section className="tq-otros-modulos">
+          <h3>Entró o salió desde otros módulos</h3>
+          <ul>
+            {taquilla.deOtrosModulos.map((o) => (
+              <li key={o.id} className={o.tipo === "INGRESO" ? "entra" : "sale"}>
+                <time>{new Date(o.created_at).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" })}</time>
+                <span>
+                  <b>{o.cliente}</b> · {o.descripcion ?? ""} <small>({o.usuario_nombre})</small>
+                </span>
+                <strong>{o.tipo === "INGRESO" ? "+" : "−"} {dinero(o.monto, o.codigo)}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Ingreso / egreso de ventanilla, debajo de la caja */}
       {taquilla && <OperacionesTaquilla taquilla={taquilla} onCambio={setTaquilla} />}
 

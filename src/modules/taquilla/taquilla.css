@@ -273,3 +273,15 @@
 .tq-operacion label.tq-leer input { display: none; }
 .tq-operacion .cc-aviso-lectura, .tq-operacion .cc-imagen-adjunta { margin: 0; }
 .tq-movimiento-datos .cc-ver-comprobante { margin-left: 0; }
+
+/* Lo que entró o salió de la caja desde otros módulos (Cuentas por Cobrar, Cuentas Corrientes) */
+.tq-otros-modulos { margin: 14px 0 0; padding: 12px 16px; border-radius: 12px; background: white; border: 1px solid #dbe4ee; }
+.tq-otros-modulos h3 { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.04em; }
+.tq-otros-modulos ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.tq-otros-modulos li { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 8px; border-radius: 8px; font-size: 0.88rem; }
+.tq-otros-modulos li.entra { background: #f1faf3; }
+.tq-otros-modulos li.sale { background: #fdf3f2; }
+.tq-otros-modulos time { color: #6b7280; font-size: 0.8rem; }
+.tq-otros-modulos small { color: #8a93a3; }
+.tq-otros-modulos li.entra strong { color: #166534; }
+.tq-otros-modulos li.sale strong { color: #b3261e; }
