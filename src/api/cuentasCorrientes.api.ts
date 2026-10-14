@@ -315,6 +315,7 @@ interface RegistrarMovimientoInput {
   metodoPagoId?: number;
   // Confirmaciones armadas con varias transferencias
   transferencias?: { referencia?: string; remitente?: string; cantidad: string; formula: "TASA" | "DIVIDIR" | "COMISION" | "DIRECTO"; valor?: string; resultado: string }[];
+  totalEnviado?: string; // lo que suman las transferencias, antes de la comisión o la tasa
 }
 
 export function registrarMovimientoCC(data: RegistrarMovimientoInput) {

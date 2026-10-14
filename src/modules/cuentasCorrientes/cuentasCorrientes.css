@@ -546,7 +546,19 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 
 /* Confirmaciones con varias transferencias: el cuadro para armarlas y el desglose en la hoja */
 .cc-varias { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid #b9cbe0; border-radius: 10px; background: #f5f9fd; }
-.cc-varias-fila { display: grid; grid-template-columns: 26px minmax(120px, 1.1fr) minmax(110px, 1fr) minmax(100px, 0.9fr) minmax(190px, 1.3fr) minmax(110px, 0.9fr) auto; gap: 8px; align-items: end; padding: 6px; border-radius: 8px; }
+.cc-varias-fila { display: grid; grid-template-columns: 26px minmax(140px, 1.2fr) minmax(120px, 1fr) minmax(120px, 0.9fr) auto; gap: 8px; align-items: end; padding: 6px; border-radius: 8px; }
+/* el resumen: cada transferencia, lo enviado, la comisión una vez sobre el total, y lo que se le paga */
+.cc-varias-resumen { display: grid; gap: 6px; margin-top: 4px; padding: 12px 14px; border-radius: 10px; background: white; border: 1px solid #d7e2ee; }
+.cc-varias-resumen ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 0.86rem; color: #374151; }
+.cc-varias-resumen li { display: flex; justify-content: space-between; gap: 10px; }
+.cc-varias-linea { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 6px; border-top: 1px solid #eef0f3; font-size: 0.92rem; }
+.cc-varias-linea.total b { font-size: 1.02rem; }
+.cc-varias-linea.formula { flex-wrap: wrap; }
+.cc-varias-linea.formula input { width: 110px; padding: 6px 8px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; text-align: right; }
+.cc-varias-linea.formula .neg { color: #b3261e; }
+.cc-varias-linea.pagar { font-weight: 700; color: var(--color-navy-dark); }
+.cc-varias-linea.pagar b { font-size: 1.2rem; }
+.cc-varias-enviar { justify-self: end; margin-top: 6px; padding: 11px 22px; }
 .cc-varias-fila.activa { background: #eaf2fb; }
 .cc-varias-fila.repetida { background: #fdf0ee; }
 .cc-varias-num { align-self: center; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--color-navy); color: white; font-size: 0.78rem; font-weight: 700; }
@@ -570,6 +582,5 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-fila-transferencias li span { color: #4b5563; }
 @media (max-width: 1000px) {
   .cc-varias-fila { grid-template-columns: 26px 1fr 1fr; }
-  .cc-varias-formula, .cc-varias-resultado { grid-column: 2 / -1; }
   .cc-varias-acciones { grid-column: 2 / -1; }
 }

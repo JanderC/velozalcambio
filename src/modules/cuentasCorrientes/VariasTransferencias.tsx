@@ -1,43 +1,46 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Plus, X } from "lucide-react";
-import { formatearMonto, leerNumero, multiplicarDecimales, dividirDecimales, sumarDecimales } from "../../utils/montos";
+import { factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, dividirDecimales, sumarDecimales } from "../../utils/montos";
 import { leerComprobante } from "./ocrComprobante";
 import { dineroEn } from "./RepartoMonedas";
 
-// Confirmaciones armadas con varias transferencias del cliente: cada una con su referencia, quién la envió, su monto,
-// su fórmula (tasa, dividir o comisión) y su captura. Se ve el total y con "Cargar" queda una sola confirmación,
-// con cada transferencia guardada aparte.
-export type FormulaTransferencia = "x" | "÷" | "%";
+// Confirmaciones armadas con varias transferencias del cliente: cada una con su referencia, quién la envió, su monto y
+// su captura. Se suman en "Total enviado", a ese total se le aplica una sola vez la comisión (o la tasa) y queda lo que
+// se le paga. Se ve el resumen completo y con "Enviar a caja" queda una sola confirmación, con cada transferencia
+// guardada aparte.
+export type FormulaGeneral = "%" | "x" | "÷";
 export interface Transferencia {
   referencia: string;
   remitente: string;
   cantidad: string;
-  formula: FormulaTransferencia;
-  valor: string; // la tasa o el % de comisión (vacío: sin convertir)
   captura: File | null;
   leyendo?: boolean;
   aviso?: string | null;
 }
-export const transferenciaVacia = (formula: FormulaTransferencia = "x", valor = ""): Transferencia => ({ referencia: "", remitente: "", cantidad: "", formula, valor, captura: null });
+export const transferenciaVacia = (): Transferencia => ({ referencia: "", remitente: "", cantidad: "", captura: null });
 
-/** La cuenta de una transferencia: cantidad × tasa, ÷ tasa, − % o tal cual (si llega en la moneda de la cuenta). */
-export function calcularTransferencia(t: Transferencia, llega: string, queda: string) {
-  const cantidad = t.cantidad.trim() ? (leerNumero(t.cantidad)?.replace(/^-/, "") ?? null) : null;
-  const valor = t.valor.trim() ? (leerNumero(t.valor.replace(/%/g, ""))?.replace(/^-/, "") ?? null) : null;
+/** El total enviado y lo que queda después de la comisión (o la tasa), en la moneda en que se le paga. */
+export function calcularResumen(filas: Transferencia[], formula: FormulaGeneral, valorEscrito: string, llega: string, queda: string) {
+  const cantidades = filas.map((f) => (f.cantidad.trim() ? (leerNumero(f.cantidad)?.replace(/^-/, "") ?? null) : null));
+  const totalEnviado = cantidades.reduce<string>((s, c) => (c ? sumarDecimales(s, c) : s), "0");
+  const valor = valorEscrito.trim() ? (leerNumero(valorEscrito.replace(/%/g, ""))?.replace(/^-/, "") ?? null) : null;
   const decimales = queda === "COP" ? 0 : 2;
-  if (!cantidad || !/[1-9]/.test(cantidad)) return { cantidad: null, valor, resultado: null, formula: "DIRECTO" as const, error: "Falta el monto de una transferencia." };
+  const base = { cantidades, totalEnviado, valor, resultado: null as string | null, descuento: null as string | null };
+  if (filas.length === 0) return { ...base, error: "Agregá al menos una transferencia." };
+  if (cantidades.some((c) => !c || !/[1-9]/.test(c))) return { ...base, error: "Falta el monto de una transferencia." };
   if (!valor || !/[1-9]/.test(valor)) {
-    if (t.valor.trim()) return { cantidad, valor: null, resultado: null, formula: "DIRECTO" as const, error: "Una tasa o comisión no es un número válido." };
-    if (llega !== queda) return { cantidad, valor: null, resultado: null, formula: "DIRECTO" as const, error: `Falta la tasa para pasar ${llega} a ${queda} en una transferencia.` };
-    return { cantidad, valor: null, resultado: cantidad, formula: "DIRECTO" as const, error: null };
+    if (valorEscrito.trim()) return { ...base, error: "La comisión o la tasa no es un número válido." };
+    // sin comisión ni tasa: se le paga lo mismo que envió (solo si llega en la moneda en que se le paga)
+    if (llega !== queda) return { ...base, error: `Falta la tasa para pasar ${llega} a ${queda}.` };
+    return { ...base, resultado: totalEnviado, error: null };
   }
-  if (t.formula === "%") {
-    if (Number(valor) >= 100) return { cantidad, valor, resultado: null, formula: "COMISION" as const, error: "La comisión tiene que ser menor al 100%." };
-    const factor = sumarDecimales("1", `-${multiplicarDecimales(valor, "0.01", 8)}`);
-    return { cantidad, valor, resultado: multiplicarDecimales(cantidad, factor, decimales), formula: "COMISION" as const, error: null };
+  if (formula === "%") {
+    if (Number(valor) >= 100) return { ...base, error: "La comisión tiene que ser menor al 100%." };
+    const resultado = multiplicarDecimales(totalEnviado, factorDeComision(valor, false), decimales);
+    return { ...base, resultado, descuento: sumarDecimales(totalEnviado, `-${resultado}`), error: null };
   }
-  const resultado = t.formula === "÷" ? dividirDecimales(cantidad, valor, decimales) : multiplicarDecimales(cantidad, valor, decimales);
-  return { cantidad, valor, resultado, formula: t.formula === "÷" ? ("DIVIDIR" as const) : ("TASA" as const), error: resultado && /[1-9]/.test(resultado) ? null : "Una transferencia da cero: revisá monto y tasa." };
+  const resultado = formula === "÷" ? dividirDecimales(totalEnviado, valor, decimales) : multiplicarDecimales(totalEnviado, valor, decimales);
+  return { ...base, resultado, error: resultado && /[1-9]/.test(resultado) ? null : "El total da cero: revisá los montos y la tasa." };
 }
 
 export function VariasTransferencias({
@@ -45,16 +48,26 @@ export function VariasTransferencias({
   queda,
   filas,
   onCambio,
+  formula,
+  onFormula,
+  valor,
+  onValor,
   repetidas,
   cargando,
+  textoBoton,
   onCargar,
 }: {
   llega: string; // en qué moneda llegan las transferencias (la del medio)
-  queda: string; // en qué moneda queda la confirmación
+  queda: string; // en qué moneda se le paga
   filas: Transferencia[];
   onCambio: (filas: Transferencia[]) => void;
+  formula: FormulaGeneral;
+  onFormula: (f: FormulaGeneral) => void;
+  valor: string;
+  onValor: (v: string) => void;
   repetidas: Record<string, string>; // referencia -> aviso de que ya está registrada
   cargando: boolean;
+  textoBoton: string;
   onCargar: () => void;
 }) {
   const [activa, setActiva] = useState(0); // la fila donde se pega la próxima captura
@@ -64,7 +77,11 @@ export function VariasTransferencias({
   const activaRef = useRef(activa);
   activaRef.current = activa;
 
-  const cambiar = (i: number, cambio: Partial<Transferencia>) => onCambio(filasRef.current.map((f, j) => (j === i ? { ...f, ...cambio } : f)));
+  const cambiar = (i: number, cambio: Partial<Transferencia>) => {
+    const nuevas = filasRef.current.map((f, j) => (j === i ? { ...f, ...cambio } : f));
+    filasRef.current = nuevas;
+    onCambio(nuevas);
+  };
 
   // Una captura por fila: se lee y llena la referencia, el monto y quién envió
   async function ponerCaptura(imagen: File, i: number) {
@@ -85,7 +102,7 @@ export function VariasTransferencias({
     }
   }
 
-  // Pegar (Ctrl+V) va a la fila en la que se está escribiendo; si esa ya tiene captura, a una nueva
+  // Pegar (Ctrl+V) va a la fila en la que se está escribiendo; si esa ya tiene captura, a una libre o a una nueva
   useEffect(() => {
     const alPegar = (e: ClipboardEvent) => {
       const imagenes = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
@@ -94,17 +111,16 @@ export function VariasTransferencias({
       if ((e.target as HTMLElement | null)?.closest?.(".wb-raiz, .wa-composer")) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      let lista = filasRef.current;
       let i = activaRef.current;
       for (const imagen of imagenes) {
+        let lista = filasRef.current;
         if (!lista[i] || lista[i]!.captura) {
           const libre = lista.findIndex((f) => !f.captura);
           if (libre >= 0) i = libre;
           else {
-            const anterior = lista[lista.length - 1];
-            lista = [...lista, transferenciaVacia(anterior?.formula, anterior?.valor)];
-            onCambio(lista);
+            lista = [...lista, transferenciaVacia()];
             filasRef.current = lista;
+            onCambio(lista);
             i = lista.length - 1;
           }
         }
@@ -118,11 +134,9 @@ export function VariasTransferencias({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const cuentas = filas.map((f) => calcularTransferencia(f, llega, queda));
-  const totalEnviado = cuentas.reduce((s, c) => (c.cantidad ? sumarDecimales(s, c.cantidad) : s), "0");
-  const total = cuentas.reduce((s, c) => (c.resultado ? sumarDecimales(s, c.resultado) : s), "0");
-  const todasBien = filas.length > 0 && cuentas.every((c) => !c.error) && !filas.some((f) => f.leyendo);
+  const r = calcularResumen(filas, formula, valor, llega, queda);
   const hayRepetidas = filas.some((f) => f.referencia.trim() && repetidas[f.referencia.trim().toLowerCase()]);
+  const leyendo = filas.some((f) => f.leyendo);
 
   return (
     <div className="cc-varias" role="group" aria-label="Varias transferencias">
@@ -138,11 +152,12 @@ export function VariasTransferencias({
         }}
       />
       {filas.map((f, i) => {
-        const c = cuentas[i]!;
         const repetida = f.referencia.trim() ? repetidas[f.referencia.trim().toLowerCase()] : undefined;
         return (
           <div className={`cc-varias-fila ${repetida ? "repetida" : ""} ${activa === i ? "activa" : ""}`} key={i} onFocusCapture={() => setActiva(i)}>
-            <span className="cc-varias-num">{i + 1}</span>
+            <span className="cc-varias-num" title={`Transferencia ${i + 1}`}>
+              {i + 1}
+            </span>
             <label>
               Referencia
               <input value={f.referencia} onChange={(e) => cambiar(i, { referencia: e.target.value })} placeholder="N.º de transferencia" autoComplete="off" />
@@ -155,17 +170,6 @@ export function VariasTransferencias({
               Monto ({llega})
               <input className="num" value={f.cantidad} onChange={(e) => cambiar(i, { cantidad: e.target.value })} inputMode="decimal" placeholder="0" autoComplete="off" />
             </label>
-            <div className="cc-varias-formula">
-              <div className="cc-modo-tasa" role="group" aria-label="Tasa, dividir o comisión">
-                {(["x", "÷", "%"] as const).map((op) => (
-                  <button type="button" key={op} className={f.formula === op ? "activo" : ""} onClick={() => cambiar(i, { formula: op })} aria-pressed={f.formula === op}>
-                    {op === "x" ? "× Tasa" : op === "÷" ? "÷ Dividir" : "− Comisión %"}
-                  </button>
-                ))}
-              </div>
-              <input className="num" value={f.valor} onChange={(e) => cambiar(i, { valor: e.target.value })} inputMode="decimal" placeholder={llega === queda ? "sin tasa" : f.formula === "%" ? "%" : "tasa"} autoComplete="off" aria-label="Tasa o comisión de esta transferencia" />
-            </div>
-            <output className="cc-varias-resultado">{c.resultado ? `= ${dineroEn(c.resultado, queda)}` : "= —"}</output>
             <span className="cc-varias-acciones">
               <button type="button" className={f.captura ? "con" : ""} onClick={() => (setActiva(i), archivo.current?.click())} title={f.captura ? "Captura cargada (tocá para cambiarla)" : "Cargar la captura (o pegala con Ctrl+V)"}>
                 <Camera size={14} /> {f.leyendo ? "Leyendo…" : f.captura ? "✓" : ""}
@@ -180,26 +184,57 @@ export function VariasTransferencias({
           </div>
         );
       })}
-      <div className="cc-varias-pie">
-        <button
-          type="button"
-          className="cc-varias-agregar"
-          onClick={() => {
-            const anterior = filas[filas.length - 1];
-            onCambio([...filas, transferenciaVacia(anterior?.formula, anterior?.valor)]);
-            setActiva(filas.length);
-          }}
-        >
-          <Plus size={13} /> Agregar transferencia
-        </button>
-        <span className="cc-varias-total">
-          {filas.length} {filas.length === 1 ? "transferencia" : "transferencias"} · enviado {dineroEn(totalEnviado, llega)} · total <b>{dineroEn(total, queda)}</b>
-        </span>
-        <button type="button" className="cc-guardar" onClick={onCargar} disabled={!todasBien || hayRepetidas || cargando} title={hayRepetidas ? "Hay una referencia ya registrada" : undefined}>
-          {cargando ? "Cargando…" : "Cargar"}
+      <button
+        type="button"
+        className="cc-varias-agregar"
+        onClick={() => {
+          onCambio([...filas, transferenciaVacia()]);
+          setActiva(filas.length);
+        }}
+      >
+        <Plus size={13} /> Agregar transferencia
+      </button>
+
+      {/* El resumen: lo enviado, la comisión (o la tasa) una sola vez sobre el total, y lo que se le paga */}
+      <div className="cc-varias-resumen">
+        <ol>
+          {filas.map((f, i) => (
+            <li key={i}>
+              <span>
+                Transferencia {i + 1}
+                {f.referencia.trim() ? ` · Ref ${f.referencia.trim()}` : ""}
+              </span>
+              <b>{r.cantidades[i] ? dineroEn(r.cantidades[i]!, llega) : "—"}</b>
+            </li>
+          ))}
+        </ol>
+        <div className="cc-varias-linea total">
+          <span>Total enviado</span>
+          <b>{dineroEn(r.totalEnviado, llega)}</b>
+        </div>
+        <div className="cc-varias-linea formula">
+          <div className="cc-modo-tasa" role="group" aria-label="Comisión o tasa sobre el total">
+            {(["%", "x", "÷"] as const).map((op) => (
+              <button type="button" key={op} className={formula === op ? "activo" : ""} onClick={() => onFormula(op)} aria-pressed={formula === op}>
+                {op === "%" ? "− Comisión %" : op === "x" ? "× Tasa" : "÷ Dividir"}
+              </button>
+            ))}
+          </div>
+          <input className="num" value={valor} onChange={(e) => onValor(e.target.value)} inputMode="decimal" placeholder={formula === "%" ? "ej. 6" : "tasa"} autoComplete="off" aria-label="Comisión o tasa sobre el total" />
+          <b className={formula === "%" ? "neg" : ""}>
+            {formula === "%" ? (r.descuento ? `− ${dineroEn(r.descuento, llega)}` : "—") : r.resultado && r.valor ? `${formula} ${formatearMonto(r.valor)}` : "—"}
+          </b>
+        </div>
+        <div className="cc-varias-linea pagar">
+          <span>Se le paga</span>
+          <b>{r.resultado ? dineroEn(r.resultado, queda) : "—"}</b>
+        </div>
+        {r.error && filas.some((f) => f.cantidad.trim()) && <small className="cc-varias-aviso">{r.error}</small>}
+        <button type="button" className="cc-guardar cc-varias-enviar" onClick={onCargar} disabled={!!r.error || hayRepetidas || leyendo || cargando} title={hayRepetidas ? "Hay una referencia ya registrada" : undefined}>
+          {cargando ? "Enviando…" : textoBoton}
         </button>
       </div>
-      <small>Pegá cada captura (Ctrl+V) y se llena su fila. Con "Cargar" queda una sola confirmación por el total, con cada transferencia guardada aparte.</small>
+      <small>Pegá cada captura (Ctrl+V) y se llena su fila. Al enviar queda una sola confirmación por lo que se le paga, con cada transferencia guardada aparte.</small>
     </div>
   );
 }
