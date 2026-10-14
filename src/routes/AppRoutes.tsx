@@ -23,6 +23,7 @@ import { WhatsAppPage } from "../modules/whatsapp/WhatsAppPage";
 import { CajasPage } from "../modules/cajas/CajasPage";
 import { CajaDetallePage } from "../modules/cajas/CajaDetallePage";
 import { CuentasEmpresaPage } from "../modules/cuentasEmpresa/CuentasEmpresaPage";
+import { CapitalPage } from "../modules/capital/CapitalPage";
 
 
 
@@ -62,6 +63,8 @@ export function AppRoutes() {
         <Route element={<RequireRole roles={["ADMIN"]} />}>
         <Route path="/usuarios" element={<UsuariosPage />} />
         <Route path="/cuentas-empresa" element={<CuentasEmpresaPage />} />
+        {/* Capital de giros: el cuadre de todo el negocio, solo administrador (se entra desde Cuentas por Cobrar) */}
+        <Route path="/capital" element={<CapitalPage />} />
         </Route>
         {/* Panel de chats: admin y asesor. Conexión y configuración de la IA: solo admin (lo decide la página y el backend) */}
         <Route element={<RequireRole roles={["ADMIN", "ASESOR"]} />}>

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowUpRight, CircleCheckBig, HandCoins, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CircleCheckBig, HandCoins, Landmark, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
+import { Link } from "react-router-dom";
 import { cambiarGrupoCobro, getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { alAbrirWhatsApp, enlaceWhatsApp, telefonoWhatsApp } from "../../utils/whatsapp";
@@ -190,6 +191,12 @@ export function CuentasPorCobrarPagarPage() {
           </small>
         </div>
         <div className="cxc-hero-acciones">
+          {/* El cuadre de todo el negocio, con el formato del Excel: solo el administrador */}
+          {usuario?.rol === "ADMIN" && (
+            <Link to="/capital" className="cxc-btn-claro cxc-btn-capital" title="Capital de giros: el cuadre de todo el negocio">
+              <Landmark size={16} /> Capital de giros
+            </Link>
+          )}
           {puedeEditar && (
             <button type="button" className="cxc-btn-oro" onClick={() => setTransfiriendo(true)} title="Le hicimos una transferencia a alguien: se pega la captura y queda en su cuenta por cobrar">
               <ArrowUpRight size={17} /> Registrar transferencia

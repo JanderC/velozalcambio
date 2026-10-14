@@ -133,3 +133,5 @@
 @media (max-width: 720px) {
   .cxc-wa button { width: 36px; height: 36px; }
 }
+
+.cxc-btn-capital { text-decoration: none; }
