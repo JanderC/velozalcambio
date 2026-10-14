@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
-import { getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { Link } from "react-router-dom";
+import { crearCuentaCorriente, getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
@@ -90,6 +91,32 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
     const t = setTimeout(cargar, buscar ? 300 : 0);
     return () => clearTimeout(t);
   }, [cargar, buscar]);
+
+  // Cuentas Corrientes: si lo buscado no está acá pero el cliente existe en otro módulo (Cuentas por Cobrar o
+  // Confirmaciones), se dice dónde está y se le puede abrir una cuenta corriente sin volver a crearlo
+  const [enOtrosModulos, setEnOtrosModulos] = useState<CuentaCorrienteResumen[]>([]);
+  const sinResultados = modo === "corrientes" && !cargando && cuentas.length === 0 && buscar.trim().length >= 3;
+  useEffect(() => {
+    if (!sinResultados) return setEnOtrosModulos([]);
+    let vigente = true;
+    getCuentasCorrientes({ buscar })
+      .then((todas) => vigente && setEnOtrosModulos(todas.filter((c) => c.modulo !== "CORRIENTE")))
+      .catch(() => vigente && setEnOtrosModulos([]));
+    return () => {
+      vigente = false;
+    };
+  }, [sinResultados, buscar]);
+  async function abrirCuentaAqui(c: CuentaCorrienteResumen) {
+    try {
+      const nueva = await crearCuentaCorriente({ terceroId: c.tercero_id, modulo: "CORRIENTE", monedaId: c.moneda_id });
+      await cargar();
+      setSeleccionadaId(nueva.id);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  const NOMBRE_MODULO: Record<string, string> = { POR_COBRAR: "Cuentas por Cobrar", CAJA: "Confirmaciones" };
+  const RUTA_MODULO: Record<string, string> = { POR_COBRAR: "/cuentas-por-cobrar-pagar", CAJA: "/cajas-confirmaciones" };
 
   // Totales por moneda: lo que me deben y lo que debo
   const resumen = useMemo(() => {
@@ -224,13 +251,39 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
               {buscar || tipo || sentido || (canalId && modo !== "cajas")
                 ? modo === "cajas"
                   ? "No hay ningún cliente con ese dato."
-                  : "Ninguna cuenta coincide."
+                  : "Ninguna cuenta coincide en Cuentas Corrientes."
                 : enCobrar
                   ? "Nadie debe ni se le debe por ahora. Las cuentas con saldo aparecen acá solas."
                   : modo === "cajas"
                     ? "Buscá arriba por nombre, teléfono, cédula o referencia de la transferencia."
                     : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
             </p>
+          )}
+          {enOtrosModulos.length > 0 && (
+            <div className="cc-otros-modulos">
+              <p>Está registrado en otro módulo:</p>
+              <ul>
+                {enOtrosModulos.map((c) => (
+                  <li key={c.id}>
+                    <span>
+                      <b>{c.tercero_nombre}</b>
+                      <small>
+                        {NOMBRE_MODULO[c.modulo] ?? c.modulo}
+                        {c.grupo_cobro ? ` · ${c.grupo_cobro}` : ""} · {c.moneda_codigo} · saldo {formatearMonto(c.saldo_actual)}
+                      </small>
+                    </span>
+                    <span className="cc-otros-modulos-acciones">
+                      {puedeCrear && (
+                        <button type="button" onClick={() => void abrirCuentaAqui(c)} title="Le abre una cuenta en Cuentas Corrientes al mismo cliente (no se crea de nuevo; lo de allá no se toca)">
+                          Abrirle cuenta aquí
+                        </button>
+                      )}
+                      {RUTA_MODULO[c.modulo] && <Link to={RUTA_MODULO[c.modulo]!}>Ver allá</Link>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <ul className="cc-cuentas">
             {visibles.map((c) => (

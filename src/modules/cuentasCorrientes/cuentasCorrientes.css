@@ -584,3 +584,14 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
   .cc-varias-fila { grid-template-columns: 26px 1fr 1fr; }
   .cc-varias-acciones { grid-column: 2 / -1; }
 }
+
+/* Cuentas Corrientes: lo buscado está registrado en otro módulo */
+.cc-otros-modulos { margin: 0 12px 10px; padding: 10px 12px; border-radius: 10px; background: #fff8e1; border: 1px solid #f1d58a; }
+.cc-otros-modulos p { margin: 0 0 6px; font-size: 0.8rem; font-weight: 600; color: #7a5b00; }
+.cc-otros-modulos ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.cc-otros-modulos li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.cc-otros-modulos li > span:first-child { display: grid; }
+.cc-otros-modulos small { font-size: 0.74rem; color: #6b7280; }
+.cc-otros-modulos-acciones { display: inline-flex; align-items: center; gap: 8px; }
+.cc-otros-modulos-acciones button { padding: 5px 10px; border: none; border-radius: 6px; background: var(--color-navy); color: white; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.cc-otros-modulos-acciones a { font-size: 0.78rem; color: var(--color-navy); }
