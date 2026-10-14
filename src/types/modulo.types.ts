@@ -9,4 +9,6 @@ export interface ModuloConfig {
   icono: LucideIcon;
   ruta: string;
   rolesPermitidos: Rol[];
+  // oculto: no aparece en el panel de módulos ni en los favoritos (se vuelve a mostrar quitando esta marca)
+  oculto?: boolean;
 }

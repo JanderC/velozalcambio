@@ -22,7 +22,7 @@ export function Header({ mostrarVolver = true }: { mostrarVolver?: boolean }) {
   // Accesos rápidos: los favoritos que este usuario puede abrir, en el orden en que los marcó
   const accesos = favoritos
     .map((id) => MODULOS.find((m) => m.id === id))
-    .filter((m): m is (typeof MODULOS)[number] => !!m && !!usuario && m.rolesPermitidos.includes(usuario.rol));
+    .filter((m): m is (typeof MODULOS)[number] => !!m && !m.oculto && !!usuario && m.rolesPermitidos.includes(usuario.rol));
 
   return (
     <header className="app-header">

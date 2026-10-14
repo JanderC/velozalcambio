@@ -23,7 +23,7 @@ export function LauncherPage() {
   const grupos = useMemo(() => {
     if (!usuario) return [];
     const visibles = MODULOS.filter(
-      (m) => m.rolesPermitidos.includes(usuario.rol) && m.titulo.toLowerCase().includes(busqueda.toLowerCase())
+      (m) => !m.oculto && m.rolesPermitidos.includes(usuario.rol) && m.titulo.toLowerCase().includes(busqueda.toLowerCase())
     );
     // Arriba de todo, los favoritos del usuario en el orden en que los marcó
     const marcados = favoritos.map((id) => visibles.find((m) => m.id === id)).filter((m): m is (typeof MODULOS)[number] => !!m);

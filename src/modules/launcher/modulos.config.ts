@@ -199,6 +199,8 @@ export const MODULOS: ModuloConfig[] = [
     icono: PlusCircle,
     ruta: "/nueva-transaccion",
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
+    // oculto por ahora, a pedido del dueño (14/10): se vuelve a mostrar quitando esta línea
+    oculto: true,
   },
   {
     id: "whatsapp",
