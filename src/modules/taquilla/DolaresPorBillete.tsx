@@ -76,7 +76,8 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
   async function registrar(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (filas.some((f) => f.escrito.trim() && !f.cantidad)) return setError("Alguna cantidad no es un número válido.");
+    // un 0 (o vacío) en un tipo de billete es "no hay de esos": no es un error; solo lo es lo que no se entiende como número
+    if (filas.some((f) => f.escrito.trim() && leerNumero(f.escrito) === null)) return setError("Alguna cantidad no es un número válido.");
     if (!hayAlgo) return setError(`Escribí cuántos ${NOMBRE[divisa].toLowerCase()} hay de cada tipo de billete.`);
     const sinPrecio = conCantidad.find((f) => !f.subtotal);
     if (sinPrecio) return setError(`Falta el valor para los billetes ${sinPrecio.corto}.`);
