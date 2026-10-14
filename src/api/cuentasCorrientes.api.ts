@@ -306,6 +306,11 @@ export function editarMovimientoCC(movimientoId: number, cambios: { descripcion?
   return api.put<{ id: number; monto: string; cambio: string }>(`/cuentas-corrientes/movimientos/${movimientoId}`, cambios);
 }
 
+/** Confirmaciones: le paga al cliente por otro método (no pasa a taquilla), desde una cuenta de la empresa. */
+export function pagarConfirmacionOtroMetodo(movimientoId: number, cajaId: number) {
+  return api.post<{ pagado: true; cuenta: string; pagoId: number }>(`/cuentas-corrientes/movimientos/${movimientoId}/pagar-otro-metodo`, { cajaId });
+}
+
 /** Vuelve a activar un movimiento anulado (solo administradores): se quita su contrario y vuelve a contar en el saldo. */
 export function reactivarMovimientoCC(movimientoId: number) {
   return api.post<{ id: number; reactivado: true }>(`/cuentas-corrientes/movimientos/${movimientoId}/reactivar`);

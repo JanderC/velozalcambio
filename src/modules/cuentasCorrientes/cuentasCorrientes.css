@@ -534,3 +534,12 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
   .cc-reparto-fila { grid-template-columns: 1fr 1fr; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
   .cc-reparto-tasa, .cc-reparto-total { grid-column: 1 / -1; }
 }
+
+/* Confirmaciones: ¿cómo se le paga? Pasa a taquilla u otro método (desde una cuenta de la empresa) */
+.cc-pago-conf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 10px; padding: 8px 10px; border: 1px solid #e3e6ea; border-radius: 10px; background: #fafbfc; }
+.cc-pago-conf > span { font-size: 0.84rem; font-weight: 600; color: #374151; }
+.cc-pago-conf .cc-chips button { padding: 6px 12px; font-size: 0.82rem; }
+.cc-pago-conf select { padding: 6px 10px; border: 2px solid #1a7f37; border-radius: 6px; background: white; color: #166534; font: inherit; font-size: 0.86rem; font-weight: 600; }
+.cc-pago-conf small { flex-basis: 100%; font-size: 0.74rem; color: #6b7280; }
+.cc-pago-conf.otro { border-color: #b7e2c4; background: #f1faf3; }
+.cc-pago-conf.otro small { color: #166534; }

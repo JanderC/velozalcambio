@@ -23,6 +23,7 @@ import {
   type TasasRecientes,
   registrarMovimientoCC,
   reactivarMovimientoCC,
+  pagarConfirmacionOtroMetodo,
   type CuentaCorrienteResumen,
   type EstadoCuenta,
   type FilaEstadoCuenta,
@@ -30,6 +31,7 @@ import {
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
+import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
@@ -1300,6 +1302,8 @@ function FilaNueva({
   // Confirmaciones, pago repartido: lo enviado se le entrega en varias monedas (800 USD: 400 en pesos, 400 en bolívares).
   // Es una casilla chica; sin marcarla el formulario es el de siempre.
   const [repartido, setRepartido] = useState(false);
+  // Confirmaciones: pasa a taquilla (como siempre) o se le paga ya por otro método, desde una cuenta de la empresa
+  const [pago, setPago] = useState<PagoElegido>(PAGO_POR_TAQUILLA);
   const [partes, setPartes] = useState<ParteReparto[]>(() => partesIniciales("COP", "VES"));
   async function cargarComprobantes(archivos: File[]) {
     if (!archivos.length) return;
@@ -1687,6 +1691,9 @@ function FilaNueva({
       if (!seguir) return setError(`No se agregó: el total iba a quedar como ${formatearMonto(monto!)} ${codigoMonto}. Elegí la moneda correcta en "Se entrega en".`);
     }
     if (otraMoneda && !monedaEntrega) return setError(`No encuentro la moneda ${codigoMonto}.`);
+    const pagarCon = enConfirmaciones && !resta && pago.modo === "otro" ? pago : null;
+    if (pagarCon && !pagarCon.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga (o dejalo en \"Pasa a taquilla\").");
+    if (pagarCon && llevaConfirmacion && !confirmada) return setError("Para pagarla ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
     // en otra moneda y convirtiendo: sin tasa no hay cómo pasarlo a la moneda de la cuenta
     if (movEnOtraMoneda && !aparte && !conTasa) return setError(`Para convertir ${monedaMov} a ${cuenta.moneda_codigo} hace falta la cantidad y la tasa (× o ÷). Si no se quiere convertir, elegí "Llevar aparte en ${monedaMov}".`);
     if (conCaja && cajaId === "") return setError(cajaObligatoria ? "Elegí qué caja alimenta este movimiento." : "Elegí la caja o banco que también se mueve.");
@@ -1759,6 +1766,7 @@ function FilaNueva({
     const escritoMoneda = { monedaMov, aparte };
     setMonedaMov(cuenta.moneda_codigo);
     setAparte(false);
+    setPago(PAGO_POR_TAQUILLA);
     setSentidoCaja("auto");
     if (conCaja && cajaId !== "") {
       try {
@@ -1836,6 +1844,16 @@ function FilaNueva({
     cola.current = turno.catch(() => {});
     try {
       const creado = await turno;
+      // pagada por otro método: se le paga ya, desde la cuenta de la empresa elegida (no pasa a taquilla)
+      let pagadaPor: string | null = null;
+      if (pagarCon) {
+        try {
+          await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarCon.cajaId!);
+          pagadaPor = pagarCon.nombre;
+        } catch (e) {
+          setError(`La confirmación quedó registrada, pero no se pudo pagar por ${pagarCon.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);
+        }
+      }
       // la tasa queda guardada apenas se registra el movimiento, sin esperar a que suba la imagen
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
@@ -1862,7 +1880,22 @@ function FilaNueva({
         datos.estadoConfirmacion === "EN_PROCESO"
           ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso", ...envio }
           : enConfirmaciones
-          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: datos.tipo === "ABONO" ? "recibe" : "retiro", ...envio }
+          ? {
+              monto: montoConSigno.replace(/^-/, ""),
+              descripcion: datos.descripcion,
+              sentido: datos.tipo === "ABONO" ? "recibe" : "retiro",
+              ...envio,
+              // pagada en el momento: el aviso dice por dónde se le pagó
+              ...(pagadaPor
+                ? {
+                    texto: avisoDePagada(
+                      escrito.mtcn.replace(/\D/g, "").length >= 6 ? `MTCN ${escrito.mtcn.replace(/\D/g, "")}` : codigosDeReferencia(escrito.persona).join(" / "),
+                      dineroEn(montoConSigno.replace(/^-/, ""), codigoMonto),
+                      pagadaPor
+                    ),
+                  }
+                : {}),
+            }
           : datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion)
             ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, ...envio }
             : undefined
@@ -1987,6 +2020,7 @@ function FilaNueva({
       {enConfirmaciones && repartido && (
         <RepartoMonedas llega={codigoLlega} monedas={monedas} partes={partes} totalEnviado={nCantidad ? sinSigno(nCantidad) : null} onCambio={setPartes} />
       )}
+      {enConfirmaciones && !resta && !repartido && <PagoConfirmacion valor={pago} onCambio={setPago} medioNombre={medioMov.nombre} />}
       {puedeElegirEntrega && !repartido && (
         <label className={`cc-entrega-en ${otraMoneda ? "otra" : ""}`}>
           ¿Qué moneda quiere el cliente? Se entrega en

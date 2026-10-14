@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, codigosDeReferencia, crearCuentaCorriente, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarMovimientoPorNumero, codigosDeReferencia, crearCuentaCorriente, pagarConfirmacionOtroMetodo, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
+import { PAGO_POR_TAQUILLA, PagoConfirmacion, type PagoElegido } from "./PagoConfirmacion";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
 const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
@@ -140,6 +141,8 @@ export function NuevaCuentaModal({
   const [movMtcn, setMovMtcn] = useState("");
   // La confirmación es parte del movimiento: marcada entra confirmada; sin marcar, queda pendiente
   const [movConfirmada, setMovConfirmada] = useState(false);
+  // cómo se le paga: pasa a taquilla, o se le paga ya por una cuenta de la empresa
+  const [movPago, setMovPago] = useState<PagoElegido>(PAGO_POR_TAQUILLA);
   const esWestern = medio?.nombre === "WESTERN_UNION";
   // Western Union y Zelle tardan en verificarse: sus compras pueden quedar pendientes de confirmar
   const puedeQuedarPendiente = esWestern || (medio?.nombre === "ZELLE" && !movResta);
@@ -242,6 +245,9 @@ export function NuevaCuentaModal({
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre.");
     if (modo === "existente" && !tercero) return setError("Buscá y elegí a quién le abrís la cuenta.");
     if (monedaId === "") return setError("Elegí la moneda.");
+    const pagarCon = enLinea && hayMovimiento && !movResta && movPago.modo === "otro" ? movPago : null;
+    if (pagarCon && !pagarCon.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga (o dejalo en \"Pasa a taquilla\").");
+    if (pagarCon && puedeQuedarPendiente && !movConfirmada) return setError("Para pagarla ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
     if (monedaCobro && (!nTasaCobro || !/[1-9]/.test(nTasaCobro) || nTasaCobro.startsWith("-"))) return setError("Para cobrar en otra moneda escribí la tasa.");
     if (saldo.trim() && !nSaldo) return setError("El saldo inicial no es un número válido.");
     // El movimiento es opcional, pero si se empezó a llenar tiene que estar completo
@@ -339,6 +345,13 @@ export function NuevaCuentaModal({
               .then((imagen) => subirComprobanteMovimiento(creado.movimiento.id, imagen))
               .catch(() => {});
           }
+          // pagada por otro método: se le paga ya, desde la cuenta de la empresa (no pasa a taquilla)
+          const pagarYa = enLinea && !movResta && movPago.modo === "otro" && movPago.cajaId ? movPago : null;
+          if (pagarYa) {
+            await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarYa.cajaId!).catch((e) => {
+              window.alert(`El cliente y la confirmación quedaron registrados, pero no se pudo pagar por ${pagarYa.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);
+            });
+          }
         } catch (err) {
           errorMovimiento = err instanceof ApiError ? err.message : "no se pudo guardar";
         }
@@ -353,6 +366,7 @@ export function NuevaCuentaModal({
           setMovPersona("");
           setMovMtcn("");
           setMovConfirmada(false);
+          setMovPago(PAGO_POR_TAQUILLA);
           setImagenesAdjuntas([]);
           setAvisoLectura(null);
         } else {
@@ -663,6 +677,7 @@ export function NuevaCuentaModal({
                 <input value={movMtcn} onChange={(e) => setMovMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
               </label>
             )}
+            {enLinea && !movResta && <PagoConfirmacion valor={movPago} onCambio={setMovPago} medioNombre={medio?.nombre} />}
             {puedeQuedarPendiente && (
               <label className={`cc-check cc-confirmada ${movConfirmada ? "si" : ""}`}>
                 <input type="checkbox" checked={movConfirmada} onChange={(e) => setMovConfirmada(e.target.checked)} />
