@@ -86,3 +86,12 @@
   .cap-bloque.ancho { grid-column: auto; }
   .cap-historial { overflow-x: auto; }
 }
+
+/* Cuentas de bancos de la empresa */
+.cap-bloque.morado h2 { background: #6d28d9; }
+.cap-banco-accion { white-space: nowrap; text-align: right; }
+.cap-banco-accion button { padding: 6px 12px; border: none; border-radius: 6px; background: #6d28d9; color: white; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.cap-banco-accion button:disabled { opacity: 0.45; cursor: default; }
+.cap-banco-accion button.secundario { margin-left: 6px; background: white; color: #374151; border: 1px solid #cfd6e0; }
+.cap-banco-nuevo select { width: 100%; padding: 6px 8px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.86rem; background: white; }
+.cap-nota-bancos { margin: 8px 14px 12px; font-size: 0.76rem; color: #6b7280; }

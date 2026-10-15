@@ -45,6 +45,7 @@ interface Foto {
   porCobrar: { grupo: string; total: number; clientes: number }[];
   porPagarCuentas: { nombre: string; monto: number }[];
   cajas: DatosDelSistema["cajas"];
+  bancos?: NonNullable<DatosDelSistema["bancos"]>; // los cuadres viejos no las traen
   confirmaciones: DatosDelSistema["confirmacionesPorPagar"];
 }
 
@@ -138,7 +139,7 @@ export function CapitalPage() {
     const porPagarCuentas = cuentas
       .filter((c) => c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual))
       .map((c) => ({ nombre: c.tercero_nombre, monto: Math.abs(Number(enPesos(c) ?? 0)) }));
-    return { porCobrar, porPagarCuentas, cajas: sistema.cajas, confirmaciones: sistema.confirmacionesPorPagar };
+    return { porCobrar, porPagarCuentas, cajas: sistema.cajas, bancos: sistema.bancos ?? [], confirmaciones: sistema.confirmacionesPorPagar };
   }, [sistema, cuentas]);
   const foto = viendo?.foto ?? fotoActual;
   const soloLectura = !!viendo;
@@ -155,9 +156,13 @@ export function CapitalPage() {
     const cobrarFuera = suma(m.cobrarFuera);
     const porPagarCuentas = foto.porPagarCuentas.reduce((s, c) => s + c.monto, 0);
     const pagarFuera = suma(m.pagarFuera);
-    const bolivares = suma(m.bolivares);
+    // las cuentas de banco de la empresa, por moneda (el USDT cuenta como dólares)
+    const bancosEn = (codigos: string[]) => (foto.bancos ?? []).flatMap((b) => b.saldos.filter((x) => codigos.includes(x.codigo)).map((x) => Number(x.monto))).reduce((s, v) => s + v, 0);
+    const bancosCop = bancosEn(["COP"]);
+    const bancosVes = bancosEn(["VES"]);
+    const bolivares = suma(m.bolivares) + bancosVes;
     const bolivaresCop = bolivares * tasaBs;
-    const pesosCajas = foto.cajas.flatMap((c) => c.saldos.filter((x) => x.codigo === "COP").map((x) => Number(x.monto))).reduce((s, v) => s + v, 0);
+    const pesosCajas = foto.cajas.flatMap((c) => c.saldos.filter((x) => x.codigo === "COP").map((x) => Number(x.monto))).reduce((s, v) => s + v, 0) + bancosCop;
     const pesosManual = suma(m.pesos);
     // dólares y euros de las cajas, cada caja con su tasa (o la general)
     const divisasCajas = foto.cajas.flatMap((c) =>
@@ -168,6 +173,18 @@ export function CapitalPage() {
           const tasa = num(m.tasasCaja[clave]) || (x.codigo === "EUR" ? tasaEuro : tasaDolar);
           return { clave, nombre: c.nombre, codigo: x.codigo, cantidad: Number(x.monto), tasa, pesos: Number(x.monto) * tasa };
         })
+    ).concat(
+      // y los de las cuentas de banco (USDT como dólares)
+      (foto.bancos ?? []).flatMap((b) =>
+        b.saldos
+          .filter((x) => x.codigo === "USD" || x.codigo === "USDT" || x.codigo === "EUR")
+          .map((x) => {
+            const clave = `b${b.id}-${x.codigo}`;
+            const codigo = x.codigo === "EUR" ? "EUR" : "USD";
+            const tasa = num(m.tasasCaja[clave]) || (codigo === "EUR" ? tasaEuro : tasaDolar);
+            return { clave, nombre: `${b.nombre}${x.codigo === "USDT" ? " (USDT)" : ""}`, codigo, cantidad: Number(x.monto), tasa, pesos: Number(x.monto) * tasa };
+          })
+      )
     );
     const divisasFuera = m.dolaresFuera.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
     const porPagarUsd = m.dolaresPorPagar.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
@@ -256,6 +273,48 @@ export function CapitalPage() {
       setError(e instanceof ApiError ? e.message : "No se pudo guardar el cuadre.");
     } finally {
       setGuardando(false);
+    }
+  }
+
+  // ---------- Cuentas de banco: agregar una y cargarle el saldo real ----------
+  const [nuevoBanco, setNuevoBanco] = useState<{ nombre: string; moneda: string } | null>(null);
+  const [saldosReales, setSaldosReales] = useState<Record<string, string>>({});
+  const [cargandoBanco, setCargandoBanco] = useState<string | null>(null);
+  async function recargarSistema() {
+    try {
+      setSistema(await capitalApi.sistema());
+    } catch {
+      // si falla, queda lo que había
+    }
+  }
+  async function agregarBanco() {
+    if (!nuevoBanco || nuevoBanco.nombre.trim().length < 2) return setError("Escribí el nombre de la cuenta (ej. Banesco, Mercantil, Nequi 2).");
+    try {
+      await capitalApi.crearBanco(nuevoBanco.nombre.trim(), nuevoBanco.moneda);
+      setNuevoBanco(null);
+      setError(null);
+      await recargarSistema();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo crear la cuenta.");
+    }
+  }
+  async function cargarSaldo(bancoId: number, moneda: string) {
+    const clave = `${bancoId}-${moneda}`;
+    const escrito = saldosReales[clave] ?? "";
+    const valor = escrito.trim() ? leerNumero(escrito) : null;
+    if (valor === null) return setError("Escribí el saldo real de la cuenta.");
+    setCargandoBanco(clave);
+    try {
+      const r = await capitalApi.cargarSaldoBanco(bancoId, moneda, valor);
+      setSaldosReales((s) => ({ ...s, [clave]: "" }));
+      setError(null);
+      setAviso(`${r.cuenta}: saldo cargado (${conDecimales(Number(r.antes))} → ${conDecimales(Number(r.ahora))} ${moneda}).`);
+      setTimeout(() => setAviso(null), 6000);
+      await recargarSistema();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo cargar el saldo.");
+    } finally {
+      setCargandoBanco(null);
     }
   }
 
@@ -511,6 +570,100 @@ export function CapitalPage() {
             </label>
           </section>
 
+          {/* ---------- Cuentas de bancos de la empresa ---------- */}
+          <section className="cap-bloque morado ancho">
+            <h2>Cuentas de bancos</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cuenta</th>
+                  <th className="num">En el sistema</th>
+                  <th className="num">{soloLectura ? "" : "Saldo real"}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {(foto.bancos ?? []).map((b) => {
+                  const moneda = b.moneda ?? "COP";
+                  const clave = `${b.id}-${moneda}`;
+                  const enSistema = Number(b.saldos.find((x) => x.codigo === moneda)?.monto ?? 0);
+                  const otras = b.saldos.filter((x) => x.codigo !== moneda);
+                  return (
+                    <tr key={b.id}>
+                      <td>
+                        {b.nombre} <small>{moneda}</small>
+                        {otras.length > 0 && <small> · también {otras.map((x) => `${conDecimales(Number(x.monto))} ${x.codigo}`).join(", ")}</small>}
+                      </td>
+                      <td className="num">{moneda === "COP" ? pesos(enSistema) : `${conDecimales(enSistema)} ${moneda}`}</td>
+                      <td className="num">
+                        {!soloLectura && (
+                          <input
+                            value={saldosReales[clave] ?? ""}
+                            onChange={(e) => setSaldosReales((s) => ({ ...s, [clave]: conPuntos(e.target.value) }))}
+                            inputMode="decimal"
+                            placeholder="lo que tiene hoy"
+                            aria-label={`Saldo real de ${b.nombre}`}
+                          />
+                        )}
+                      </td>
+                      <td className="cap-banco-accion">
+                        {!soloLectura && (
+                          <button type="button" onClick={() => void cargarSaldo(b.id, moneda)} disabled={!saldosReales[clave]?.trim() || cargandoBanco === clave} title="Deja la cuenta con ese saldo: la diferencia queda anotada como un movimiento de esa cuenta">
+                            {cargandoBanco === clave ? "…" : "Cargar"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {(foto.bancos ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="cap-vacio">
+                      Todavía no hay cuentas de banco.
+                    </td>
+                  </tr>
+                )}
+                {!soloLectura &&
+                  (nuevoBanco ? (
+                    <tr className="cap-banco-nuevo">
+                      <td>
+                        <input value={nuevoBanco.nombre} onChange={(e) => setNuevoBanco({ ...nuevoBanco, nombre: e.target.value })} placeholder="Nombre (ej. Banesco)" autoFocus aria-label="Nombre de la cuenta" />
+                      </td>
+                      <td>
+                        <select value={nuevoBanco.moneda} onChange={(e) => setNuevoBanco({ ...nuevoBanco, moneda: e.target.value })} aria-label="Moneda de la cuenta">
+                          <option value="COP">Pesos (COP)</option>
+                          <option value="VES">Bolívares (VES)</option>
+                          <option value="USD">Dólares (USD)</option>
+                          <option value="USDT">USDT</option>
+                          <option value="EUR">Euros (EUR)</option>
+                        </select>
+                      </td>
+                      <td className="cap-banco-accion" colSpan={2}>
+                        <button type="button" onClick={() => void agregarBanco()}>
+                          Crear
+                        </button>
+                        <button type="button" className="secundario" onClick={() => setNuevoBanco(null)}>
+                          Cancelar
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr className="cap-agregar">
+                      <td colSpan={4}>
+                        <button type="button" onClick={() => setNuevoBanco({ nombre: "", moneda: "COP" })}>
+                          <Plus size={13} /> Agregar cuenta de banco
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+            <p className="cap-nota-bancos">
+              Se carga lo que cada cuenta tiene hoy y desde ahí el sistema la lleva: las confirmaciones pagadas por otro método salen de ahí. Lo de cada cuenta
+              entra solo en Pesos, Bolívares o Dólares según su moneda.
+            </p>
+          </section>
+
           {/* ---------- Bolívares ---------- */}
           <section className="cap-bloque magenta">
             <h2>Bolívares</h2>
@@ -522,7 +675,22 @@ export function CapitalPage() {
                   <th />
                 </tr>
               </thead>
-              <tbody>{tablaFilas("bolivares", "Banco o persona", "Bolívares", true)}</tbody>
+              <tbody>
+                {(foto.bancos ?? []).flatMap((b) =>
+                  b.saldos
+                    .filter((x) => x.codigo === "VES")
+                    .map((x) => (
+                      <tr key={`b${b.id}-ves`} className="cap-auto">
+                        <td>
+                          {b.nombre} <small>cuenta de banco</small>
+                        </td>
+                        <td className="num">{conDecimales(Number(x.monto))}</td>
+                        <td />
+                      </tr>
+                    ))
+                )}
+                {tablaFilas("bolivares", "Banco o persona", "Bolívares", true)}
+              </tbody>
               <tfoot>
                 <tr>
                   <td>Total bolívares</td>
@@ -557,6 +725,19 @@ export function CapitalPage() {
                       <tr key={`${c.id}-cop`} className="cap-auto">
                         <td>
                           {c.nombre} <small>del sistema</small>
+                        </td>
+                        <td className="num">{pesos(Number(x.monto))}</td>
+                        <td />
+                      </tr>
+                    ))
+                )}
+                {(foto.bancos ?? []).flatMap((b) =>
+                  b.saldos
+                    .filter((x) => x.codigo === "COP")
+                    .map((x) => (
+                      <tr key={`b${b.id}-cop`} className="cap-auto">
+                        <td>
+                          {b.nombre} <small>cuenta de banco</small>
                         </td>
                         <td className="num">{pesos(Number(x.monto))}</td>
                         <td />
