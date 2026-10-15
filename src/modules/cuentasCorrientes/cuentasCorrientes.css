@@ -595,3 +595,12 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-otros-modulos-acciones { display: inline-flex; align-items: center; gap: 8px; }
 .cc-otros-modulos-acciones button { padding: 5px 10px; border: none; border-radius: 6px; background: var(--color-navy); color: white; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
 .cc-otros-modulos-acciones a { font-size: 0.78rem; color: var(--color-navy); }
+
+/* Mover un movimiento a otro cliente */
+.cc-mover-lista { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 10px; }
+.cc-mover-lista li + li { border-top: 1px solid #f0f2f5; }
+.cc-mover-lista button { display: flex; width: 100%; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 12px; border: none; background: white; font: inherit; text-align: left; cursor: pointer; }
+.cc-mover-lista button:hover { background: #f5f7fb; }
+.cc-mover-lista button.activo { background: #e8eefb; font-weight: 600; }
+.cc-mover-lista small { color: #6b7280; font-size: 0.76rem; white-space: nowrap; }
+.cc-mover-vacio { padding: 10px 12px; color: #8a93a3; font-size: 0.86rem; }

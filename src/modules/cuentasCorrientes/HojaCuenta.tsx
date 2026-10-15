@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -34,6 +34,7 @@ import {
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
+import { MoverMovimientoModal } from "./MoverMovimientoModal";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
 import { VariasTransferencias, calcularResumen, transferenciaVacia, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
@@ -166,6 +167,7 @@ export function HojaCuenta({
   // Corregir un movimiento mal cargado: solo el administrador, en Cuentas Corrientes y Cuentas por Cobrar
   const puedeEditarMovimientos = usuario?.rol === "ADMIN" && cuenta.modulo !== "CAJA";
   const [movimientoEditado, setMovimientoEditado] = useState<FilaEstadoCuenta | null>(null);
+  const [movimientoMovido, setMovimientoMovido] = useState<FilaEstadoCuenta | null>(null); // el que se pasa a otro cliente
   // los movimientos armados con varias transferencias que tienen el desglose abierto
   const [desglosados, setDesglosados] = useState<Set<number>>(new Set());
   async function verCapturaTransferencia(t: TransferenciaFila) {
@@ -868,6 +870,18 @@ export function HojaCuenta({
           }}
         />
       )}
+      {movimientoMovido && (
+        <MoverMovimientoModal
+          movimiento={movimientoMovido}
+          cuenta={cuenta}
+          onCerrar={() => setMovimientoMovido(null)}
+          onMovido={() => {
+            setMovimientoMovido(null);
+            void cargar();
+            onActualizar();
+          }}
+        />
+      )}
       {imagenComprobante && (
         <Modal titulo="Comprobante" ancho="ancho" onCerrar={() => setImagenComprobante(null)}>
           <div className="cc-reporte">
@@ -1153,6 +1167,11 @@ export function HojaCuenta({
                       title={m.anulado ? "Está anulado: se reactiva y se edita" : "Editar este movimiento (corrige el saldo)"}
                     >
                       <Pencil size={14} />
+                    </button>
+                  )}
+                  {puedeEditarMovimientos && !m.anulado && !m.reverso_de_id && !m.pagado_en && (
+                    <button onClick={() => setMovimientoMovido(m)} aria-label={`Mover ${m.descripcion ?? m.tipo} a otro cliente`} title="Se cargó en el cliente equivocado: pasarlo a la cuenta que era">
+                      <ArrowRightLeft size={14} />
                     </button>
                   )}
                   {puedeEditarMovimientos && m.anulado && !m.reverso_de_id && (

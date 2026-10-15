@@ -333,6 +333,11 @@ export function pagarConfirmacionOtroMetodo(movimientoId: number, cajaId: number
 }
 
 /** Vuelve a activar un movimiento anulado (solo administradores): se quita su contrario y vuelve a contar en el saldo. */
+/** Pasa un movimiento cargado en el cliente equivocado a otra cuenta (mismo módulo y moneda). Solo administradores. */
+export function moverMovimientoCC(movimientoId: number, cuentaId: number) {
+  return api.post<{ id: number; de: string; a: string }>(`/cuentas-corrientes/movimientos/${movimientoId}/mover`, { cuentaId });
+}
+
 export function reactivarMovimientoCC(movimientoId: number) {
   return api.post<{ id: number; reactivado: true }>(`/cuentas-corrientes/movimientos/${movimientoId}/reactivar`);
 }
