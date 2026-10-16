@@ -616,3 +616,7 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-existente-acciones button { padding: 6px 11px; border: none; border-radius: 7px; background: var(--color-navy); color: white; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
 .cc-existente-acciones button.secundario { background: white; color: #374151; border: 1px solid #cfd6e0; font-weight: 500; }
 .cc-existente-nota { font-size: 0.76rem; color: #7a5b00; }
+
+/* Pago repartido: la parte con comisión */
+.cc-reparto-total small { font-size: 0.74rem; font-weight: 500; color: #6b7280; }
+.cc-reparto-total small.cc-reparto-error { color: #b3261e; }

@@ -1860,7 +1860,12 @@ function FilaNueva({
             (c.tasa && p.operador === "÷" ? ` (${formatearMonto(c.cantidad!)} ${codigoLlega} a ${formatearMonto(c.tasa)})` : "") +
             `${SEPARADOR_PERSONA}parte ${i + 1} de ${partes.length}`,
           fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
-          ...(c.tasa && p.operador === "x" ? { cantidadBase: `${signo}${c.cantidad!}`, tasa: c.tasa } : { monto: `${signo}${c.total!}` }),
+          ...(c.tasa && p.operador === "x"
+            ? { cantidadBase: `${signo}${c.cantidad!}`, tasa: c.tasa }
+            : c.tasa && p.operador === "%"
+              ? // comisión: lo enviado menos el %, como un movimiento con comisión de siempre
+                { cantidadBase: `${signo}${c.cantidad!}`, tasa: factorDeComision(c.tasa, false), tasaEsPorcentaje: true, comisionDescontada: true, comisionIncluida: false }
+              : { monto: `${signo}${c.total!}` }),
           cuentaDestino: cuentaDestino.trim() || undefined,
           ...(llevaConfirmacion
             ? { estadoConfirmacion: confirmada ? ("CONFIRMADA" as const) : ("EN_PROCESO" as const) }
