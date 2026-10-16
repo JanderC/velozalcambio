@@ -5,6 +5,8 @@ import { useAuth } from "../../auth/useAuth";
 import { Link } from "react-router-dom";
 import { crearCuentaCorriente, getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
+import { actualizarTercero, type TipoTercero } from "../../api/terceros.api";
+import { ApiError } from "../../api/client";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
@@ -70,6 +72,18 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   const [error, setError] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
   const [personalizando, setPersonalizando] = useState(false);
+
+  // Qué es el cliente (proveedor, cliente, eventual…): se cambia ahí mismo en la lista
+  async function cambiarTipo(c: CuentaCorrienteResumen, nuevo: TipoTercero) {
+    try {
+      await actualizarTercero(c.tercero_id, { tipo: nuevo });
+      setCuentas((lista) => lista.map((x) => (x.tercero_id === c.tercero_id ? { ...x, tercero_tipo: nuevo } : x)));
+      // con un filtro puesto (ej. Proveedores), el que cambió puede dejar de ir en la lista
+      if (tipo) void cargar();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo cambiar qué es el cliente.");
+    }
+  }
 
   useEffect(() => {
     getCanales().then(setCanales).catch(() => setCanales([]));
@@ -289,7 +303,19 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           <ul className="cc-cuentas">
             {visibles.map((c) => (
               <li key={c.id}>
-                <button className={seleccionadaId === c.id ? "activa" : ""} onClick={() => setSeleccionadaId(c.id)}>
+                {/* la fila es un div (no un botón) para que el selector de qué es el cliente funcione adentro */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`cc-fila-cuenta ${seleccionadaId === c.id ? "activa" : ""}`}
+                  onClick={() => setSeleccionadaId(c.id)}
+                  onKeyDown={(e) => {
+                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      setSeleccionadaId(c.id);
+                    }
+                  }}
+                >
                   <span className="cc-cuenta-nombre">
                     {c.tercero_nombre}
                     {c.estado !== "DISPONIBLE" && <span className={`cc-estado-badge cc-estado-${c.estado.toLowerCase()}`}>{c.estado.toLowerCase()}</span>}
@@ -297,7 +323,33 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   </span>
                   <span className={`cc-cuenta-saldo ${yoDebo(c) ? "cc-neg" : ""}`}>{montoTexto(c.modulo === "CAJA" ? c.saldo_actual.replace(/^-/, "") : c.saldo_actual, c.moneda_codigo)}</span>
                   <span className="cc-cuenta-detalle">
-                    {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : c.tercero_tipo === "AMIGO" ? "Amigo" : c.tercero_tipo === "EVENTUAL" ? "Eventual" : "Mixto"}
+                    {puedeCrear && !enConfirmaciones ? (
+                      <select
+                        className="cc-tipo-rapido"
+                        value={c.tercero_tipo}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onChange={(e) => void cambiarTipo(c, e.target.value as TipoTercero)}
+                        aria-label={`Qué es ${c.tercero_nombre}`}
+                        title="Cambiar qué es: proveedor, cliente, eventual…"
+                      >
+                        <option value="PROVEEDOR">Proveedor</option>
+                        <option value="CLIENTE">Cliente</option>
+                        <option value="EVENTUAL">Eventual</option>
+                        <option value="AMIGO">Amigo</option>
+                        <option value="MIXTO">Mixto</option>
+                      </select>
+                    ) : c.tercero_tipo === "PROVEEDOR" ? (
+                      "Proveedor"
+                    ) : c.tercero_tipo === "CLIENTE" ? (
+                      "Cliente"
+                    ) : c.tercero_tipo === "AMIGO" ? (
+                      "Amigo"
+                    ) : c.tercero_tipo === "EVENTUAL" ? (
+                      "Eventual"
+                    ) : (
+                      "Mixto"
+                    )}
                     {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
                     {enConfirmaciones && c.tercero_telefono ? ` · ${c.tercero_telefono}` : ""}
                     {enConfirmaciones && c.tercero_identificacion ? ` · CC ${c.tercero_identificacion}` : ""}
@@ -330,7 +382,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                       Hoy: {c.modulo === "CAJA" ? "le compramos" : "le vendí"} <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · {c.modulo === "CAJA" ? "le vendimos" : "me vendió o abonó"} <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>
                     </span>
                   )}
-                </button>
+                </div>
               </li>
             ))}
           </ul>
