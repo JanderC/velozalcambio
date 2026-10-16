@@ -1544,7 +1544,8 @@ function FilaNueva({
     getCajas()
       .then((lista) => {
         setCajas(lista);
-        // La última caja usada viene elegida, igual que la tasa
+        // La última caja usada viene elegida, igual que la tasa (en Cuentas por Cobrar no: se elige cada vez)
+        if (cuenta.modulo === "POR_COBRAR") return;
         try {
           const ultima = Number(localStorage.getItem(CLAVE_ULTIMA_CAJA));
           if (lista.some((c) => c.id === ultima)) setCajaId((actual) => (actual === "" ? ultima : actual));
@@ -1556,7 +1557,7 @@ function FilaNueva({
     getMonedas()
       .then(setMonedas)
       .catch(() => setMonedas([]));
-  }, [conCaja, cajas.length]);
+  }, [conCaja, cajas.length, cuenta.modulo]);
 
   const nCantidad = cantidad.trim() ? leerNumero(cantidad) : null;
   // Lo escrito en la casilla (ej. "3" si es comisión) y el multiplicador que se guarda (3% -> "0.03")

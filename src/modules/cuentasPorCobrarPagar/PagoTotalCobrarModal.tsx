@@ -7,7 +7,6 @@ import { dinero } from "./cobrar";
 
 const METODOS = ["Efectivo", "Bancolombia", "Nequi", "Zelle", "Daviplata", "Otro"];
 const SIN_CAJA = "ninguna";
-const CLAVE_ULTIMA_CAJA = "cxc-pago-ultima-caja";
 // Las cajas manejan efectivo en estas monedas
 const MONEDAS_DE_CAJA = ["COP", "USD", "EUR"];
 const GRUPOS: { tipo: Caja["tipo"]; titulo: string }[] = [
@@ -35,17 +34,8 @@ export function PagoTotalCobrarModal({ cuenta, onPagado, onCerrar }: { cuenta: C
   useEffect(() => {
     if (!cajaPuede) return;
     getCajas()
-      .then((lista) => {
-        const activas = lista.filter((c) => c.activo);
-        setCajas(activas);
-        // viene elegida la última usada, si sigue existiendo
-        try {
-          const ultima = localStorage.getItem(CLAVE_ULTIMA_CAJA) ?? "";
-          if (ultima === SIN_CAJA || activas.some((c) => String(c.id) === ultima)) setDestino((actual) => actual || ultima);
-        } catch {
-          // sin almacenamiento: se elige a mano
-        }
-      })
+      // no viene nada elegido: venía la última caja usada y pagos que no entraban a ninguna terminaban en la taquilla
+      .then((lista) => setCajas(lista.filter((c) => c.activo)))
       .catch(() => setCajas([]));
   }, [cajaPuede]);
 
@@ -71,11 +61,6 @@ export function PagoTotalCobrarModal({ cuenta, onPagado, onCerrar }: { cuenta: C
         // ...y esa misma plata entra a la caja elegida
         ...(cajaElegida ? { cajaId: cajaElegida.id, montoCaja: cuenta.saldo_actual, monedaCajaId: cuenta.moneda_id } : {}),
       });
-      try {
-        if (destino) localStorage.setItem(CLAVE_ULTIMA_CAJA, destino);
-      } catch {
-        // no es grave: solo no se recuerda
-      }
       onPagado();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar el pago.");
