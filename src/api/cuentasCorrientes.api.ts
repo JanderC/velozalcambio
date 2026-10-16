@@ -36,7 +36,7 @@ export interface CuentaCorrienteResumen {
   moneda_codigo: string;
   saldo_actual: string;
   estado: "DISPONIBLE" | "BLOQUEADA" | "CERRADA";
-  tercero_tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO";
+  tercero_tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO" | "EVENTUAL";
   moneda_decimales: number;
   ultimo_movimiento: string | null;
   // Lo de hoy: lo que le vendí (positivo) y lo que me vendió o abonó (negativo)
@@ -142,7 +142,7 @@ export function actualizarCanal(id: number, cambios: { nombre?: string; activo?:
 
 export function crearCuentaCorriente(data: {
   terceroId?: number;
-  nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO"; telefono?: string; identificacion?: string };
+  nuevoTercero?: { nombre: string; tipo: "CLIENTE" | "PROVEEDOR" | "MIXTO" | "AMIGO" | "EVENTUAL"; telefono?: string; identificacion?: string };
   canalId?: number; // sin banco: no es obligatorio
   modulo?: ModuloCuenta;
   referencia?: string;

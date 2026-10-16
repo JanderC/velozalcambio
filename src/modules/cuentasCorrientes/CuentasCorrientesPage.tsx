@@ -16,6 +16,7 @@ const TIPOS: { valor: string; etiqueta: string }[] = [
   { valor: "PROVEEDOR", etiqueta: "Proveedores" },
   { valor: "CLIENTE", etiqueta: "Clientes" },
   { valor: "AMIGO", etiqueta: "Amigos" },
+  { valor: "EVENTUAL", etiqueta: "Eventuales" },
 ];
 
 // En Confirmaciones los filtros son los bancos o medios por donde llega la plata, en este orden
@@ -296,7 +297,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   </span>
                   <span className={`cc-cuenta-saldo ${yoDebo(c) ? "cc-neg" : ""}`}>{montoTexto(c.modulo === "CAJA" ? c.saldo_actual.replace(/^-/, "") : c.saldo_actual, c.moneda_codigo)}</span>
                   <span className="cc-cuenta-detalle">
-                    {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : c.tercero_tipo === "AMIGO" ? "Amigo" : "Mixto"}
+                    {c.tercero_tipo === "PROVEEDOR" ? "Proveedor" : c.tercero_tipo === "CLIENTE" ? "Cliente" : c.tercero_tipo === "AMIGO" ? "Amigo" : c.tercero_tipo === "EVENTUAL" ? "Eventual" : "Mixto"}
                     {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
                     {enConfirmaciones && c.tercero_telefono ? ` · ${c.tercero_telefono}` : ""}
                     {enConfirmaciones && c.tercero_identificacion ? ` · CC ${c.tercero_identificacion}` : ""}

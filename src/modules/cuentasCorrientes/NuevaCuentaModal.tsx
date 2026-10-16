@@ -42,7 +42,7 @@ export function NuevaCuentaModal({
 }) {
   const [modo, setModo] = useState<"nuevo" | "existente">("nuevo");
   const [nombre, setNombre] = useState("");
-  const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO">(modulo === "CAJA" ? "CLIENTE" : "PROVEEDOR");
+  const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO" | "EVENTUAL">(modulo === "CAJA" ? "CLIENTE" : "PROVEEDOR");
   const [referencia, setReferencia] = useState(""); // dato libre del cliente (Confirmaciones)
   const [cedula, setCedula] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -429,6 +429,7 @@ export function NuevaCuentaModal({
                     <option value="CLIENTE">Cliente</option>
                     <option value="MIXTO">Cliente y proveedor</option>
                     <option value="AMIGO">Amigo</option>
+                    <option value="EVENTUAL">Cliente eventual</option>
                   </select>
                 </label>
               )}

@@ -52,7 +52,7 @@ function esSeccion(valor: string | null): valor is SeccionId {
   return SECCIONES.some((s) => s.id === valor);
 }
 
-const TIPO_TERCERO_LABEL: Record<TipoTercero, string> = { CLIENTE: "Cliente", PROVEEDOR: "Proveedor", MIXTO: "Mixto", AMIGO: "Amigo" };
+const TIPO_TERCERO_LABEL: Record<TipoTercero, string> = { CLIENTE: "Cliente", PROVEEDOR: "Proveedor", MIXTO: "Mixto", AMIGO: "Amigo", EVENTUAL: "Eventual" };
 
 export function ClienteFichaPage() {
   const { id } = useParams();
@@ -391,7 +391,7 @@ function TablaDeuda({
   );
 }
 
-const TIPOS_TERCERO: TipoTercero[] = ["CLIENTE", "PROVEEDOR", "MIXTO", "AMIGO"];
+const TIPOS_TERCERO: TipoTercero[] = ["CLIENTE", "PROVEEDOR", "MIXTO", "AMIGO", "EVENTUAL"];
 
 function esTipoTercero(valor: string): valor is TipoTercero {
   return TIPOS_TERCERO.some((t) => t === valor);

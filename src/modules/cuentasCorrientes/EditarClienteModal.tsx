@@ -1,14 +1,15 @@
 import { useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
-import { actualizarTercero } from "../../api/terceros.api";
+import { actualizarTercero, type TipoTercero } from "../../api/terceros.api";
 import { ApiError } from "../../api/client";
 import type { CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 
-/** Corregir o completar los datos del cliente de la cuenta: nombre, teléfono y cédula. */
+/** Corregir o completar los datos del cliente de la cuenta: nombre, qué es (cliente, eventual…), teléfono y cédula. */
 export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: CuentaCorrienteResumen; onGuardado: () => void; onCerrar: () => void }) {
   const [nombre, setNombre] = useState(cuenta.tercero_nombre);
   const [telefono, setTelefono] = useState(cuenta.tercero_telefono ?? "");
   const [cedula, setCedula] = useState(cuenta.tercero_identificacion ?? "");
+  const [tipo, setTipo] = useState<TipoTercero>(cuenta.tercero_tipo);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +20,7 @@ export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: C
     setEnviando(true);
     try {
       // la cédula es única en el sistema: vacía no se manda (no se puede dejar en blanco dos veces)
-      await actualizarTercero(cuenta.tercero_id, { nombre: nombre.trim(), telefono: telefono.trim(), identificacion: cedula.trim() || undefined });
+      await actualizarTercero(cuenta.tercero_id, { nombre: nombre.trim(), tipo, telefono: telefono.trim(), identificacion: cedula.trim() || undefined });
       onGuardado();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudieron guardar los datos.");
@@ -34,6 +35,16 @@ export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: C
         <label>
           Nombre
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+        </label>
+        <label>
+          Es
+          <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoTercero)}>
+            <option value="CLIENTE">Cliente</option>
+            <option value="EVENTUAL">Cliente eventual</option>
+            <option value="PROVEEDOR">Proveedor</option>
+            <option value="MIXTO">Cliente y proveedor</option>
+            <option value="AMIGO">Amigo</option>
+          </select>
         </label>
         <label>
           Número de teléfono
