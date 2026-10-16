@@ -43,6 +43,8 @@ export function calcularParte(p: ParteReparto, llega: string): { cantidad: strin
     if (p.moneda !== llega) return { cantidad, tasa: null, total: null, error: `Falta la tasa para pasar ${llega} a ${p.moneda}.` };
     return { cantidad, tasa: null, total: cantidad, error: null };
   }
+  // misma moneda que llegó con tasa: no hay nada que convertir (3 × 116.000 daría $348.000): es comisión o nada
+  if (p.moneda === llega) return { cantidad, tasa, total: null, error: `La parte en ${llega} se entrega en la misma moneda que llegó: no lleva tasa. Para descontar la comisión usá % Comisión.` };
   const total = p.operador === "÷" ? dividirDecimales(cantidad, tasa, decimales) : multiplicarDecimales(cantidad, tasa, decimales);
   if (!total || !/[1-9]/.test(total)) return { cantidad, tasa, total: null, error: `La parte en ${p.moneda} da cero: revisá la cantidad y la tasa.` };
   return { cantidad, tasa, total, error: null };
@@ -118,7 +120,7 @@ export function RepartoMonedas({
             <output className="cc-reparto-total" title={c.error ?? undefined}>
               {c.total ? `= ${dineroEn(c.total, p.moneda)}` : "= —"}
               {p.operador === "%" && c.total && c.tasa && <small> (− {formatearMonto(c.tasa)}%)</small>}
-              {p.operador === "%" && p.moneda !== llega && <small className="cc-reparto-error"> se entrega en {llega}</small>}
+              {!c.total && c.error && p.tasa.trim() && <small className="cc-reparto-error"> {c.error}</small>}
             </output>
             <span className="cc-reparto-acciones">
               {resto && /[1-9]/.test(resto) && !resto.startsWith("-") && !p.cantidad.trim() && (
