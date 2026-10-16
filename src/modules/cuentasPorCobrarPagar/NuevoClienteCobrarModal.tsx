@@ -5,6 +5,8 @@ import { crearCuentaCorriente, registrarMovimientoCC, type CuentaCorrienteResume
 import type { Moneda } from "../../api/monedas.api";
 import { formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
 import { SIN_GRUPO, dinero } from "./cobrar";
+import { AvisoClienteExistente, useClienteExistente } from "../cuentasCorrientes/ClienteExistente";
+import type { ClienteExistente } from "../../api/cuentasCorrientes.api";
 
 const NUEVO = "__nuevo__";
 
@@ -40,6 +42,9 @@ export function NuevoClienteCobrarModal({
   const elegibles = grupos.filter((g) => g !== SIN_GRUPO);
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
+  // el cliente ya estaba en el sistema (en otro módulo): se usa ese, no se crea otro
+  const [existente, setExistente] = useState<ClienteExistente | null>(null);
+  const existentes = useClienteExistente(nombre, telefono, !existente);
   const [grupo, setGrupo] = useState(elegibles.includes(grupoInicial) ? grupoInicial : (elegibles[0] ?? NUEVO));
   const [grupoNuevo, setGrupoNuevo] = useState("");
   const cop = monedas.find((m) => m.codigo === "COP");
@@ -60,7 +65,7 @@ export function NuevoClienteCobrarModal({
     e.preventDefault();
     setError(null);
     const grupoFinal = grupo === NUEVO ? grupoNuevo.trim() : grupo;
-    if (nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
+    if (!existente && nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
     if (!grupoFinal) return setError("Escribí el nombre del grupo nuevo.");
     if (!cop) return setError("No se pudo cargar la moneda. Cerrá y volvé a abrir.");
     if (conMovimiento) {
@@ -69,15 +74,24 @@ export function NuevoClienteCobrarModal({
     }
     setEnviando(true);
     try {
-      const cuenta = await crearCuentaCorriente({
-        nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE", telefono: telefono.trim() || undefined },
-        modulo: "POR_COBRAR",
+      const datos = {
+        ...(existente
+          ? { terceroId: existente.id, usarExistente: true }
+          : { nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE" as const, telefono: telefono.trim() || undefined } }),
+        modulo: "POR_COBRAR" as const,
         grupoCobro: grupoFinal,
         monedaId: cop.id,
+      };
+      const cuenta = await crearCuentaCorriente(datos).catch((err) => {
+        // ya hay un cliente con ese nombre (en otro módulo): ¿es el mismo?
+        if (!(err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
+        if (!window.confirm(`Ya hay un cliente llamado "${nombre.trim()}" en el sistema.\n\n¿Es la misma persona? Aceptar: se usa ese cliente y se le abre su cuenta aquí.\nCancelar: no se registra nada (si es otra persona, escribí el nombre distinto).`)) throw err;
+        return crearCuentaCorriente({ ...datos, usarExistente: true });
       });
       if (conMovimiento && total) {
         try {
           await registrarMovimientoCC({
+            cuentaId: cuenta.id,
             terceroId: cuenta.tercero_id,
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
@@ -101,14 +115,26 @@ export function NuevoClienteCobrarModal({
   return (
     <Modal titulo="Nuevo cliente por cobrar" onCerrar={onCerrar}>
       <form className="cc-modal cxc-form" onSubmit={guardar}>
-        <label>
-          Nombre del cliente
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="ej. Pedro Pablo" autoComplete="off" autoFocus />
-        </label>
-        <label>
-          Teléfono (para enviarle el saldo por WhatsApp)
-          <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="ej. 314 349 8481" inputMode="tel" autoComplete="off" />
-        </label>
+        {existente ? (
+          <p className="cc-elegido">
+            <strong>{existente.nombre}</strong> · {existente.telefono ? `${existente.telefono} · ` : ""}ya está en el sistema: se le abre su cuenta aquí
+            <button type="button" onClick={() => setExistente(null)}>
+              Cambiar
+            </button>
+          </p>
+        ) : (
+          <>
+            <label>
+              Nombre del cliente
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="ej. Pedro Pablo" autoComplete="off" autoFocus />
+            </label>
+            <label>
+              Teléfono (para enviarle el saldo por WhatsApp)
+              <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="ej. 314 349 8481" inputMode="tel" autoComplete="off" />
+            </label>
+            <AvisoClienteExistente lista={existentes.lista} modulo="POR_COBRAR" onDescartar={existentes.descartar} onUsar={setExistente} />
+          </>
+        )}
         <label>
           Grupo
           <select value={grupo} onChange={(e) => setGrupo(e.target.value)}>

@@ -109,6 +109,7 @@ export function PagoTotalCobrarModal({ cuenta, onPagado, onCerrar }: { cuenta: C
         const como = metodo === "Efectivo" ? "en efectivo" : `por ${metodo}`;
         const titulo = !varios ? `Pago total ${como}` : completo ? `Pago total · parte ${i + 1} de ${partes.length} ${como}` : `Abono ${como}`;
         await registrarMovimientoCC({
+          cuentaId: cuenta.id,
           terceroId: cuenta.tercero_id,
           canalId: cuenta.canal_id,
           monedaId: cuenta.moneda_id,

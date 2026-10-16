@@ -7,6 +7,7 @@ import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
+import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, type PagoElegido } from "./PagoConfirmacion";
 
@@ -75,6 +76,9 @@ export function NuevaCuentaModal({
     }, 300);
     return () => clearTimeout(t);
   }, [busqueda, modo]);
+
+  // ¿Ya existe en el sistema (en cualquier módulo)? El cliente es uno solo: se ofrece traerlo en vez de crear otro
+  const existentes = useClienteExistente(nombre, telefono, modo === "nuevo");
 
   // Lo escrito a mano manda sobre lo que viene de la búsqueda
   const tocado = useRef({ nombre: false, telefono: false, cedula: false });
@@ -282,7 +286,7 @@ export function NuevaCuentaModal({
         }
       }
       const datosCuenta = {
-        ...(modo === "existente" ? { terceroId: tercero!.id } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
+        ...(modo === "existente" ? { terceroId: tercero!.id, usarExistente: true } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
         canalId: enLinea ? medio?.id : canalId === "" ? undefined : canalId,
         modulo,
         referencia: referencia.trim() || undefined,
@@ -295,7 +299,7 @@ export function NuevaCuentaModal({
       const cuenta = await crearCuentaCorriente(datosCuenta).catch((err) => {
         // Confirmaciones: el cliente ya existe (quizás con otro medio, y por eso no salía en la lista filtrada).
         // Se pregunta si es el mismo y, si lo es, el movimiento se le registra a él con este medio.
-        if (!(enLinea && err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
+        if (!(err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
         const esElMismo = window.confirm(
           `Ya hay un cliente llamado "${nombre.trim()}" en el sistema.\n\n` +
             `¿Es la misma persona? Aceptar: el movimiento se le registra a ese cliente${etiquetaMedio ? ` por ${etiquetaMedio}` : ""}.\n` +
@@ -318,6 +322,7 @@ export function NuevaCuentaModal({
             }
           }
           const creado = await registrarMovimientoCC({
+            cuentaId: cuenta.id,
             terceroId: cuenta.tercero_id,
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
@@ -453,11 +458,27 @@ export function NuevaCuentaModal({
                 </label>
               )}
             </div>
+            <AvisoClienteExistente
+              lista={existentes.lista}
+              modulo={modulo}
+              onDescartar={existentes.descartar}
+              onUsar={(c) => {
+                setTercero({ id: c.id, nombre: c.nombre, telefono: c.telefono, identificacion: c.identificacion, tipo: c.tipo as Tercero["tipo"], created_at: "" });
+                setModo("existente");
+              }}
+            />
           </>
         ) : tercero ? (
           <p className="cc-elegido">
-            <strong>{tercero.nombre}</strong> · {tercero.tipo.toLowerCase()}
-            <button type="button" onClick={() => setTercero(null)}>
+            <strong>{tercero.nombre}</strong> · {tercero.telefono ? `${tercero.telefono} · ` : ""}ya está en el sistema
+            <button
+              type="button"
+              onClick={() => {
+                setTercero(null);
+                // en Confirmaciones no hay buscador: se vuelve a escribir el cliente
+                if (enLinea) setModo("nuevo");
+              }}
+            >
               Cambiar
             </button>
           </p>

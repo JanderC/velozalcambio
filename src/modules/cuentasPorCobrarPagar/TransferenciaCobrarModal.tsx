@@ -12,6 +12,8 @@ import { leerComprobante } from "../cuentasCorrientes/ocrComprobante";
 import { imagenDelPortapapeles, traeImagen } from "../whatsapp/utilidades";
 import { SIN_GRUPO, dinero, fechaDeHoy, grupoDe } from "./cobrar";
 import { conPuntos } from "./NuevoClienteCobrarModal";
+import { AvisoClienteExistente, useClienteExistente } from "../cuentasCorrientes/ClienteExistente";
+import type { ClienteExistente } from "../../api/cuentasCorrientes.api";
 
 const NUEVO = "__nuevo__";
 const METODOS = ["Bancolombia", "Nequi", "Zelle", "Daviplata", "Efectivo", "Otro"];
@@ -57,6 +59,11 @@ export function TransferenciaCobrarModal({
   const [nombre, setNombre] = useState("");
   const [elegida, setElegida] = useState<CuentaCorrienteResumen | null>(null); // el cliente que ya existe
   const [telefono, setTelefono] = useState("");
+  // el cliente ya estaba en el sistema en otro módulo (Confirmaciones, Cuentas Corrientes): se usa ese
+  const [existente, setExistente] = useState<ClienteExistente | null>(null);
+  const buscados = useClienteExistente(nombre, telefono, !elegida && !existente);
+  // los que ya están en Cuentas por Cobrar salen en la lista de abajo: acá solo los de otros módulos
+  const deOtrosModulos = buscados.lista.filter((c) => !c.modulos.includes("POR_COBRAR"));
   const [grupo, setGrupo] = useState(elegibles.find((g) => g === "Préstamos") ?? elegibles[0] ?? NUEVO);
   const [grupoNuevo, setGrupoNuevo] = useState("");
   const [monto, setMonto] = useState("");
@@ -155,23 +162,26 @@ export function TransferenciaCobrarModal({
     if (!elegida && !grupoFinal) return setError("Escribí el nombre del grupo nuevo.");
     if (!elegida && !monedaNueva) return setError("Esa moneda no está disponible. Elegí otra.");
     // mismo nombre que un cliente que ya está: es ese (no se crea dos veces)
-    const existente = elegida ?? cuentas.find((c) => sinAcentos(c.tercero_nombre) === sinAcentos(nombre)) ?? null;
+    const yaEnCobrar = elegida ?? cuentas.find((c) => sinAcentos(c.tercero_nombre) === sinAcentos(nombre)) ?? null;
     // ...pero si su cuenta se lleva en otra moneda que la elegida, se muestra antes de anotar nada
-    if (!elegida && existente && existente.moneda_codigo !== monedaElegida) {
-      elegir(existente);
-      return setError(`${existente.tercero_nombre} ya está en Cuentas por Cobrar y su cuenta se lleva en ${existente.moneda_codigo}. Revisá el monto en esa moneda y volvé a registrar.`);
+    if (!elegida && yaEnCobrar && yaEnCobrar.moneda_codigo !== monedaElegida) {
+      elegir(yaEnCobrar);
+      return setError(`${yaEnCobrar.tercero_nombre} ya está en Cuentas por Cobrar y su cuenta se lleva en ${yaEnCobrar.moneda_codigo}. Revisá el monto en esa moneda y volvé a registrar.`);
     }
     setEnviando(true);
     try {
       const cuenta =
-        existente ??
+        yaEnCobrar ??
         (await crearCuentaCorriente({
-          nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE", telefono: telefono.trim() || undefined },
+          ...(existente
+            ? { terceroId: existente.id, usarExistente: true }
+            : { nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE" as const, telefono: telefono.trim() || undefined } }),
           modulo: "POR_COBRAR",
           grupoCobro: grupoFinal,
           monedaId: monedaNueva!.id,
         }));
       const creado = await registrarMovimientoCC({
+        cuentaId: cuenta.id,
         terceroId: cuenta.tercero_id,
         canalId: cuenta.canal_id,
         monedaId: cuenta.moneda_id,
@@ -313,6 +323,7 @@ export function TransferenciaCobrarModal({
             onChange={(e) => {
               setNombre(e.target.value);
               setElegida(null);
+              setExistente(null);
             }}
             placeholder="Nombre del cliente"
             autoComplete="off"
@@ -322,9 +333,14 @@ export function TransferenciaCobrarModal({
             <small className="cxc-transf-cliente si">
               <UserCheck size={13} /> Ya está en Cuentas por Cobrar ({grupoDe(elegida)}) · debe {dinero(elegida.saldo_actual, elegida.moneda_codigo)}. Se le suma esta transferencia.
             </small>
+          ) : existente ? (
+            <small className="cxc-transf-cliente si">
+              <UserCheck size={13} /> {existente.nombre} ya está en el sistema: se usa ese cliente y se le abre su cuenta en Cuentas por Cobrar.
+            </small>
           ) : (
             nombre.trim().length >= 2 &&
-            sugeridos.length === 0 && (
+            sugeridos.length === 0 &&
+            deOtrosModulos.length === 0 && (
               <small className="cxc-transf-cliente">
                 <UserPlus size={13} /> Cliente nuevo: se agrega a Cuentas por Cobrar.
               </small>
@@ -345,6 +361,18 @@ export function TransferenciaCobrarModal({
           </div>
         )}
 
+        {!elegida && !existente && (
+          <AvisoClienteExistente
+            lista={deOtrosModulos}
+            modulo="POR_COBRAR"
+            onDescartar={buscados.descartar}
+            onUsar={(c) => {
+              setExistente(c);
+              setNombre(c.nombre);
+              if (c.telefono) setTelefono(c.telefono);
+            }}
+          />
+        )}
         {!elegida && (
           <>
             <label>

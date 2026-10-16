@@ -604,3 +604,15 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-mover-lista button.activo { background: #e8eefb; font-weight: 600; }
 .cc-mover-lista small { color: #6b7280; font-size: 0.76rem; white-space: nowrap; }
 .cc-mover-vacio { padding: 10px 12px; color: #8a93a3; font-size: 0.86rem; }
+
+/* El cliente ya existe en el sistema: se ofrece traerlo en vez de crear otro */
+.cc-existente { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid #f0c36d; border-radius: 10px; background: #fff8e6; color: #7a5b00; font-size: 0.86rem; }
+.cc-existente > strong { display: inline-flex; align-items: center; gap: 6px; }
+.cc-existente-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; background: white; }
+.cc-existente-fila > div { display: grid; gap: 2px; min-width: 0; }
+.cc-existente-fila b { color: #111827; }
+.cc-existente-fila small { color: #6b7280; font-size: 0.76rem; }
+.cc-existente-acciones { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.cc-existente-acciones button { padding: 6px 11px; border: none; border-radius: 7px; background: var(--color-navy); color: white; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.cc-existente-acciones button.secundario { background: white; color: #374151; border: 1px solid #cfd6e0; font-weight: 500; }
+.cc-existente-nota { font-size: 0.76rem; color: #7a5b00; }

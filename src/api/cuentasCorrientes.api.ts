@@ -292,6 +292,8 @@ export function getMovimientosCuentaCorriente(cuentaId: number) {
 }
 
 interface RegistrarMovimientoInput {
+  // la cuenta exacta: el mismo cliente puede tener cuenta en varios módulos con el mismo medio y moneda
+  cuentaId?: number;
   terceroId: number;
   canalId: number;
   monedaId: number;
@@ -390,4 +392,20 @@ export function importarSaldosIniciales(archivo: File) {
     "/cuentas-corrientes/importar-saldos-iniciales",
     formData
   );
+}
+/** Un cliente que ya está en el sistema con el mismo nombre o el mismo teléfono (en cualquier módulo). */
+export interface ClienteExistente {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  identificacion: string | null;
+  tipo: string;
+  mismo_nombre: boolean;
+  mismo_telefono: boolean;
+  modulos: string[];
+}
+
+export function buscarClientesExistentes(nombre: string, telefono: string) {
+  const q = new URLSearchParams({ nombre, telefono });
+  return api.get<ClienteExistente[]>(`/cuentas-corrientes/clientes-existentes?${q.toString()}`);
 }

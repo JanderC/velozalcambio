@@ -1740,6 +1740,7 @@ function FilaNueva({
             ? { cantidadBase: `${signo}${r.totalEnviado}`, tasa: factorDeComision(r.valor!, false), tasaEsPorcentaje: true, comisionDescontada: true, comisionIncluida: false }
             : { cantidadBase: `${signo}${r.totalEnviado}`, tasa: r.valor! };
       const creado = await registrarMovimientoCC({
+        cuentaId: destino.id,
         terceroId: cuenta.tercero_id,
         canalId: destino.canal_id,
         monedaId: destino.moneda_id,
@@ -1847,6 +1848,7 @@ function FilaNueva({
             ? cuenta
             : await crearCuentaCorriente({ terceroId: cuenta.tercero_id, canalId: cuenta.canal_id, modulo: "CAJA", monedaId: moneda.id, usarExistente: true });
         const creado = await registrarMovimientoCC({
+          cuentaId: destino.id,
           terceroId: cuenta.tercero_id,
           canalId: destino.canal_id,
           monedaId: destino.moneda_id,
@@ -2047,6 +2049,7 @@ function FilaNueva({
     else refInput.current?.focus();
     const signo = resta ? "-" : "";
     const datos = {
+      cuentaId: cuenta.id,
       terceroId: cuenta.tercero_id,
       canalId: cuenta.canal_id,
       monedaId: cuenta.moneda_id,
@@ -2087,7 +2090,7 @@ function FilaNueva({
             ...(cuenta.grupo_cobro ? { grupoCobro: cuenta.grupo_cobro } : {}),
           })));
       otraCuentaId = destino.id;
-      return registrarMovimientoCC({ ...datos, canalId: destino.canal_id, monedaId: destino.moneda_id });
+      return registrarMovimientoCC({ ...datos, cuentaId: destino.id, canalId: destino.canal_id, monedaId: destino.moneda_id });
     });
     cola.current = turno.catch(() => {});
     try {
