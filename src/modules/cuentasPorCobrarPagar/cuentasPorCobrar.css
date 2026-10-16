@@ -135,3 +135,17 @@
 }
 
 .cxc-btn-capital { text-decoration: none; }
+
+/* Pago con varios métodos: cada parte con su método, monto y caja */
+.cxc-parte { display: grid; gap: 10px; margin: 0; padding: 0; border: none; min-width: 0; }
+.cxc-parte:not(.sola) { padding: 10px 12px 12px; border: 1px solid #d7dbe2; border-radius: 10px; background: #f8fafc; }
+.cxc-parte legend { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; font-size: 0.8rem; font-weight: 700; color: var(--color-navy); }
+.cxc-parte legend button { display: grid; place-items: center; width: 22px; height: 22px; border: none; border-radius: 6px; background: none; color: #9ca3af; cursor: pointer; }
+.cxc-parte legend button:hover { background: #fdf0ee; color: #b3261e; }
+.cxc-parte-monto { display: flex; gap: 8px; align-items: center; }
+.cxc-parte-monto input { flex: 1; min-width: 0; }
+.cxc-parte-monto .cc-btn-secundario { padding: 7px 10px; font-size: 0.78rem; white-space: nowrap; }
+.cxc-parte-agregar { display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 6px 11px; border: 1px dashed #b8c2cf; border-radius: 8px; background: white; color: var(--color-navy); font: inherit; font-size: 0.82rem; cursor: pointer; }
+.cxc-parte-resumen { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0; padding: 9px 12px; border-radius: 9px; background: #fff6d6; color: #7a5b00; font-size: 0.88rem; }
+.cxc-parte-resumen.ok { background: #e8f6ec; color: #166534; }
+.cxc-parte-resumen.mal { background: #fdf0ee; color: #b3261e; }
