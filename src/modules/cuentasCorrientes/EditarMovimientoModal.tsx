@@ -84,12 +84,12 @@ export function EditarMovimientoModal({
             Fecha
             <input type="date" value={fecha} max={diaBogota(new Date().toISOString())} onChange={(e) => e.target.value && setFecha(e.target.value)} />
           </label>
-          <div className="cc-c-signo" role="group" aria-label="Suma o abono">
-            <button type="button" className={!resta ? "activo suma" : ""} onClick={() => setResta(false)} aria-pressed={!resta} disabled={montoFijo}>
-              + Suma
+          <div className="cc-c-signo" role="group" aria-label="Egreso o ingreso">
+            <button type="button" className={!resta ? "activo suma" : ""} onClick={() => setResta(false)} aria-pressed={!resta} disabled={montoFijo} title="Egreso: le dimos o vendimos al cliente, suma a lo que debe">
+              Egreso
             </button>
-            <button type="button" className={resta ? "activo resta" : ""} onClick={() => setResta(true)} aria-pressed={resta} disabled={montoFijo}>
-              − Abono
+            <button type="button" className={resta ? "activo resta" : ""} onClick={() => setResta(true)} aria-pressed={resta} disabled={montoFijo} title="Ingreso: el cliente nos paga o abona, resta de lo que debe">
+              Ingreso
             </button>
           </div>
         </div>

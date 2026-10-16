@@ -2361,24 +2361,24 @@ function FilaNueva({
           Cuenta a la que se pagó (opcional)
           <input value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)} placeholder="ej. Bancolombia ahorros 1234, Nequi 300…" autoComplete="off" maxLength={120} />
         </label>
-        <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Compra o venta" : "Suma o abono"}>
+        <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Compra o venta" : "Egreso o ingreso"}>
           <button
             type="button"
             className={!resta ? "activo suma" : ""}
             onClick={() => setResta(false)}
             aria-pressed={!resta}
-            title={enConfirmaciones ? "Le compramos al cliente: nos resta pesos o dólares" : undefined}
+            title={enConfirmaciones ? "Le compramos al cliente: nos resta pesos o dólares" : "Egreso: le dimos o vendimos al cliente, suma a lo que debe"}
           >
-            {enConfirmaciones ? "Compra" : "+ Suma"}
+            {enConfirmaciones ? "Compra" : "Egreso"}
           </button>
           <button
             type="button"
             className={resta ? "activo resta" : ""}
             onClick={() => setResta(true)}
             aria-pressed={resta}
-            title={enConfirmaciones ? "Le vendemos al cliente: nos aumenta el saldo en pesos" : undefined}
+            title={enConfirmaciones ? "Le vendemos al cliente: nos aumenta el saldo en pesos" : "Ingreso: el cliente nos paga o abona, resta de lo que debe"}
           >
-            {enConfirmaciones ? "Venta" : "− Abono"}
+            {enConfirmaciones ? "Venta" : "Ingreso"}
           </button>
         </div>
         <label className="cc-c-num">

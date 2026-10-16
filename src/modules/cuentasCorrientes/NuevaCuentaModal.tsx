@@ -580,12 +580,12 @@ export function NuevaCuentaModal({
             </label>
             <div className="cc-primer-mov-opciones">
               {/* Compra: le compramos al cliente lo que nos pasa (nos resta pesos o dólares). Venta: le vendemos bolívares o dólares (nos aumenta el saldo en pesos). */}
-              <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label="Compra o venta">
-                <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta} title="Le compramos al cliente: nos resta pesos o dólares">
-                  Compra
+              <div className="cc-c-signo cc-primer-mov-signo" role="group" aria-label={modulo === "CAJA" ? "Compra o venta" : "Egreso o ingreso"}>
+                <button type="button" className={!movResta ? "activo suma" : ""} onClick={() => setMovResta(false)} aria-pressed={!movResta} title={modulo === "CAJA" ? "Le compramos al cliente: nos resta pesos o dólares" : "Egreso: le dimos o vendimos al cliente, suma a lo que debe"}>
+                  {modulo === "CAJA" ? "Compra" : "Egreso"}
                 </button>
-                <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta} title="Le vendemos al cliente: nos aumenta el saldo en pesos">
-                  Venta
+                <button type="button" className={movResta ? "activo resta" : ""} onClick={() => setMovResta(true)} aria-pressed={movResta} title={modulo === "CAJA" ? "Le vendemos al cliente: nos aumenta el saldo en pesos" : "Ingreso: el cliente nos paga o abona, resta de lo que debe"}>
+                  {modulo === "CAJA" ? "Venta" : "Ingreso"}
                 </button>
               </div>
               <div className="cc-segmento cc-primer-mov-formula" role="group" aria-label="Tasa o comisión">
