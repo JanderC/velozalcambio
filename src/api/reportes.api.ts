@@ -89,3 +89,29 @@ export function getCuadresCaja(filtros: { cajaId?: number; estado?: string }) {
   const q = p.toString();
   return api.get<CuadreCaja[]>(`/reportes/cuadres-caja${q ? `?${q}` : ""}`);
 }
+// ---------- Rendimiento del día por empleado ----------
+export interface TotalMoneda {
+  codigo: string;
+  cantidad: number;
+  total: string;
+}
+export interface RendimientoEmpleado {
+  usuarioId: number;
+  nombre: string;
+  rol: string;
+  confirmaciones: { cantidad: number; clientes: number; porMoneda: TotalMoneda[] };
+  pagadas: { cantidad: number; porMoneda: TotalMoneda[] };
+  ventanilla: { cantidad: number; ingresos: TotalMoneda[]; egresos: TotalMoneda[] };
+  clientesTaquilla: number;
+  cuentasCorrientes: number;
+  cuentasPorCobrar: number;
+}
+export interface Rendimiento {
+  dia: string;
+  empleados: RendimientoEmpleado[];
+}
+
+/** El administrador recibe a todo el equipo; los demás, solo lo suyo. */
+export function getRendimiento(dia: string) {
+  return api.get<Rendimiento>(`/reportes/rendimiento?dia=${dia}`);
+}

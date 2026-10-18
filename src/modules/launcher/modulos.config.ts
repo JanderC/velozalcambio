@@ -15,6 +15,7 @@ import {
   Wallet,
   Landmark,
   Vault,
+  TrendingUp,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
 import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
@@ -181,6 +182,16 @@ export const MODULOS: ModuloConfig[] = [
     icono: BarChart3,
     ruta: "/reportes",
     rolesPermitidos: ["ADMIN", "ASESOR"],
+  },
+  {
+    id: "rendimiento",
+    titulo: "Rendimiento",
+    categoria: "Administración general",
+    acento: ACENTO_ADMIN,
+    icono: TrendingUp,
+    ruta: "/rendimiento",
+    // el dueño ve a todo el equipo; cada empleado, su propio día
+    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
   },
   {
     id: "usuarios",

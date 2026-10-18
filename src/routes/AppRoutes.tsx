@@ -17,6 +17,7 @@ import { RegistroTasasPage } from "../modules/tasas/RegistroTasasPage";
 import { ROLES_REGISTRO_TASAS } from "../modules/tasas/tasas.roles";
 import { CierreCajaPage } from "../modules/cierreCaja/CierreCajaPage";
 import { ReportesPage } from "../modules/reportes/ReportesPage";
+import { RendimientoPage } from "../modules/rendimiento/RendimientoPage";
 import { UsuariosPage } from "../modules/usuarios/UsuariosPage";
 import { NuevaTransaccionPage } from "../modules/nuevaTransaccion/NuevaTransaccionPage";
 import { WhatsAppPage } from "../modules/whatsapp/WhatsAppPage";
@@ -45,7 +46,8 @@ export function AppRoutes() {
         <Route path="/taquilla-2" element={<TaquillaPage key="taquilla-2" numero={2} />} />
         <Route path="/taquilla-3" element={<TaquillaPage key="taquilla-3" numero={3} />} />
         <Route path="/caja-fuerte" element={<CajaFuertePage />} />
-        <Route path="/reportes" element={<ReportesPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
+        <Route path="/reportes" element={<ReportesPage />} />
+        <Route path="/rendimiento" element={<RendimientoPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />
         <Route element={<RequireRole roles={ROLES_REGISTRO_TASAS} />}>

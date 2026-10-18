@@ -1,0 +1,46 @@
+/* Rendimiento del día por empleado */
+.rend-page { min-height: 100vh; background: #f2f4f7; padding-bottom: 48px; font-family: "Inter", sans-serif; }
+.rend-cabeza { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 28px 40px 0; }
+.rend-cabeza h1 { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); }
+.rend-cabeza p { margin: 0; color: #5b6472; }
+.rend-dia { display: flex; align-items: center; gap: 6px; }
+.rend-dia button { display: grid; place-items: center; height: 38px; min-width: 38px; padding: 0 10px; border: 1px solid #d7dbe2; border-radius: 8px; background: white; color: var(--color-navy); font: inherit; font-weight: 600; cursor: pointer; }
+.rend-dia button:disabled { opacity: 0.4; cursor: default; }
+.rend-dia input { height: 38px; padding: 0 10px; border: 1px solid #d7dbe2; border-radius: 8px; font: inherit; }
+.rend-dia .rend-hoy { background: var(--color-navy); color: white; border-color: var(--color-navy); }
+.rend-fecha { margin: 8px 40px 0; color: #6b7280; font-size: 0.9rem; text-transform: capitalize; }
+.rend-error { margin: 16px 40px 0; padding: 10px 14px; border-radius: 10px; background: #fdf0ee; color: #b3261e; }
+.rend-cargando, .rend-vacio { margin: 20px 0; color: #6b7280; }
+.rend-cargando { margin: 20px 40px; }
+
+.rend-totales { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 18px 40px 0; }
+.rend-totales > div { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 12px; padding: 16px 18px; border-radius: 14px; background: linear-gradient(135deg, #0b0e13 0%, #14406f 100%); color: white; }
+.rend-totales svg { grid-row: span 2; color: var(--color-gold); }
+.rend-totales span { font-size: 0.8rem; color: rgba(255, 255, 255, 0.75); }
+.rend-totales strong { font-family: "Space Grotesk", sans-serif; font-size: 1.8rem; line-height: 1.1; }
+
+.rend-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin: 18px 40px 0; align-items: start; }
+.rend-tarjeta { display: grid; gap: 12px; padding: 16px; border-radius: 14px; background: white; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
+.rend-tarjeta header { display: flex; align-items: center; gap: 12px; }
+.rend-tarjeta h2 { margin: 0; font-family: "Space Grotesk", sans-serif; font-size: 1.1rem; color: var(--color-navy-dark); }
+.rend-tarjeta header small { color: #6b7280; font-size: 0.78rem; }
+.rend-puesto { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #f4f6f9; color: var(--color-navy); font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
+.rend-tarjeta:first-child .rend-puesto { background: var(--color-gold); color: #0b0e13; }
+.rend-numeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rend-numero { display: grid; justify-items: start; gap: 1px; padding: 10px; border-radius: 10px; background: #f7f8fa; }
+.rend-numero svg { color: var(--color-navy); }
+.rend-numero strong { font-family: "Space Grotesk", sans-serif; font-size: 1.5rem; color: var(--color-navy-dark); }
+.rend-numero span { font-size: 0.76rem; color: #4b5563; }
+.rend-numero small { font-size: 0.7rem; color: #8a93a3; }
+.rend-montos { display: grid; gap: 4px; margin: 0; padding-top: 10px; border-top: 1px solid #eef0f3; }
+.rend-montos div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.84rem; }
+.rend-montos dt { color: #6b7280; }
+.rend-montos dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.rend-sin-nada { margin: 14px 40px 0; color: #8a93a3; font-size: 0.84rem; }
+
+@media (max-width: 760px) {
+  .rend-cabeza { padding: 18px 14px 0; }
+  .rend-fecha, .rend-error, .rend-totales, .rend-lista, .rend-sin-nada { margin-left: 14px; margin-right: 14px; }
+  .rend-lista { grid-template-columns: 1fr; }
+  .rend-numero strong { font-size: 1.25rem; }
+}
