@@ -168,3 +168,42 @@
   .cap-guardar button { justify-content: center; }
 }
 .cap-historial, .cap-resumen, .cap-resumen-col { min-width: 0; }
+
+/* Por cobrar y por pagar por grupos */
+.cap-grupo-fila td { background: #f4f6fb; font-weight: 700; cursor: pointer; }
+.cap-grupo-fila button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: none; background: none; color: var(--color-navy-dark); font: inherit; cursor: pointer; text-align: left; }
+.cap-grupo-fila small { font-weight: 500; }
+.cap-grupo-flecha { display: inline-block; width: 12px; color: #6b7280; }
+.cap-cliente-fila td:first-child { padding-left: 30px; }
+.cap-cliente-fila a { color: var(--color-navy); font-weight: 500; text-decoration: none; }
+.cap-cliente-fila a:hover { text-decoration: underline; }
+.cap-sub { margin: 0 14px 6px; font-size: 0.76rem; color: #6b7280; }
+/* Total en pesos y en dólares, junto a las tasas */
+.cap-hero-totales { display: flex; gap: 10px; flex-wrap: wrap; }
+.cap-hero-totales div { display: grid; gap: 2px; padding: 8px 14px; border-radius: 10px; background: rgba(244, 215, 81, 0.12); border: 1px solid rgba(244, 215, 81, 0.4); }
+.cap-hero-totales span { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-gold); }
+.cap-hero-totales strong { font-family: "Space Grotesk", sans-serif; font-size: 1.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* ¿El capital sube o baja? */
+.cap-graf-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 8px; }
+.cap-graf-cabeza h2 { margin: 0; font-family: "Space Grotesk", sans-serif; font-size: 1.05rem; color: var(--color-navy-dark); }
+.cap-graf-cambio { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 0.88rem; color: #374151; }
+.cap-graf-cambio.sube svg { color: #15803d; }
+.cap-graf-cambio.baja svg { color: #b3261e; }
+.cap-graf-lienzo { position: relative; width: 100%; touch-action: pan-y; }
+.cap-graf-lienzo svg { display: block; }
+.cap-graf-grilla { stroke: #e5e7eb; stroke-width: 1; }
+.cap-graf-eje { fill: #6b7280; font-size: 11px; font-family: Inter, sans-serif; }
+.cap-graf-area { fill: rgba(20, 64, 111, 0.08); }
+.cap-graf-linea { fill: none; stroke: #14406f; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.cap-graf-punto { fill: #14406f; stroke: white; stroke-width: 2; }
+.cap-graf-guia { stroke: #9ca3af; stroke-width: 1; stroke-dasharray: 3 3; }
+.cap-graf-tip { position: absolute; width: 180px; display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; background: #0b0e13; color: white; font-size: 0.78rem; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); }
+.cap-graf-tip b { font-size: 0.95rem; }
+.cap-graf-tip small { color: rgba(255, 255, 255, 0.6); }
+.cap-graf-nota { display: block; margin-top: 4px; font-size: 0.74rem; color: #8a93a3; }
+.cap-graf-vacio { margin: 0; color: #6b7280; font-size: 0.86rem; }
+@media (max-width: 760px) {
+  .cap-hero-totales { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cap-hero-totales strong { font-size: 1.05rem; }
+  .cap-cliente-fila td:first-child { padding-left: 20px; }
+}

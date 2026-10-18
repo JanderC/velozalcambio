@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowUpRight, CircleCheckBig, HandCoins, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
@@ -31,7 +32,9 @@ export function CuentasPorCobrarPagarPage() {
   const [monedas, setMonedas] = useState<Moneda[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
-  const [abiertaId, setAbiertaId] = useState<number | null>(null);
+  // ?cuenta=: se entra directo a esa cuenta (desde Capital de giros)
+  const [parametros] = useSearchParams();
+  const [abiertaId, setAbiertaId] = useState<number | null>(() => Number(parametros.get("cuenta")) || null);
   const [creandoEn, setCreandoEn] = useState<string | null>(null); // el grupo donde se está creando un cliente
   const [transfiriendo, setTransfiriendo] = useState(false); // registrar una transferencia que le hicimos a alguien
   const [pagandoId, setPagandoId] = useState<number | null>(null); // el cliente que paga todo lo que debe

@@ -3,7 +3,7 @@ import { Plus, Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { MiDiaHoy } from "../rendimiento/MiDiaHoy";
 import { useAuth } from "../../auth/useAuth";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { crearCuentaCorriente, getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { actualizarTercero, type TipoTercero } from "../../api/terceros.api";
@@ -68,7 +68,9 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   const [sentido, setSentido] = useState("");
   const [buscar, setBuscar] = useState("");
   const [cuentas, setCuentas] = useState<CuentaCorrienteResumen[]>([]);
-  const [seleccionadaId, setSeleccionadaId] = useState<number | null>(null);
+  // ?cuenta=: se entra directo a esa cuenta (desde Capital de giros)
+  const [parametros] = useSearchParams();
+  const [seleccionadaId, setSeleccionadaId] = useState<number | null>(() => Number(parametros.get("cuenta")) || null);
   // el movimiento encontrado con el buscador: la hoja abre ese día y lo resalta
   const [irA, setIrA] = useState<{ cuentaId: number; id: number; fecha: string; clave: number } | null>(null);
   const abrir = (c: CuentaCorrienteResumen) => {
