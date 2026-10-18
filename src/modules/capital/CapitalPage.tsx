@@ -247,6 +247,7 @@ export function CapitalPage() {
     const capitalDivisaCop = divisasCop - usdPorPagarCop;
     return {
       tasaDolar,
+      tasaEuro,
       tasaBs,
       enPesosCliente,
       cajasAhora,
@@ -479,18 +480,9 @@ export function CapitalPage() {
             <p>{viendo ? `Cuadre guardado el ${fechaHora(viendo.fecha)} por ${viendo.usuario}${viendo.nota ? ` · ${viendo.nota}` : ""}` : "Lo del sistema sale solo; lo de afuera se llena a mano. Cada cuadre queda guardado."}</p>
           </div>
         </div>
-        {t && (
-          <div className="cap-hero-totales" aria-label="Capital total">
-            <div>
-              <span>Total en pesos</span>
-              <strong>{t.tasaDolar || !t.capitalDivisa ? pesos(t.capitalCop + t.capitalDivisaCop) : "falta la tasa"}</strong>
-            </div>
-            <div>
-              <span>Total en dólares</span>
-              <strong>{t.tasaDolar ? `$${conDecimales(t.capitalCop / t.tasaDolar + t.capitalDivisa)}` : "falta la tasa"}</strong>
-            </div>
-          </div>
-        )}
+        {t && <TotalesPorMoneda t={t} />}
+        <div className="cap-referencia">
+          <span className="cap-referencia-titulo">Tasas de referencia</span>
         <div className="cap-tasas">
           <label>
             Tasa dólar
@@ -504,6 +496,8 @@ export function CapitalPage() {
             Pesos por bolívar
             <input value={manual.tasaBolivar} onChange={(e) => cambiar("tasaBolivar", conPuntos(e.target.value))} inputMode="decimal" placeholder="3,30" disabled={soloLectura} />
           </label>
+        </div>
+          {t && <TodoJunto t={t} />}
         </div>
       </header>
 
@@ -1214,5 +1208,78 @@ function ListaSaldos({
         </table>
       </div>
     </>
+  );
+}
+
+/** Lo que se necesita de las cuentas para los totales de arriba. */
+interface Totales {
+  tasaDolar: number;
+  tasaEuro: number;
+  tasaBs: number;
+  pesosCajas: number;
+  pesosManual: number;
+  usdEnCaja: number;
+  eurEnCaja: number;
+  bolivares: number;
+  capitalCop: number;
+  capitalDivisa: number;
+  capitalDivisaCop: number;
+}
+const usd = (n: number) => `US$${conDecimales(n)}`;
+const eur = (n: number) => `€${conDecimales(n)}`;
+
+/** Lo que hay en cada moneda (cajas, bancos y lo anotado a mano), y cuánto vale en las otras con las tasas de referencia. */
+function TotalesPorMoneda({ t }: { t: Totales }) {
+  const pesosTotal = t.pesosCajas + t.pesosManual;
+  // todo pasa por pesos: X dólares = X × tasa dólar en pesos = (eso ÷ tasa euro) en euros
+  const aUsd = (cop: number) => (t.tasaDolar ? usd(cop / t.tasaDolar) : null);
+  const aEur = (cop: number) => (t.tasaEuro ? eur(cop / t.tasaEuro) : null);
+  const tarjetas = [
+    { clave: "cop", titulo: "Pesos", valor: pesos(pesosTotal), equivale: [aUsd(pesosTotal), aEur(pesosTotal)] },
+    { clave: "usd", titulo: "Dólares", valor: usd(t.usdEnCaja), equivale: t.tasaDolar ? [pesos(t.usdEnCaja * t.tasaDolar), aEur(t.usdEnCaja * t.tasaDolar)] : [] },
+    { clave: "eur", titulo: "Euros", valor: eur(t.eurEnCaja), equivale: t.tasaEuro ? [pesos(t.eurEnCaja * t.tasaEuro), aUsd(t.eurEnCaja * t.tasaEuro)] : [] },
+    ...(t.bolivares
+      ? [{ clave: "ves", titulo: "Bolívares", valor: `Bs. ${conDecimales(t.bolivares)}`, equivale: t.tasaBs ? [pesos(t.bolivares * t.tasaBs), aUsd(t.bolivares * t.tasaBs)] : [] }]
+      : []),
+  ];
+  return (
+    <div className="cap-monedas" aria-label="Total general por moneda">
+      {tarjetas.map((c) => {
+        const otras = c.equivale.filter(Boolean);
+        return (
+          <div key={c.clave} className={`cap-moneda ${c.clave}`}>
+            <span>Total en {c.titulo.toLowerCase()}</span>
+            <strong>{c.valor}</strong>
+            <small>{otras.length ? `≈ ${otras.join(" · ")}` : "escribí la tasa para ver cuánto vale"}</small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Todo lo que hay junto, en cada moneda, y el capital (lo que hay más lo que me deben, menos lo que debo). */
+function TodoJunto({ t }: { t: Totales }) {
+  const enPesos = t.pesosCajas + t.pesosManual + t.usdEnCaja * t.tasaDolar + t.eurEnCaja * t.tasaEuro + t.bolivares * t.tasaBs;
+  const capital = t.capitalCop + t.capitalDivisaCop;
+  const falta = (!t.tasaDolar && t.usdEnCaja) || (!t.tasaEuro && t.eurEnCaja) || (!t.tasaBs && t.bolivares);
+  return (
+    <div className="cap-todo-junto">
+      <div>
+        <span>Todo lo que hay, junto</span>
+        <strong>{pesos(enPesos)}</strong>
+        <small>
+          {t.tasaDolar ? usd(enPesos / t.tasaDolar) : "—"} · {t.tasaEuro ? eur(enPesos / t.tasaEuro) : "—"}
+        </small>
+      </div>
+      <div>
+        <span>Capital</span>
+        <strong>{pesos(capital)}</strong>
+        <small>
+          {t.tasaDolar ? usd(capital / t.tasaDolar) : "—"} · {t.tasaEuro ? eur(capital / t.tasaEuro) : "—"}
+        </small>
+      </div>
+      {falta ? <p className="cap-todo-falta">Falta alguna tasa: lo de esa moneda no entra en lo de “junto”.</p> : null}
+    </div>
   );
 }

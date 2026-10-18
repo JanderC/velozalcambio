@@ -207,3 +207,29 @@
   .cap-hero-totales strong { font-size: 1.05rem; }
   .cap-cliente-fila td:first-child { padding-left: 20px; }
 }
+
+/* Arriba: el total de cada moneda y las tasas de referencia con lo que vale todo */
+.cap-hero { flex-direction: column; align-items: stretch; }
+.cap-monedas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.cap-moneda { display: grid; gap: 3px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14); min-width: 0; }
+.cap-moneda span { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-gold); }
+.cap-moneda strong { font-family: "Space Grotesk", sans-serif; font-size: 1.45rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap-moneda small { font-size: 0.78rem; color: rgba(255, 255, 255, 0.7); font-variant-numeric: tabular-nums; }
+.cap-referencia { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.cap-referencia-titulo { width: 100%; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255, 255, 255, 0.65); }
+.cap-todo-junto { display: flex; flex-wrap: wrap; gap: 10px; margin-left: auto; }
+.cap-todo-junto > div { display: grid; gap: 2px; padding: 8px 14px; border-radius: 10px; background: rgba(244, 215, 81, 0.12); border: 1px solid rgba(244, 215, 81, 0.4); }
+.cap-todo-junto span { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-gold); }
+.cap-todo-junto strong { font-family: "Space Grotesk", sans-serif; font-size: 1.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cap-todo-junto small { font-size: 0.76rem; color: rgba(255, 255, 255, 0.75); white-space: nowrap; }
+.cap-todo-falta { width: 100%; margin: 0; font-size: 0.74rem; color: #fca5a5; }
+@media (max-width: 760px) {
+  .cap-monedas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .cap-moneda { padding: 10px; }
+  .cap-moneda strong { font-size: 1.1rem; }
+  .cap-moneda small { font-size: 0.7rem; }
+  .cap-referencia .cap-tasas { width: 100%; }
+  .cap-todo-junto { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; margin-left: 0; }
+  .cap-todo-junto strong { font-size: 1.05rem; }
+  .cap-todo-junto small { white-space: normal; }
+}
