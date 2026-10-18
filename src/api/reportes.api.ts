@@ -115,3 +115,20 @@ export interface Rendimiento {
 export function getRendimiento(dia: string) {
   return api.get<Rendimiento>(`/reportes/rendimiento?dia=${dia}`);
 }
+
+// ---------- Clientes que más vienen (Confirmaciones) ----------
+export interface ClienteFrecuente {
+  tercero_id: number;
+  nombre: string;
+  telefono: string | null;
+  confirmaciones: number;
+  dias: number;
+  retiradas: number;
+  primera: string;
+  ultima: string;
+  totales: { codigo: string; total: string }[] | null;
+  cuenta_id: number | null;
+}
+export function getClientesFrecuentes(desde: string, hasta: string) {
+  return api.get<ClienteFrecuente[]>(`/reportes/clientes-frecuentes?desde=${desde}&hasta=${hasta}`);
+}

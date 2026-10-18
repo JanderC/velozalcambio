@@ -44,3 +44,18 @@
 .estado-cuenta-bloque { background: white; border-radius: 8px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
 .estado-cuenta-bloque h4 { font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); margin: 0 0 4px; }
 .estado-cuenta-saldo { font-weight: 700; margin-bottom: 12px; }
+/* Clientes frecuentes */
+.rep-periodos button { background: white; color: var(--color-navy); border: 1px solid #d7dbe2; border-radius: 16px; padding: 7px 14px; font-weight: 600; font-size: 0.84rem; }
+.rep-periodos button.activo { background: var(--color-navy); color: white; border-color: var(--color-navy); }
+.rep-tabla-scroll { overflow-x: auto; }
+.rep-frecuentes { min-width: 720px; }
+.rep-frecuentes .num { text-align: right; font-variant-numeric: tabular-nums; }
+.rep-frecuentes td small { display: block; color: #8a93a3; font-size: 0.74rem; }
+.rep-frecuentes td a { color: var(--color-navy); font-weight: 600; text-decoration: none; }
+.rep-frecuentes td a:hover { text-decoration: underline; }
+.rep-frecuentes tr.top td { background: #fffbea; }
+.rep-puesto { width: 36px; font-weight: 700; color: #6b7280; }
+.rep-puesto svg { color: #c9a23e; }
+.rep-falta { color: #a8531f !important; font-weight: 600; }
+.rep-nota { margin-top: 10px; font-size: 0.8rem; }
+@media (max-width: 760px) { .reportes-header, .reportes-body { padding-left: 12px; padding-right: 12px; } .reportes-tabs { padding: 0 8px; } }

@@ -5,22 +5,24 @@ import { MovimientosCajaView } from "./MovimientosCajaView";
 import { MovimientosCCView } from "./MovimientosCCView";
 import { EstadoCuentaView } from "./EstadoCuentaTerceroView";
 import { CuadresCajaView } from "./CuadresCajaView";
+import { ClientesFrecuentesView } from "./ClientesFrecuentesView";
 import "./reportes.css";
 
-type Tab = "capital" | "caja" | "cuenta-corriente" | "estado-cuenta" | "cuadres";
+type Tab = "frecuentes" | "capital" | "caja" | "cuenta-corriente" | "estado-cuenta" | "cuadres";
 
 export function ReportesPage() {
-  const [tab, setTab] = useState<Tab>("capital");
+  const [tab, setTab] = useState<Tab>("frecuentes");
 
   return (
     <div className="reportes-page">
       <Header />
       <div className="reportes-header">
         <h1>Reportes</h1>
-        <p>Capital consolidado, movimientos y cuadres de caja.</p>
+        <p>Clientes que más vienen, capital consolidado, movimientos y cuadres de caja.</p>
       </div>
 
       <div className="reportes-tabs">
+        <button className={tab === "frecuentes" ? "activo" : ""} onClick={() => setTab("frecuentes")}>Clientes frecuentes</button>
         <button className={tab === "capital" ? "activo" : ""} onClick={() => setTab("capital")}>Capital Consolidado</button>
         <button className={tab === "caja" ? "activo" : ""} onClick={() => setTab("caja")}>Movimientos de Caja</button>
         <button className={tab === "cuenta-corriente" ? "activo" : ""} onClick={() => setTab("cuenta-corriente")}>Cuentas Corrientes</button>
@@ -29,6 +31,7 @@ export function ReportesPage() {
       </div>
 
       <div className="reportes-body">
+        {tab === "frecuentes" && <ClientesFrecuentesView />}
         {tab === "capital" && <CapitalConsolidadoView />}
         {tab === "caja" && <MovimientosCajaView />}
         {tab === "cuenta-corriente" && <MovimientosCCView />}
