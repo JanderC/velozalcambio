@@ -240,3 +240,35 @@
 .cap-en-vivo { margin-left: 10px; font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; color: #a7f3d0; }
 .cap-fecha-pend { display: block; margin-top: 1px; font-size: 0.72rem; color: #6b7280; }
 .cap-fecha-pend.vieja { color: #a8531f; font-weight: 600; }
+
+/* Cuadros de cuentas de banco (Bancolombia y Nequi, bolívares) */
+.cap-bancos td { vertical-align: middle; }
+.cap-banco-nombre { font-weight: 600; color: #111827; }
+.cap-banco-cierre { min-width: 120px; }
+.cap-banco-cierre input { max-width: 150px; margin-left: auto; display: block; border: 1px solid #d7dbe2 !important; background: white !important; }
+.cap-banco-cierre small { display: block; margin-top: 2px; font-size: 0.7rem; font-weight: 600; }
+.cap-banco-cierre .cap-pos { color: #166534; }
+.cap-banco-cierre .cap-neg { color: #b3261e; }
+.cap-menu-celda { width: 38px; padding: 0 6px !important; text-align: right; }
+.cap-menu { position: relative; display: inline-block; vertical-align: middle; }
+.cap-menu summary { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: #4b5563; cursor: pointer; list-style: none; }
+.cap-menu summary::-webkit-details-marker { display: none; }
+.cap-menu summary:hover, .cap-menu[open] summary { background: #eef1f6; color: var(--color-navy); }
+.cap-menu-lista { position: absolute; right: 0; top: 34px; z-index: 20; display: grid; min-width: 190px; padding: 6px; border-radius: 10px; background: white; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); border: 1px solid #e5e7eb; }
+.cap-menu-lista button { padding: 8px 10px; border: none; border-radius: 6px; background: none; font: inherit; font-size: 0.86rem; text-align: left; color: #1f2937; cursor: pointer; white-space: nowrap; }
+.cap-menu-lista button:hover { background: #f2f5fa; color: var(--color-navy); }
+td .cap-menu { margin-left: 6px; }
+.cap-cierre-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 8px 12px 0; padding: 10px 12px; border-radius: 10px; background: #fff8e6; border: 1px solid #f0c36d; font-size: 0.8rem; color: #7a5b00; }
+.cap-cierre-barra button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; border-radius: 8px; background: var(--color-navy); color: white; font: inherit; font-size: 0.84rem; font-weight: 700; cursor: pointer; }
+.cap-cierre-barra button:disabled { opacity: 0.6; }
+.cap-a-mano { margin: 10px 12px 12px; border: 1px dashed #cfd6e0; border-radius: 10px; }
+.cap-a-mano summary { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; font-size: 0.8rem; font-weight: 600; color: #4b5563; cursor: pointer; }
+.cap-a-mano summary b { color: #111827; font-variant-numeric: tabular-nums; }
+.cap-a-mano[open] summary { border-bottom: 1px dashed #cfd6e0; }
+.cap-bancos-total { margin: 0 12px 12px; font-size: 0.82rem; color: #374151; }
+.cap-bancos-total b { color: #111827; }
+@media (max-width: 760px) {
+  .cap-bancos .cap-tabla table { min-width: 0; }
+  .cap-banco-cierre input { max-width: 110px; }
+  .cap-cierre-barra { margin: 8px 8px 0; }
+}

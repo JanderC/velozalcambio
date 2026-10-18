@@ -4,7 +4,7 @@ import { ApiError } from "../../api/client";
 import { capitalApi, type BancoDelSistema, type MovimientoBanco } from "../../api/capital.api";
 import { formatearMonto, leerNumero } from "../../utils/montos";
 
-export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial";
+export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo";
 
 /** Lo que se va escribiendo, con los puntos de miles puestos solos y decimales con coma. */
 function conPuntos(escrito: string) {
@@ -64,7 +64,12 @@ export function BancoAccionModal({
     const nMonto = leerNumero(monto)?.replace(/^-/, "") ?? null;
     setEnviando(true);
     try {
-      if (accion === "renombrar") {
+      if (accion === "saldo") {
+        const real = leerNumero(monto);
+        if (real === null) throw new Error("Escribí lo que hay de verdad en la cuenta.");
+        const r = await capitalApi.cargarSaldoBanco(banco.id, moneda, real);
+        onHecho(`${banco.nombre}: quedó en ${dinero(r.ahora, moneda)} (antes ${dinero(r.antes, moneda)}).`);
+      } else if (accion === "renombrar") {
         if (nombre.trim().length < 2) throw new Error("Escribí el nombre de la cuenta.");
         await capitalApi.renombrarBanco(banco.id, nombre.trim());
         onHecho(`La cuenta ahora se llama ${nombre.trim()}.`);
@@ -85,7 +90,7 @@ export function BancoAccionModal({
     }
   }
 
-  const titulo = accion === "renombrar" ? "Editar cuenta" : accion === "movimiento" ? "Ingreso o egreso" : accion === "traslado" ? "Pasar a otra cuenta" : "Movimientos de la cuenta";
+  const titulo = accion === "saldo" ? "Cargar saldo real" : accion === "renombrar" ? "Editar cuenta" : accion === "movimiento" ? "Ingreso o egreso" : accion === "traslado" ? "Pasar a otra cuenta" : "Movimientos de la cuenta";
 
   if (accion === "historial") {
     return (
@@ -131,7 +136,13 @@ export function BancoAccionModal({
   return (
     <Modal titulo={`${titulo} · ${banco.nombre}`} onCerrar={onCerrar}>
       <form className="cc-modal" onSubmit={guardar}>
-        {accion === "renombrar" ? (
+        {accion === "saldo" ? (
+          <label>
+            Lo que hay de verdad en la cuenta ({moneda})
+            <input value={monto} onChange={(e) => setMonto(conPuntos(e.target.value))} inputMode="decimal" placeholder="0" autoComplete="off" autoFocus />
+            <small>La diferencia con lo que dice el sistema queda anotada como un movimiento de la cuenta.</small>
+          </label>
+        ) : accion === "renombrar" ? (
           <label>
             Nombre de la cuenta
             <input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} autoFocus />
@@ -177,7 +188,7 @@ export function BancoAccionModal({
             Cancelar
           </button>
           <button type="submit" className="cc-guardar" disabled={enviando}>
-            {enviando ? "Guardando…" : accion === "renombrar" ? "Guardar" : accion === "traslado" ? "Pasar la plata" : `Registrar ${tipo === "INGRESO" ? "ingreso" : "egreso"}`}
+            {enviando ? "Guardando…" : accion === "saldo" ? "Cargar saldo" : accion === "renombrar" ? "Guardar" : accion === "traslado" ? "Pasar la plata" : `Registrar ${tipo === "INGRESO" ? "ingreso" : "egreso"}`}
           </button>
         </div>
       </form>

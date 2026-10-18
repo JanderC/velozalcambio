@@ -9,6 +9,7 @@ import { formatearMonto, leerNumero } from "../../utils/montos";
 import { enPesos, grupoDe } from "../cuentasPorCobrarPagar/cobrar";
 import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
 import { CapitalGrafica } from "./CapitalGrafica";
+import { CuadroBancos, MenuBanco } from "./CuadroBancos";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import "./capital.css";
 
@@ -403,10 +404,7 @@ export function CapitalPage() {
     }
   }
 
-  // ---------- Cuentas de banco: agregar una y cargarle el saldo real ----------
-  const [nuevoBanco, setNuevoBanco] = useState<{ nombre: string; moneda: string } | null>(null);
-  const [saldosReales, setSaldosReales] = useState<Record<string, string>>({});
-  const [cargandoBanco, setCargandoBanco] = useState<string | null>(null);
+  // ---------- Cuentas de banco ----------
   // editar, ingreso o egreso, traslado o ver movimientos de una cuenta
   const [accionBanco, setAccionBanco] = useState<{ accion: AccionBanco; bancoId: number } | null>(null);
   async function recargarSistema() {
@@ -416,34 +414,36 @@ export function CapitalPage() {
       // si falla, queda lo que había
     }
   }
-  async function agregarBanco() {
-    if (!nuevoBanco || nuevoBanco.nombre.trim().length < 2) return setError("Escribí el nombre de la cuenta (ej. Banesco, Mercantil, Nequi 2).");
+  // una cuenta nueva en esa moneda (Bancolombia y Nequi en pesos, o de bolívares)
+  async function crearBanco(nombre: string, moneda: string) {
+    if (nombre.trim().length < 2) return setError("Escribí el nombre de la cuenta."), false;
     try {
-      await capitalApi.crearBanco(nuevoBanco.nombre.trim(), nuevoBanco.moneda);
-      setNuevoBanco(null);
+      await capitalApi.crearBanco(nombre.trim(), moneda);
       setError(null);
       await recargarSistema();
+      return true;
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "No se pudo crear la cuenta.");
+      return false;
     }
   }
-  async function cargarSaldo(bancoId: number, moneda: string) {
-    const clave = `${bancoId}-${moneda}`;
-    const escrito = saldosReales[clave] ?? "";
-    const valor = escrito.trim() ? leerNumero(escrito) : null;
-    if (valor === null) return setError("Escribí el saldo real de la cuenta.");
-    setCargandoBanco(clave);
+  // el cierre de la noche: lo que hay de verdad en cada cuenta (la diferencia queda anotada en cada una)
+  async function registrarCierre(moneda: string, valores: { bancoId: number; saldo: string }[]) {
+    const hechos: string[] = [];
     try {
-      const r = await capitalApi.cargarSaldoBanco(bancoId, moneda, valor);
-      setSaldosReales((s) => ({ ...s, [clave]: "" }));
+      for (const v of valores) {
+        const r = await capitalApi.cargarSaldoBanco(v.bancoId, moneda, v.saldo);
+        hechos.push(r.cuenta);
+      }
       setError(null);
-      setAviso(`${r.cuenta}: saldo cargado (${conDecimales(Number(r.antes))} → ${conDecimales(Number(r.ahora))} ${moneda}).`);
-      setTimeout(() => setAviso(null), 6000);
-      await recargarSistema();
+      setAviso(`Cierre registrado: ${hechos.join(", ")}.`);
+      setTimeout(() => setAviso(null), 7000);
+      return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo cargar el saldo.");
+      setError(`${hechos.length ? `Quedaron registradas ${hechos.join(", ")}. ` : ""}${e instanceof ApiError ? e.message : "No se pudo registrar el cierre."}`);
+      return false;
     } finally {
-      setCargandoBanco(null);
+      await recargarSistema();
     }
   }
 
@@ -744,215 +744,43 @@ export function CapitalPage() {
               }}
             />
           )}
-          {/* ---------- Cuentas de bancos de la empresa ---------- */}
-          <section className="cap-bloque morado ancho">
-            <h2>Cuentas de bancos</h2>
-            <div className="cap-tabla">
-            <table>
-              <thead>
-                <tr>
-                  <th>Cuenta</th>
-                  <th className="num">En el sistema</th>
-                  <th className="num">{soloLectura ? "" : "Saldo real"}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {(foto.bancos ?? []).map((b) => {
-                  const moneda = b.moneda ?? "COP";
-                  const clave = `${b.id}-${moneda}`;
-                  const enSistema = Number(b.saldos.find((x) => x.codigo === moneda)?.monto ?? 0);
-                  const otras = b.saldos.filter((x) => x.codigo !== moneda);
-                  return (
-                    <tr key={b.id}>
-                      <td>
-                        {b.nombre} <small>{moneda}</small>
-                        <span className="cap-banco-links">
-                          {!soloLectura && (
-                            <>
-                              <button type="button" onClick={() => setAccionBanco({ accion: "movimiento", bancoId: b.id })}>
-                                Ingreso / egreso
-                              </button>
-                              <button type="button" onClick={() => setAccionBanco({ accion: "traslado", bancoId: b.id })}>
-                                Pasar a otra cuenta
-                              </button>
-                              <button type="button" onClick={() => setAccionBanco({ accion: "renombrar", bancoId: b.id })}>
-                                Editar
-                              </button>
-                            </>
-                          )}
-                          <button type="button" onClick={() => setAccionBanco({ accion: "historial", bancoId: b.id })}>
-                            Movimientos
-                          </button>
-                        </span>
-                        {otras.length > 0 && <small> · también {otras.map((x) => `${conDecimales(Number(x.monto))} ${x.codigo}`).join(", ")}</small>}
-                      </td>
-                      <td className="num">{moneda === "COP" ? pesos(enSistema) : `${conDecimales(enSistema)} ${moneda}`}</td>
-                      <td className="num">
-                        {!soloLectura && (
-                          <input
-                            value={saldosReales[clave] ?? ""}
-                            onChange={(e) => setSaldosReales((s) => ({ ...s, [clave]: conPuntos(e.target.value) }))}
-                            inputMode="decimal"
-                            placeholder="lo que tiene hoy"
-                            aria-label={`Saldo real de ${b.nombre}`}
-                          />
-                        )}
-                      </td>
-                      <td className="cap-banco-accion">
-                        {!soloLectura && (
-                          <button type="button" onClick={() => void cargarSaldo(b.id, moneda)} disabled={!saldosReales[clave]?.trim() || cargandoBanco === clave} title="Deja la cuenta con ese saldo: la diferencia queda anotada como un movimiento de esa cuenta">
-                            {cargandoBanco === clave ? "…" : "Cargar"}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {(foto.bancos ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="cap-vacio">
-                      Todavía no hay cuentas de banco.
-                    </td>
-                  </tr>
-                )}
-                {!soloLectura &&
-                  (nuevoBanco ? (
-                    <tr className="cap-banco-nuevo">
-                      <td>
-                        <input value={nuevoBanco.nombre} onChange={(e) => setNuevoBanco({ ...nuevoBanco, nombre: e.target.value })} placeholder="Nombre (ej. Banesco)" autoFocus aria-label="Nombre de la cuenta" />
-                      </td>
-                      <td>
-                        <select value={nuevoBanco.moneda} onChange={(e) => setNuevoBanco({ ...nuevoBanco, moneda: e.target.value })} aria-label="Moneda de la cuenta">
-                          <option value="COP">Pesos (COP)</option>
-                          <option value="VES">Bolívares (VES)</option>
-                          <option value="USD">Dólares (USD)</option>
-                          <option value="USDT">USDT</option>
-                          <option value="EUR">Euros (EUR)</option>
-                        </select>
-                      </td>
-                      <td className="cap-banco-accion" colSpan={2}>
-                        <button type="button" onClick={() => void agregarBanco()}>
-                          Crear
-                        </button>
-                        <button type="button" className="secundario" onClick={() => setNuevoBanco(null)}>
-                          Cancelar
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr className="cap-agregar">
-                      <td colSpan={4}>
-                        <button type="button" onClick={() => setNuevoBanco({ nombre: "", moneda: "COP" })}>
-                          <Plus size={13} /> Agregar cuenta de banco
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-            </div>
-            <p className="cap-nota-bancos">
-              Se carga lo que cada cuenta tiene hoy y desde ahí el sistema la lleva: las confirmaciones pagadas por otro método salen de ahí. Lo de cada cuenta
-              entra solo en Pesos, Bolívares o Dólares según su moneda.
+          {/* ---------- Las cuentas de banco: Bancolombia y Nequi, y bolívares, lado a lado ---------- */}
+          <CuadroBancos
+            titulo="Bancolombia y Nequi"
+            color="cian"
+            moneda="COP"
+            bancos={(foto.bancos ?? []).filter((b) => (b.moneda ?? "COP") === "COP")}
+            soloLectura={soloLectura}
+            onAccion={(accion, bancoId) => setAccionBanco({ accion, bancoId })}
+            onCrear={(nombre) => crearBanco(nombre, "COP")}
+            onCierre={(valores) => registrarCierre("COP", valores)}
+          >
+            <ManoDe titulo="Otros pesos (fuera del sistema)" abierto={manual.pesos.some((f) => f.nombre.trim() || f.monto.trim())} total={pesos(t.pesosManual)}>
+              {tablaFilas("pesos", "Persona o cuenta", "Pesos", true)}
+            </ManoDe>
+          </CuadroBancos>
+          <CuadroBancos
+            titulo="Bolívares"
+            color="magenta"
+            moneda="VES"
+            bancos={(foto.bancos ?? []).filter((b) => b.moneda === "VES")}
+            soloLectura={soloLectura}
+            tasaAPesos={t.tasaBs}
+            onAccion={(accion, bancoId) => setAccionBanco({ accion, bancoId })}
+            onCrear={(nombre) => crearBanco(nombre, "VES")}
+            onCierre={(valores) => registrarCierre("VES", valores)}
+          >
+            <ManoDe
+              titulo="Otros bolívares (fuera del sistema)"
+              abierto={manual.bolivares.some((f) => f.nombre.trim() || f.monto.trim())}
+              total={`Bs ${conDecimales(t.bolivares - (foto.bancos ?? []).reduce((s, b) => s + Number(b.saldos.find((x) => x.codigo === "VES")?.monto ?? 0), 0))}`}
+            >
+              {tablaFilas("bolivares", "Persona o cuenta", "Bolívares", true)}
+            </ManoDe>
+            <p className="cap-sub cap-bancos-total">
+              Total bolívares <b>Bs {conDecimales(t.bolivares)}</b> · en pesos <b>{pesos(t.bolivaresCop)}</b>
             </p>
-          </section>
-
-          {/* ---------- Bolívares ---------- */}
-          <section className="cap-bloque magenta">
-            <h2>Bolívares</h2>
-            <div className="cap-tabla">
-            <table>
-              <thead>
-                <tr>
-                  <th>Banco o persona</th>
-                  <th className="num">Bs</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {(foto.bancos ?? []).flatMap((b) =>
-                  b.saldos
-                    .filter((x) => x.codigo === "VES")
-                    .map((x) => (
-                      <tr key={`b${b.id}-ves`} className="cap-auto">
-                        <td>
-                          {b.nombre} <small>cuenta de banco</small>
-                        </td>
-                        <td className="num">{conDecimales(Number(x.monto))}</td>
-                        <td />
-                      </tr>
-                    ))
-                )}
-                {tablaFilas("bolivares", "Banco o persona", "Bolívares", true)}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>Total bolívares</td>
-                  <td className="num">Bs {conDecimales(t.bolivares)}</td>
-                  <td />
-                </tr>
-                <tr className="cap-fila-oscura">
-                  <td>En pesos {t.tasaBs ? `(× ${formatearMonto(String(t.tasaBs))})` : "(falta la tasa)"}</td>
-                  <td className="num">{pesos(t.bolivaresCop)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-            </div>
-          </section>
-
-          {/* ---------- Pesos ---------- */}
-          <section className="cap-bloque cian">
-            <h2>Pesos</h2>
-            <div className="cap-tabla">
-            <table>
-              <thead>
-                <tr>
-                  <th>Banco o persona</th>
-                  <th className="num">Pesos</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {foto.cajas.flatMap((c) =>
-                  c.saldos
-                    .filter((x) => x.codigo === "COP")
-                    .map((x) => (
-                      <tr key={`${c.id}-cop`} className="cap-auto">
-                        <td>
-                          {c.nombre} <small>del sistema</small>
-                        </td>
-                        <td className="num">{pesos(Number(x.monto))}</td>
-                        <td />
-                      </tr>
-                    ))
-                )}
-                {(foto.bancos ?? []).flatMap((b) =>
-                  b.saldos
-                    .filter((x) => x.codigo === "COP")
-                    .map((x) => (
-                      <tr key={`b${b.id}-cop`} className="cap-auto">
-                        <td>
-                          {b.nombre} <small>cuenta de banco</small>
-                        </td>
-                        <td className="num">{pesos(Number(x.monto))}</td>
-                        <td />
-                      </tr>
-                    ))
-                )}
-                {tablaFilas("pesos", "Banco o persona", "Pesos", true)}
-              </tbody>
-              <tfoot>
-                <tr className="cap-fila-oscura">
-                  <td>Total pesos</td>
-                  <td className="num">{pesos(t.pesosCajas + t.pesosManual)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-            </div>
-          </section>
+          </CuadroBancos>
 
           {/* ---------- Dólares y pesos ---------- */}
           <section className="cap-bloque verde ancho">
@@ -972,7 +800,10 @@ export function CapitalPage() {
                 {t.divisasCajas.map((d) => (
                   <tr key={d.clave} className="cap-auto">
                     <td>
-                      {d.nombre} <small>{d.codigo === "EUR" ? "euros · del sistema" : "del sistema"}</small>
+                      {d.nombre} <small>{d.codigo === "EUR" ? "euros · del sistema" : d.clave.startsWith("b") ? "cuenta de banco" : "del sistema"}</small>
+                      {d.clave.startsWith("b") && !soloLectura && (
+                        <MenuBanco onAccion={(accion) => setAccionBanco({ accion, bancoId: Number(d.clave.slice(1).split("-")[0]) })} />
+                      )}
                     </td>
                     <td className="num">
                       {d.codigo === "EUR" ? "€" : "$"}
@@ -1417,5 +1248,21 @@ function FechaPendiente({ desde, hasta, cantidad }: { desde: string; hasta: stri
     <small className={`cap-fecha-pend ${dias >= 3 ? "vieja" : ""}`} title={`La más vieja: ${new Date(desde).toLocaleString("es-CO", { timeZone: "America/Bogota" })}`}>
       {cuando} · {hace}
     </small>
+  );
+}
+
+/** Lo que se anota a mano dentro de un cuadro de cuentas: plegado si está vacío, para que el cuadro no se alargue. */
+function ManoDe({ titulo, abierto, total, children }: { titulo: string; abierto: boolean; total: string; children: React.ReactNode }) {
+  return (
+    <details className="cap-a-mano" open={abierto || undefined}>
+      <summary>
+        {titulo} <b>{total}</b>
+      </summary>
+      <div className="cap-tabla">
+        <table>
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    </details>
   );
 }
