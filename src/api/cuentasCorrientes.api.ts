@@ -43,7 +43,7 @@ export interface CuentaCorrienteResumen {
   // Cuentas que no son en pesos: cuántos pesos vale 1 de su moneda (tasa de cobro o la última usada en los movimientos)
   valor_moneda: string | null;
   // Al buscar: el movimiento de esta cuenta donde apareció lo buscado (una referencia, un MTCN, quién envió)
-  movimiento_coincide?: { descripcion: string; fecha: string; monto: string } | null;
+  movimiento_coincide?: { id: number; descripcion: string; fecha: string; monto: string; cuantos: number } | null;
   vendido_hoy: string;
   abonado_hoy: string;
 }
@@ -408,4 +408,12 @@ export interface ClienteExistente {
 export function buscarClientesExistentes(nombre: string, telefono: string) {
   const q = new URLSearchParams({ nombre, telefono });
   return api.get<ClienteExistente[]>(`/cuentas-corrientes/clientes-existentes?${q.toString()}`);
+}
+
+/** Pasar a Confirmaciones lo que se le debe en Cuentas Corrientes, con comisión o tasa. */
+export function enviarAConfirmaciones(
+  cuentaId: number,
+  d: { monto: string; formula: "DIRECTO" | "COMISION" | "TASA" | "DIVIDIR"; valor?: string; monedaEntregaId: number; canalId: number; descripcion?: string }
+) {
+  return api.post<{ confirmacionId: number; corrienteId: number; cuentaConfirmacionesId: number; resultado: string; moneda: string }>(`/cuentas-corrientes/${cuentaId}/enviar-a-confirmaciones`, d);
 }

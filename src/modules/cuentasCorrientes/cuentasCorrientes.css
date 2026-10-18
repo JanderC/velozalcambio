@@ -624,3 +624,13 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 /* Qué es el cliente, cambiable desde la lista: se ve como el texto, con su flechita */
 .cc-tipo-rapido { padding: 0 2px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: inherit; font: inherit; font-size: inherit; cursor: pointer; }
 .cc-tipo-rapido:hover, .cc-tipo-rapido:focus { border-color: #cfd6e0; background: white; outline: none; }
+
+/* El movimiento encontrado con el buscador */
+.cc-tabla tr.cc-fila-buscada td, tr.cc-fila-buscada td { background: #fff3c4 !important; box-shadow: inset 0 1px 0 #f0c36d, inset 0 -1px 0 #f0c36d; }
+.cc-cuenta-coincide u { text-decoration: underline; cursor: pointer; }
+
+/* Enviar a Confirmaciones */
+.cc-a-confirmaciones { display: inline-flex; align-items: center; gap: 5px; }
+.cc-calculadora-enviar { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: none; border-radius: 7px; background: var(--color-navy); color: white; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.cc-enviar-hecho { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 12px 14px; border-radius: 10px; background: #e8f6ec; color: #166534; font-size: 0.92rem; line-height: 1.45; }
+.cc-enviar-hecho svg { flex-shrink: 0; margin-top: 2px; }

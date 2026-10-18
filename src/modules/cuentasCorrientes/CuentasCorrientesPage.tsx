@@ -68,6 +68,12 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   const [buscar, setBuscar] = useState("");
   const [cuentas, setCuentas] = useState<CuentaCorrienteResumen[]>([]);
   const [seleccionadaId, setSeleccionadaId] = useState<number | null>(null);
+  // el movimiento encontrado con el buscador: la hoja abre ese día y lo resalta
+  const [irA, setIrA] = useState<{ cuentaId: number; id: number; fecha: string; clave: number } | null>(null);
+  const abrir = (c: CuentaCorrienteResumen) => {
+    setSeleccionadaId(c.id);
+    setIrA(c.movimiento_coincide ? { cuentaId: c.id, id: c.movimiento_coincide.id, fecha: c.movimiento_coincide.fecha, clave: Date.now() } : null);
+  };
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
@@ -308,11 +314,11 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   role="button"
                   tabIndex={0}
                   className={`cc-fila-cuenta ${seleccionadaId === c.id ? "activa" : ""}`}
-                  onClick={() => setSeleccionadaId(c.id)}
+                  onClick={() => abrir(c)}
                   onKeyDown={(e) => {
                     if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
                       e.preventDefault();
-                      setSeleccionadaId(c.id);
+                      abrir(c);
                     }
                   }}
                 >
@@ -361,9 +367,9 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                   </span>
                   {c.movimiento_coincide && (
                     <span className="cc-cuenta-coincide">
-                      Referencia encontrada: <b>{c.movimiento_coincide.descripcion}</b> ·{" "}
+                      {c.movimiento_coincide.cuantos > 1 ? `Está en ${c.movimiento_coincide.cuantos} movimientos, el último: ` : "Está en: "}<b>{c.movimiento_coincide.descripcion}</b> ·{" "}
                       {new Date(c.movimiento_coincide.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "2-digit" })} ·{" "}
-                      {montoTexto(c.movimiento_coincide.monto.replace(/^-/, ""), c.moneda_codigo)}
+                      {montoTexto(c.movimiento_coincide.monto.replace(/^-/, ""), c.moneda_codigo)} · <u>ver el movimiento</u>
                     </span>
                   )}
                   {c.valor_moneda && c.modulo !== "CAJA" && (
@@ -392,6 +398,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
           <HojaCuenta
             key={seleccionada.id}
             cuenta={seleccionada}
+            irA={irA && irA.cuentaId === seleccionada.id ? irA : null}
             onActualizar={cargar}
             onVolver={() => setSeleccionadaId(null)}
             medio={enConfirmaciones ? (canales.find((c) => c.id === canalId) ?? null) : null}

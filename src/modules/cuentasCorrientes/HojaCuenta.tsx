@@ -35,6 +35,7 @@ import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
+import { EnviarAConfirmacionesModal } from "./EnviarAConfirmacionesModal";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
 import { VariasTransferencias, calcularResumen, transferenciaVacia, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
@@ -148,8 +149,11 @@ export function HojaCuenta({
   medios = [],
   onElegirMedio,
   onAbrirCuenta,
+  irA = null,
 }: {
   cuenta: CuentaCorrienteResumen;
+  // desde el buscador: ir al día de este movimiento y resaltarlo (clave cambia en cada búsqueda para volver a ir)
+  irA?: { id: number; fecha: string; clave: number } | null;
   onActualizar: () => void;
   onVolver: () => void;
   // Confirmaciones: el medio elegido arriba para el próximo movimiento. El cliente se registra una sola vez y cada
@@ -200,6 +204,26 @@ export function HojaCuenta({
   // null = la hoja de un solo día, como siempre.
   const [desdeElegido, setDesdeElegido] = useState<string | null>(null);
   const desde = desdeElegido && desdeElegido < dia ? desdeElegido : dia;
+  // el movimiento que se buscó: se abre su día y se resalta
+  const [resaltado, setResaltado] = useState<number | null>(null);
+  useEffect(() => {
+    if (!irA) return;
+    setDesdeElegido(null);
+    setDia(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(irA.fecha)));
+    llevado.current = null;
+    setResaltado(irA.id);
+  }, [irA]);
+  // se lleva a la vista una sola vez, cuando la fila ya está (la hoja carga el día después)
+  const llevado = useRef<number | null>(null);
+  useEffect(() => {
+    if (resaltado === null || llevado.current === resaltado) return;
+    const fila = document.getElementById(`cc-mov-${resaltado}`);
+    if (!fila) return;
+    llevado.current = resaltado;
+    fila.scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+  // Cuentas Corrientes: pasar a Confirmaciones lo que se le debe (con el monto con que arranca)
+  const [enviandoAConf, setEnviandoAConf] = useState<string | null>(null);
   const enRango = desde !== dia;
   const [cerrando, setCerrando] = useState(false);
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
@@ -649,6 +673,16 @@ export function HojaCuenta({
               <button type="button" className="cc-mover cc-eliminar" onClick={eliminar}>
                 Eliminar
               </button>
+              {cuenta.modulo === "CORRIENTE" && (
+                <button
+                  type="button"
+                  className="cc-mover cc-a-confirmaciones"
+                  onClick={() => setEnviandoAConf(saldoActual.startsWith("-") ? saldoActual.slice(1) : "")}
+                  title="Pasar a Confirmaciones lo que se le debe, cobrándole comisión o con una tasa: allá se le paga en taquilla"
+                >
+                  <Send size={13} /> Enviar a Confirmaciones
+                </button>
+              )}
             </span>
           )}
         </div>
@@ -870,6 +904,18 @@ export function HojaCuenta({
           }}
         />
       )}
+      {enviandoAConf !== null && (
+        <EnviarAConfirmacionesModal
+          cuenta={actual}
+          montoInicial={enviandoAConf}
+          onCerrar={() => setEnviandoAConf(null)}
+          onEnviado={() => {
+            setMarcados(new Set());
+            void cargar();
+            onActualizar();
+          }}
+        />
+      )}
       {movimientoMovido && (
         <MoverMovimientoModal
           movimiento={movimientoMovido}
@@ -967,6 +1013,11 @@ export function HojaCuenta({
             }} title="Borra las marcas y la meta guardadas de este día">
               Quitar marcas
             </button>
+            {cuenta.modulo === "CORRIENTE" && puedeAnular && (
+              <button type="button" className="cc-calculadora-enviar" onClick={() => setEnviandoAConf(sumaMonto.replace(/^-/, ""))} title="Pasar el total de lo marcado a Confirmaciones, con comisión o tasa">
+                <Send size={13} /> Enviar a Confirmaciones
+              </button>
+            )}
           </div>
           <div className="cc-calculadora-sumas">
             {hayCantidades && (
@@ -1081,7 +1132,11 @@ export function HojaCuenta({
             )}
             {movimientosVisibles.map((m) => (
               <Fragment key={m.id}>
-              <tr className={m.anulado ? "cc-anulado" : marcados.has(m.id) ? "cc-fila-marcada" : ""} title={`Cargado por ${m.usuario_nombre}`}>
+              <tr
+                id={`cc-mov-${m.id}`}
+                className={`${m.anulado ? "cc-anulado" : marcados.has(m.id) ? "cc-fila-marcada" : ""} ${resaltado === m.id ? "cc-fila-buscada" : ""}`}
+                title={`Cargado por ${m.usuario_nombre}`}
+              >
                 <td>
                   {m.anulado ? (
                     fechaCorta(m.fecha)
