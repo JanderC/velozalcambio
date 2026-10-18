@@ -60,6 +60,9 @@ export const capitalApi = {
   movimientosBanco: (id: number) => api.get<MovimientoBanco[]>(`/capital/bancos/${id}/movimientos`),
   transferirBancos: (d: { origenId: number; destinoId: number; moneda: string; monto: string; nota?: string }) =>
     api.post<{ de: string; a: string; monto: string; moneda: string }>("/capital/bancos/transferir", d),
+  // lo que se va escribiendo (tasas, filas a mano), guardado al instante
+  borrador: () => api.get<{ datos: Record<string, unknown>; updated_at: string } | null>("/capital/borrador"),
+  guardarBorrador: (datos: Record<string, unknown>) => api.put<{ guardado: true }>("/capital/borrador", { datos }),
   guardar: (cuadre: { datos: Record<string, unknown>; capitalCop: number; capitalDivisa: number; capitalDivisaCop: number; nota?: string }) =>
     api.post<{ id: number; created_at: string }>("/capital/cuadres", cuadre),
 };

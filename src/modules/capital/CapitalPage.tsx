@@ -139,20 +139,64 @@ export function CapitalPage() {
     }
   }, []);
 
-  // Al entrar, lo que se llenó a mano en el último cuadre viene puesto: se corrige solo lo que cambió
+  // Lo escrito a mano (tasas incluidas): lo último que se escribió, guardado al instante en el servidor; si no hay,
+  // lo del último cuadre. Así las tasas quedan puestas aunque no se guarde el cuadre, en cualquier computador.
+  const manualGuardado = useCallback(async (lista: CuadreResumen[]): Promise<Manual> => {
+    try {
+      const b = await capitalApi.borrador();
+      const m = (b?.datos as { manual?: Manual } | undefined)?.manual;
+      if (m) return { ...MANUAL_INICIAL, ...m };
+    } catch {
+      // sin borrador: el último cuadre
+    }
+    const ultimo = lista[0];
+    if (!ultimo) return MANUAL_INICIAL;
+    const c = await capitalApi.cuadre(ultimo.id).catch(() => null);
+    const m = (c?.datos as { manual?: Manual } | undefined)?.manual;
+    return m ? { ...MANUAL_INICIAL, ...m } : MANUAL_INICIAL;
+  }, []);
+  // hasta que no llega lo guardado no se guarda nada (si no, se pisaría con la hoja vacía)
+  const [manualListo, setManualListo] = useState(false);
   useEffect(() => {
     void cargar().then(async (lista) => {
-      const ultimo = lista[0];
-      if (!ultimo) return;
-      try {
-        const c = await capitalApi.cuadre(ultimo.id);
-        const m = (c.datos as { manual?: Manual }).manual;
-        if (m) setManual({ ...MANUAL_INICIAL, ...m });
-      } catch {
-        // sin el último cuadre se empieza vacío
-      }
+      setManual(await manualGuardado(lista));
+      setManualListo(true);
     });
-  }, [cargar]);
+  }, [cargar, manualGuardado]);
+
+  // ---------- En tiempo real ----------
+  // Lo del sistema se vuelve a traer solo: cada 15 segundos y al volver a esta pestaña (ej. después de pagar en
+  // taquilla), para que lo pagado salga de la lista de una vez. Viendo un cuadre viejo no hace falta.
+  const [actualizado, setActualizado] = useState<Date | null>(null);
+  useEffect(() => {
+    if (viendo) return;
+    const refrescar = () => {
+      if (document.visibilityState !== "visible") return;
+      void cargar().then(() => setActualizado(new Date()));
+    };
+    const t = setInterval(refrescar, 15_000);
+    document.addEventListener("visibilitychange", refrescar);
+    window.addEventListener("focus", refrescar);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", refrescar);
+      window.removeEventListener("focus", refrescar);
+    };
+  }, [cargar, viendo]);
+
+  // Las tasas y lo escrito a mano se guardan solos al escribir (un momento después de la última tecla)
+  const [estadoBorrador, setEstadoBorrador] = useState<"" | "guardando" | "guardado" | "error">("");
+  useEffect(() => {
+    if (!manualListo || viendo) return;
+    const t = setTimeout(() => {
+      setEstadoBorrador("guardando");
+      capitalApi
+        .guardarBorrador({ manual })
+        .then(() => setEstadoBorrador("guardado"))
+        .catch(() => setEstadoBorrador("error"));
+    }, 800);
+    return () => clearTimeout(t);
+  }, [manual, manualListo, viendo]);
 
   // ---------- Lo que trae el sistema ----------
   const fotoActual: Foto | null = useMemo(() => {
@@ -410,13 +454,9 @@ export function CapitalPage() {
     }
   }
   async function volverAlActual() {
+    // vuelve con lo que estaba escribiendo (las tasas guardadas), para seguir desde ahí
+    setManual(await manualGuardado(cuadres));
     setViendo(null);
-    // vuelve con lo manual del último cuadre, para seguir desde ahí
-    const ultimo = cuadres[0];
-    if (!ultimo) return setManual(MANUAL_INICIAL);
-    const c = await capitalApi.cuadre(ultimo.id).catch(() => null);
-    const m = (c?.datos as { manual?: Manual } | undefined)?.manual;
-    setManual(m ? { ...MANUAL_INICIAL, ...m } : MANUAL_INICIAL);
   }
 
   // ---------- Piezas de la hoja ----------
@@ -511,7 +551,15 @@ export function CapitalPage() {
         </div>
         {t && <TotalesPorMoneda t={t} />}
         <div className="cap-referencia">
-          <span className="cap-referencia-titulo">Tasas de referencia</span>
+          <span className="cap-referencia-titulo">
+            Tasas de referencia
+            {!viendo && (
+              <em className="cap-en-vivo">
+                {estadoBorrador === "guardando" ? "guardando…" : estadoBorrador === "error" ? "no se pudieron guardar las tasas" : estadoBorrador === "guardado" ? "guardadas ✓" : ""}
+                {actualizado ? ` · en vivo, actualizado ${actualizado.toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", second: "2-digit" })}` : " · en vivo"}
+              </em>
+            )}
+          </span>
         <div className="cap-tasas">
           <label>
             Tasa dólar
