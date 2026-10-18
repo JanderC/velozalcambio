@@ -6,15 +6,17 @@ import { ApiError } from "../../api/client";
 import { capitalApi, type CuadreResumen, type DatosDelSistema } from "../../api/capital.api";
 import { getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, leerNumero } from "../../utils/montos";
-import { enPesos, grupoDe, gruposDe, mismoGrupo } from "../cuentasPorCobrarPagar/cobrar";
+import { enPesos } from "../cuentasPorCobrarPagar/cobrar";
 import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
+import { SaldarCuentaModal } from "./SaldarCuentaModal";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import "./capital.css";
 
 /*
  * Capital de giros: el cuadre de todo el negocio, con el mismo formato del Excel.
- *   Lo que el sistema ya sabe sale solo: por cobrar por grupo (Cuentas por Cobrar), lo que se le debe a esos clientes,
- *   los pesos, dólares y euros de las taquillas y la Caja Fuerte, y las confirmaciones sin pagar.
+ *   Lo que el sistema ya sabe sale solo: cada cliente que me debe y cada uno al que le debo (Cuentas Corrientes y
+ *   Cuentas por Cobrar, y desde acá se le cancela), las taquillas y la Caja Fuerte con lo que tienen ahora, las cuentas
+ *   de banco y las confirmaciones sin pagar.
  *   Lo que está fuera del sistema se llena a mano: bancos y personas en bolívares y en pesos, cobros y deudas fuera del
  *   sistema, dólares por pagar y las tasas.
  * Da el capital en pesos y el capital en divisas, y cada cuadre queda guardado con fecha y quién lo hizo.
@@ -42,8 +44,20 @@ interface Manual {
   dolaresPorPagar: FilaDivisa[];
   restarConfirmaciones: boolean;
 }
+// un cliente con saldo: lo que me debe (o le debo), en la moneda de su cuenta
+interface ClienteSaldo {
+  id: number; // la cuenta
+  nombre: string;
+  modulo: string;
+  codigo: string;
+  saldo: number; // sin signo
+  pesosCuenta: number | null; // en pesos con la tasa de la cuenta (si no hay tasa arriba para esa moneda)
+}
 // lo que el sistema traía, guardado con el cuadre para verlo después tal cual
 interface Foto {
+  // los cuadres viejos traen por cobrar por grupo (porCobrar) y no estas listas
+  cobrarClientes?: ClienteSaldo[];
+  pagarClientes?: ClienteSaldo[];
   porCobrar: { grupo: string; total: number; clientes: number }[];
   porPagarCuentas: { nombre: string; monto: number }[];
   cajas: DatosDelSistema["cajas"];
@@ -102,9 +116,15 @@ export function CapitalPage() {
 
   const cargar = useCallback(async () => {
     try {
-      const [s, c, lista] = await Promise.all([capitalApi.sistema(), getCuentasCorrientes({ vista: "cobrar" }), capitalApi.cuadres()]);
+      // por cobrar y por pagar salen de Cuentas Corrientes (y de Cuentas por Cobrar)
+      const [s, corrientes, cobrar, lista] = await Promise.all([
+        capitalApi.sistema(),
+        getCuentasCorrientes({ vista: "corrientes" }),
+        getCuentasCorrientes({ vista: "cobrar" }),
+        capitalApi.cuadres(),
+      ]);
       setSistema(s);
-      setCuentas(c);
+      setCuentas([...corrientes, ...cobrar]);
       setCuadres(lista);
       return lista;
     } catch (e) {
@@ -131,17 +151,15 @@ export function CapitalPage() {
   // ---------- Lo que trae el sistema ----------
   const fotoActual: Foto | null = useMemo(() => {
     if (!sistema || !cuentas) return null;
-    const grupos = gruposDe(cuentas);
-    const porCobrar = grupos
-      .map((g) => {
-        const delGrupo = cuentas.filter((c) => mismoGrupo(grupoDe(c), g) && !c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual));
-        return { grupo: g, total: delGrupo.reduce((s, c) => s + Number(enPesos(c) ?? 0), 0), clientes: delGrupo.length };
-      })
-      .filter((g) => g.clientes > 0);
-    const porPagarCuentas = cuentas
-      .filter((c) => c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual))
-      .map((c) => ({ nombre: c.tercero_nombre, monto: Math.abs(Number(enPesos(c) ?? 0)) }));
-    return { porCobrar, porPagarCuentas, cajas: sistema.cajas, bancos: sistema.bancos ?? [], confirmaciones: sistema.confirmacionesPorPagar };
+    const conSaldo = cuentas.filter((c) => /[1-9]/.test(c.saldo_actual));
+    const aCliente = (c: CuentaCorrienteResumen): ClienteSaldo => {
+      const p = enPesos(c);
+      return { id: c.id, nombre: c.tercero_nombre, modulo: c.modulo, codigo: c.moneda_codigo, saldo: Math.abs(Number(c.saldo_actual)), pesosCuenta: p === null ? null : Math.abs(Number(p)) };
+    };
+    // me debe: saldo positivo · le debo: saldo negativo
+    const cobrarClientes = conSaldo.filter((c) => !c.saldo_actual.startsWith("-")).map(aCliente);
+    const pagarClientes = conSaldo.filter((c) => c.saldo_actual.startsWith("-")).map(aCliente);
+    return { porCobrar: [], porPagarCuentas: [], cobrarClientes, pagarClientes, cajas: sistema.cajas, bancos: sistema.bancos ?? [], confirmaciones: sistema.confirmacionesPorPagar };
   }, [sistema, cuentas]);
   const foto = viendo?.foto ?? fotoActual;
   const soloLectura = !!viendo;
@@ -154,9 +172,28 @@ export function CapitalPage() {
     const tasaEuro = num(m.tasaEuro);
     const tasaBs = num(m.tasaBolivar);
     const suma = (filas: Fila[]) => filas.reduce((s, f) => s + num(f.monto), 0);
-    const porCobrar = foto.porCobrar.reduce((s, g) => s + g.total, 0);
+    // cada cliente en pesos, con las tasas de arriba (si falta la de su moneda, con la de su cuenta)
+    const enPesosCliente = (c: ClienteSaldo) =>
+      c.codigo === "COP"
+        ? c.saldo
+        : (c.codigo === "USD" || c.codigo === "USDT") && tasaDolar
+          ? c.saldo * tasaDolar
+          : c.codigo === "EUR" && tasaEuro
+            ? c.saldo * tasaEuro
+            : c.codigo === "VES" && tasaBs
+              ? c.saldo * tasaBs
+              : (c.pesosCuenta ?? 0);
+    const porCobrar = foto.cobrarClientes ? foto.cobrarClientes.reduce((s, c) => s + enPesosCliente(c), 0) : foto.porCobrar.reduce((s, g) => s + g.total, 0);
     const cobrarFuera = suma(m.cobrarFuera);
-    const porPagarCuentas = foto.porPagarCuentas.reduce((s, c) => s + c.monto, 0);
+    const porPagarCuentas = foto.pagarClientes ? foto.pagarClientes.reduce((s, c) => s + enPesosCliente(c), 0) : foto.porPagarCuentas.reduce((s, c) => s + c.monto, 0);
+    // lo que hay ahora en cada caja (taquillas, Caja Fuerte…), por moneda y en pesos
+    const cajasAhora = foto.cajas.map((c) => {
+      const de = (codigo: string) => Number(c.saldos.find((x) => x.codigo === codigo)?.monto ?? 0);
+      const cop = de("COP");
+      const usd = de("USD");
+      const eur = de("EUR");
+      return { id: c.id, nombre: c.nombre, tipo: c.tipo, cop, usd, eur, enPesos: cop + usd * tasaDolar + eur * tasaEuro };
+    });
     const pagarFuera = suma(m.pagarFuera);
     // las cuentas de banco de la empresa, por moneda (el USDT cuenta como dólares)
     const bancosEn = (codigos: string[]) => (foto.bancos ?? []).flatMap((b) => b.saldos.filter((x) => codigos.includes(x.codigo)).map((x) => Number(x.monto))).reduce((s, v) => s + v, 0);
@@ -208,6 +245,8 @@ export function CapitalPage() {
     return {
       tasaDolar,
       tasaBs,
+      enPesosCliente,
+      cajasAhora,
       porCobrar,
       cobrarFuera,
       porPagarCuentas,
@@ -232,6 +271,12 @@ export function CapitalPage() {
       capitalDivisaCop,
     };
   }, [foto, manual]);
+
+  // ---------- Cancelarle a un cliente (cobrar o pagar) desde acá ----------
+  const [saldando, setSaldando] = useState<number | null>(null);
+  const cuentaSaldando = saldando !== null ? (cuentas ?? []).find((c) => c.id === saldando) ?? null : null;
+  // el capital total, visto en pesos o en dólares
+  const [verEn, setVerEn] = useState<"COP" | "USD">("COP");
 
   // ---------- Editar lo manual ----------
   const cambiar = <K extends keyof Manual>(clave: K, valor: Manual[K]) => setManual((m) => ({ ...m, [clave]: valor }));
@@ -419,8 +464,8 @@ export function CapitalPage() {
     <div className="cap-page">
       <Header />
       <div className="cap-barra">
-        <Link to="/cuentas-por-cobrar-pagar" className="cap-volver">
-          <ArrowLeft size={16} /> Cuentas por Cobrar
+        <Link to="/" className="cap-volver">
+          <ArrowLeft size={16} /> Panel de módulos
         </Link>
       </div>
 
@@ -476,40 +521,70 @@ export function CapitalPage() {
         <p className="cap-cargando">Cargando el capital…</p>
       ) : (
         <div className="cap-hoja">
-          {/* ---------- Por cobrar ---------- */}
-          <section className="cap-bloque azul">
-            <h2>Por cobrar</h2>
+          {cuentaSaldando && (
+            <SaldarCuentaModal
+              cuenta={cuentaSaldando}
+              onCerrar={() => setSaldando(null)}
+              onHecho={(mensaje) => {
+                setSaldando(null);
+                setAviso(mensaje);
+                setTimeout(() => setAviso(null), 7000);
+                void cargar();
+              }}
+            />
+          )}
+
+          {/* ---------- Las cajas, con lo que tienen ahora ---------- */}
+          <section className="cap-bloque oscuro ancho">
+            <h2>Cajas · lo que hay ahora</h2>
             <table>
               <thead>
                 <tr>
-                  <th>Grupo</th>
-                  <th className="num">Monto</th>
+                  <th>Caja</th>
+                  <th className="num">Pesos</th>
+                  <th className="num">Dólares</th>
+                  <th className="num">Euros</th>
+                  <th className="num">Todo en pesos</th>
                 </tr>
               </thead>
               <tbody>
-                {foto.porCobrar.map((g) => (
-                  <tr key={g.grupo}>
+                {t.cajasAhora.map((c) => (
+                  <tr key={c.id}>
                     <td>
-                      {g.grupo} <small>({g.clientes})</small>
+                      {c.nombre} <small>{c.tipo === "FUERTE" ? "Caja Fuerte" : ""}</small>
                     </td>
-                    <td className="num">{pesos(g.total)}</td>
+                    <td className="num">{pesos(c.cop)}</td>
+                    <td className="num">${conDecimales(c.usd)}</td>
+                    <td className="num">{c.eur ? `€${conDecimales(c.eur)}` : "—"}</td>
+                    <td className="num cap-calculado">{t.tasaDolar || (!c.usd && !c.eur) ? pesos(c.enPesos) : "falta la tasa"}</td>
                   </tr>
                 ))}
-                {foto.porCobrar.length === 0 && (
-                  <tr>
-                    <td colSpan={2} className="cap-vacio">
-                      Nadie debe en Cuentas por Cobrar.
-                    </td>
-                  </tr>
-                )}
               </tbody>
               <tfoot>
                 <tr>
-                  <td>Total (del sistema)</td>
-                  <td className="num">{pesos(t.porCobrar)}</td>
+                  <td>Total en cajas</td>
+                  <td className="num">{pesos(t.cajasAhora.reduce((s, c) => s + c.cop, 0))}</td>
+                  <td className="num">${conDecimales(t.cajasAhora.reduce((s, c) => s + c.usd, 0))}</td>
+                  <td className="num">€{conDecimales(t.cajasAhora.reduce((s, c) => s + c.eur, 0))}</td>
+                  <td className="num">{pesos(t.cajasAhora.reduce((s, c) => s + c.enPesos, 0))}</td>
                 </tr>
               </tfoot>
             </table>
+          </section>
+
+          {/* ---------- Por cobrar: cada cliente que me debe ---------- */}
+          <section className="cap-bloque azul">
+            <h2>Por cobrar · me deben</h2>
+            <ListaSaldos
+              clientes={foto.cobrarClientes}
+              viejos={foto.porCobrar.map((g) => ({ nombre: `${g.grupo} (${g.clientes})`, pesos: g.total }))}
+              enPesosDe={t.enPesosCliente}
+              columna="Me debe"
+              accion="Cobrar"
+              onSaldar={soloLectura ? undefined : setSaldando}
+              vacio="Nadie me debe."
+              total={t.porCobrar}
+            />
             <h3>Por cobrar fuera del sistema</h3>
             <table>
               <tbody>{tablaFilas("cobrarFuera", "Nombre (ej. Kilbet 130$)", "Monto en pesos")}</tbody>
@@ -525,30 +600,17 @@ export function CapitalPage() {
 
           {/* ---------- Por pagar ---------- */}
           <section className="cap-bloque rojo">
-            <h2>Por pagar</h2>
-            <table>
-              <tbody>
-                {foto.porPagarCuentas.map((c, i) => (
-                  <tr key={i}>
-                    <td>{c.nombre}</td>
-                    <td className="num">{pesos(c.monto)}</td>
-                  </tr>
-                ))}
-                {foto.porPagarCuentas.length === 0 && (
-                  <tr>
-                    <td colSpan={2} className="cap-vacio">
-                      No se le debe a nadie en Cuentas por Cobrar.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>Total (del sistema)</td>
-                  <td className="num">{pesos(t.porPagarCuentas)}</td>
-                </tr>
-              </tfoot>
-            </table>
+            <h2>Por pagar · le debo</h2>
+            <ListaSaldos
+              clientes={foto.pagarClientes}
+              viejos={foto.porPagarCuentas.map((c) => ({ nombre: c.nombre, pesos: c.monto }))}
+              enPesosDe={t.enPesosCliente}
+              columna="Le debo"
+              accion="Pagar"
+              onSaldar={soloLectura ? undefined : setSaldando}
+              vacio="No le debo a nadie."
+              total={t.porPagarCuentas}
+            />
             <h3>Por pagar fuera del sistema</h3>
             <table>
               <tbody>{tablaFilas("pagarFuera", "Nombre", "Monto en pesos")}</tbody>
@@ -915,6 +977,44 @@ export function CapitalPage() {
                 <strong>{pesos(t.capitalDivisaCop)}</strong>
               </div>
             </div>
+            <div className="cap-resumen-col cap-total">
+              <div className="cap-ver-en" role="radiogroup" aria-label="Ver el capital en">
+                <span>Ver mi capital en</span>
+                <button type="button" role="radio" aria-checked={verEn === "COP"} className={verEn === "COP" ? "activo" : ""} onClick={() => setVerEn("COP")}>
+                  Pesos
+                </button>
+                <button type="button" role="radio" aria-checked={verEn === "USD"} className={verEn === "USD" ? "activo" : ""} onClick={() => setVerEn("USD")}>
+                  Dólares
+                </button>
+              </div>
+              {t.tasaDolar ? (
+                <>
+                  <dl>
+                    <div className={t.capitalCop < 0 ? "neg" : ""}>
+                      <dt>Lo de pesos{t.capitalCop < 0 ? " (es deuda)" : ""}</dt>
+                      <dd>{verEn === "COP" ? pesos(t.capitalCop) : `$${conDecimales(t.capitalCop / t.tasaDolar)} USD`}</dd>
+                    </div>
+                    <div className={t.capitalDivisa < 0 ? "neg" : ""}>
+                      <dt>Lo de dólares{t.capitalDivisa < 0 ? " (es deuda)" : ""}</dt>
+                      <dd>{verEn === "COP" ? pesos(t.capitalDivisaCop) : `$${conDecimales(t.capitalDivisa)} USD`}</dd>
+                    </div>
+                  </dl>
+                  <div className="cap-capital">
+                    <span>Capital total</span>
+                    <strong>
+                      {verEn === "COP" ? pesos(t.capitalCop + t.capitalDivisaCop) : `$${conDecimales(t.capitalCop / t.tasaDolar + t.capitalDivisa)}`}
+                    </strong>
+                    <span>{verEn === "COP" ? "En dólares" : "En pesos"}</span>
+                    <strong className="cap-otra">
+                      {verEn === "COP" ? `$${conDecimales(t.capitalCop / t.tasaDolar + t.capitalDivisa)}` : pesos(t.capitalCop + t.capitalDivisaCop)}
+                    </strong>
+                  </div>
+                  <small className="cap-total-nota">Con la tasa del dólar de arriba ({formatearMonto(String(t.tasaDolar))}): lo de pesos pasa a dólares dividiendo y lo de dólares a pesos multiplicando.</small>
+                </>
+              ) : (
+                <p className="cap-total-nota">Escribí la tasa del dólar arriba para ver el capital total en pesos y en dólares.</p>
+              )}
+            </div>
             {!soloLectura && (
               <div className="cap-guardar">
                 <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota del cuadre (opcional)" maxLength={500} />
@@ -968,5 +1068,94 @@ export function CapitalPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Los clientes con saldo, uno por uno, con lo que deben en su moneda y en pesos, y el botón para cancelar. */
+function ListaSaldos({
+  clientes,
+  viejos,
+  enPesosDe,
+  columna,
+  accion,
+  onSaldar,
+  vacio,
+  total,
+}: {
+  clientes: ClienteSaldo[] | undefined;
+  viejos: { nombre: string; pesos: number }[]; // los cuadres viejos: por grupo
+  enPesosDe: (c: ClienteSaldo) => number;
+  columna: string;
+  accion: string;
+  onSaldar?: (cuentaId: number) => void;
+  vacio: string;
+  total: number;
+}) {
+  const [buscar, setBuscar] = useState("");
+  const texto = buscar.trim().toLowerCase();
+  const lista = clientes ? clientes.filter((c) => !texto || c.nombre.toLowerCase().includes(texto)).sort((a, b) => enPesosDe(b) - enPesosDe(a)) : null;
+  return (
+    <>
+      {clientes && clientes.length > 6 && (
+        <div className="cap-buscar">
+          <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder={`Buscar entre ${clientes.length} clientes…`} aria-label="Buscar cliente" />
+        </div>
+      )}
+      <div className="cap-lista-saldos">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th className="num">{columna}</th>
+              <th className="num">En pesos</th>
+              {onSaldar && <th />}
+            </tr>
+          </thead>
+          <tbody>
+            {lista
+              ? lista.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      {c.nombre} {c.modulo === "POR_COBRAR" && <small>por cobrar</small>}
+                    </td>
+                    <td className="num">{c.codigo === "COP" ? pesos(c.saldo) : `${conDecimales(c.saldo)} ${c.codigo}`}</td>
+                    <td className="num cap-calculado">{pesos(enPesosDe(c))}</td>
+                    {onSaldar && (
+                      <td className="cap-banco-accion">
+                        <button type="button" onClick={() => onSaldar(c.id)} title={`${accion}: se anota en su cuenta y se elige qué caja se mueve (o ninguna)`}>
+                          {accion}
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              : viejos.map((v, i) => (
+                  <tr key={i}>
+                    <td>{v.nombre}</td>
+                    <td />
+                    <td className="num">{pesos(v.pesos)}</td>
+                  </tr>
+                ))}
+            {(lista ? lista.length === 0 : viejos.length === 0) && (
+              <tr>
+                <td colSpan={4} className="cap-vacio">
+                  {texto ? "Nadie con ese nombre." : vacio}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <table>
+        <tfoot>
+          <tr>
+            <td>
+              Total (del sistema){clientes ? ` · ${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"}` : ""}
+            </td>
+            <td className="num">{pesos(total)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </>
   );
 }

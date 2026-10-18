@@ -184,6 +184,15 @@ export const MODULOS: ModuloConfig[] = [
     rolesPermitidos: ["ADMIN", "ASESOR"],
   },
   {
+    id: "capital",
+    titulo: "Capital de giros",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: Landmark,
+    ruta: "/capital",
+    rolesPermitidos: ["ADMIN"],
+  },
+  {
     id: "rendimiento",
     titulo: "Rendimiento",
     categoria: "Administración general",
