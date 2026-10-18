@@ -7,6 +7,8 @@ import { capitalApi, type CuadreResumen, type DatosDelSistema } from "../../api/
 import { getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, leerNumero } from "../../utils/montos";
 import { enPesos, grupoDe, gruposDe, mismoGrupo } from "../cuentasPorCobrarPagar/cobrar";
+import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
+import "../cuentasCorrientes/cuentasCorrientes.css";
 import "./capital.css";
 
 /*
@@ -280,6 +282,8 @@ export function CapitalPage() {
   const [nuevoBanco, setNuevoBanco] = useState<{ nombre: string; moneda: string } | null>(null);
   const [saldosReales, setSaldosReales] = useState<Record<string, string>>({});
   const [cargandoBanco, setCargandoBanco] = useState<string | null>(null);
+  // editar, ingreso o egreso, traslado o ver movimientos de una cuenta
+  const [accionBanco, setAccionBanco] = useState<{ accion: AccionBanco; bancoId: number } | null>(null);
   async function recargarSistema() {
     try {
       setSistema(await capitalApi.sistema());
@@ -570,6 +574,20 @@ export function CapitalPage() {
             </label>
           </section>
 
+          {accionBanco && sistema?.bancos?.some((b) => b.id === accionBanco.bancoId) && (
+            <BancoAccionModal
+              accion={accionBanco.accion}
+              banco={sistema.bancos.find((b) => b.id === accionBanco.bancoId)!}
+              bancos={sistema.bancos}
+              onCerrar={() => setAccionBanco(null)}
+              onHecho={(mensaje) => {
+                setAccionBanco(null);
+                setAviso(mensaje);
+                setTimeout(() => setAviso(null), 6000);
+                void recargarSistema();
+              }}
+            />
+          )}
           {/* ---------- Cuentas de bancos de la empresa ---------- */}
           <section className="cap-bloque morado ancho">
             <h2>Cuentas de bancos</h2>
@@ -592,6 +610,24 @@ export function CapitalPage() {
                     <tr key={b.id}>
                       <td>
                         {b.nombre} <small>{moneda}</small>
+                        <span className="cap-banco-links">
+                          {!soloLectura && (
+                            <>
+                              <button type="button" onClick={() => setAccionBanco({ accion: "movimiento", bancoId: b.id })}>
+                                Ingreso / egreso
+                              </button>
+                              <button type="button" onClick={() => setAccionBanco({ accion: "traslado", bancoId: b.id })}>
+                                Pasar a otra cuenta
+                              </button>
+                              <button type="button" onClick={() => setAccionBanco({ accion: "renombrar", bancoId: b.id })}>
+                                Editar
+                              </button>
+                            </>
+                          )}
+                          <button type="button" onClick={() => setAccionBanco({ accion: "historial", bancoId: b.id })}>
+                            Movimientos
+                          </button>
+                        </span>
                         {otras.length > 0 && <small> · también {otras.map((x) => `${conDecimales(Number(x.monto))} ${x.codigo}`).join(", ")}</small>}
                       </td>
                       <td className="num">{moneda === "COP" ? pesos(enSistema) : `${conDecimales(enSistema)} ${moneda}`}</td>

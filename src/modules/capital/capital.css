@@ -95,3 +95,16 @@
 .cap-banco-accion button.secundario { margin-left: 6px; background: white; color: #374151; border: 1px solid #cfd6e0; }
 .cap-banco-nuevo select { width: 100%; padding: 6px 8px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.86rem; background: white; }
 .cap-nota-bancos { margin: 8px 14px 12px; font-size: 0.76rem; color: #6b7280; }
+
+/* Lo que se le hace a cada cuenta de banco */
+.cap-banco-links { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; }
+.cap-banco-links button { padding: 0; border: none; background: none; color: #6d28d9; font: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
+.cap-banco-links button:hover { text-decoration: underline; }
+.cap-historial-banco { max-height: 60vh; overflow-y: auto; }
+.cap-historial-banco table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.cap-historial-banco th { padding: 7px 10px; text-align: left; font-size: 0.74rem; text-transform: uppercase; color: #6b7280; border-bottom: 2px solid #eef0f3; }
+.cap-historial-banco td { padding: 7px 10px; border-bottom: 1px solid #eef0f3; }
+.cap-historial-banco td small { color: #8a93a3; }
+.cap-historial-banco .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cap-historial-banco .cap-neg { color: #b3261e; }
+.cap-historial-banco .cap-pos { color: #166534; }

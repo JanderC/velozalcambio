@@ -14,6 +14,17 @@ export interface BancoDelSistema {
   saldos: { codigo: string; monto: string | number }[];
 }
 
+export interface MovimientoBanco {
+  id: number;
+  tipo: "INGRESO" | "EGRESO";
+  monto: string;
+  saldo_nuevo: string;
+  observacion: string | null;
+  created_at: string;
+  codigo: string;
+  usuario: string | null;
+}
+
 export interface DatosDelSistema {
   cajas: CajaDelSistema[];
   // las cuentas de banco de la empresa y lo que tienen
@@ -43,6 +54,12 @@ export const capitalApi = {
   crearBanco: (nombre: string, moneda: string) => api.post<{ id: number; nombre: string }>("/capital/bancos", { nombre, moneda }),
   cargarSaldoBanco: (id: number, moneda: string, saldo: string) =>
     api.post<{ cuenta: string; antes: string; ahora: string; diferencia: string }>(`/capital/bancos/${id}/saldo`, { moneda, saldo }),
+  renombrarBanco: (id: number, nombre: string) => api.put<{ id: number; nombre: string }>(`/capital/bancos/${id}`, { nombre }),
+  movimientoBanco: (id: number, d: { tipo: "INGRESO" | "EGRESO"; moneda: string; monto: string; nota: string }) =>
+    api.post<{ cuenta: string; antes: string; ahora: string }>(`/capital/bancos/${id}/movimiento`, d),
+  movimientosBanco: (id: number) => api.get<MovimientoBanco[]>(`/capital/bancos/${id}/movimientos`),
+  transferirBancos: (d: { origenId: number; destinoId: number; moneda: string; monto: string; nota?: string }) =>
+    api.post<{ de: string; a: string; monto: string; moneda: string }>("/capital/bancos/transferir", d),
   guardar: (cuadre: { datos: Record<string, unknown>; capitalCop: number; capitalDivisa: number; capitalDivisaCop: number; nota?: string }) =>
     api.post<{ id: number; created_at: string }>("/capital/cuadres", cuadre),
 };
