@@ -59,6 +59,8 @@ interface Foto {
   // los cuadres viejos traen por cobrar por grupo (porCobrar) y no estas listas
   cobrarClientes?: ClienteSaldo[];
   pagarClientes?: ClienteSaldo[];
+  // las confirmaciones sin pagar van en por pagar, cliente por cliente (en los cuadres viejos iban solo por moneda)
+  confirmacionesEnLista?: boolean;
   porCobrar: { grupo: string; total: number; clientes: number }[];
   porPagarCuentas: { nombre: string; monto: number }[];
   cajas: DatosDelSistema["cajas"];
@@ -118,15 +120,17 @@ export function CapitalPage() {
 
   const cargar = useCallback(async () => {
     try {
-      // por cobrar y por pagar salen de Cuentas Corrientes (y de Cuentas por Cobrar)
-      const [s, corrientes, cobrar, lista] = await Promise.all([
+      // por cobrar y por pagar salen de Cuentas Corrientes, de Cuentas por Cobrar y de Confirmaciones (lo confirmado que
+      // todavía no han venido a retirar)
+      const [s, corrientes, cobrar, confirmaciones, lista] = await Promise.all([
         capitalApi.sistema(),
         getCuentasCorrientes({ vista: "corrientes" }),
         getCuentasCorrientes({ vista: "cobrar" }),
+        getCuentasCorrientes({ vista: "cajas" }),
         capitalApi.cuadres(),
       ]);
       setSistema(s);
-      setCuentas([...corrientes, ...cobrar]);
+      setCuentas([...corrientes, ...cobrar, ...confirmaciones]);
       setCuadres(lista);
       return lista;
     } catch (e) {
@@ -156,13 +160,29 @@ export function CapitalPage() {
     const conSaldo = cuentas.filter((c) => /[1-9]/.test(c.saldo_actual));
     const aCliente = (c: CuentaCorrienteResumen): ClienteSaldo => {
       const p = enPesos(c);
-      const grupo = c.modulo === "POR_COBRAR" ? `Cuentas por Cobrar · ${grupoDe(c)}` : `Cuentas Corrientes · ${TIPO_TERCERO[c.tercero_tipo] ?? "Otros"}`;
+      const grupo =
+        c.modulo === "CAJA"
+          ? c.saldo_actual.startsWith("-") ? "Confirmaciones · pagado de más" : "Confirmaciones · no han venido a retirar"
+          : c.modulo === "POR_COBRAR"
+            ? `Cuentas por Cobrar · ${grupoDe(c)}`
+            : `Cuentas Corrientes · ${TIPO_TERCERO[c.tercero_tipo] ?? "Otros"}`;
       return { id: c.id, nombre: c.tercero_nombre, modulo: c.modulo, codigo: c.moneda_codigo, saldo: Math.abs(Number(c.saldo_actual)), grupo, pesosCuenta: p === null ? null : Math.abs(Number(p)) };
     };
-    // me debe: saldo positivo · le debo: saldo negativo
-    const cobrarClientes = conSaldo.filter((c) => !c.saldo_actual.startsWith("-")).map(aCliente);
-    const pagarClientes = conSaldo.filter((c) => c.saldo_actual.startsWith("-")).map(aCliente);
-    return { porCobrar: [], porPagarCuentas: [], cobrarClientes, pagarClientes, cajas: sistema.cajas, bancos: sistema.bancos ?? [], confirmaciones: sistema.confirmacionesPorPagar };
+    // me debe: saldo positivo · le debo: saldo negativo. En Confirmaciones es al revés: positivo es lo que le debo
+    const leDebo = (c: CuentaCorrienteResumen) => c.saldo_actual.startsWith("-") !== (c.modulo === "CAJA");
+    // de Confirmaciones solo lo que se le debe al cliente (lo que no ha venido a retirar); un saldo al revés allá es un error de carga, no plata por cobrar
+    const cobrarClientes = conSaldo.filter((c) => !leDebo(c) && c.modulo !== "CAJA").map(aCliente);
+    const pagarClientes = conSaldo.filter(leDebo).map(aCliente);
+    return {
+      porCobrar: [],
+      porPagarCuentas: [],
+      cobrarClientes,
+      pagarClientes,
+      confirmacionesEnLista: true,
+      cajas: sistema.cajas,
+      bancos: sistema.bancos ?? [],
+      confirmaciones: sistema.confirmacionesPorPagar,
+    };
   }, [sistema, cuentas]);
   const foto = viendo?.foto ?? fotoActual;
   const soloLectura = !!viendo;
@@ -188,7 +208,12 @@ export function CapitalPage() {
               : (c.pesosCuenta ?? 0);
     const porCobrar = foto.cobrarClientes ? foto.cobrarClientes.reduce((s, c) => s + enPesosCliente(c), 0) : foto.porCobrar.reduce((s, g) => s + g.total, 0);
     const cobrarFuera = suma(m.cobrarFuera);
-    const porPagarCuentas = foto.pagarClientes ? foto.pagarClientes.reduce((s, c) => s + enPesosCliente(c), 0) : foto.porPagarCuentas.reduce((s, c) => s + c.monto, 0);
+    // lo que no han venido a retirar (Confirmaciones) se cuenta solo con la casilla marcada
+    const sinRetirar = (foto.pagarClientes ?? []).filter((c) => c.modulo === "CAJA");
+    const sinRetirarCop = sinRetirar.reduce((s, c) => s + enPesosCliente(c), 0);
+    const porPagarCuentas = foto.pagarClientes
+      ? foto.pagarClientes.filter((c) => c.modulo !== "CAJA" || m.restarConfirmaciones).reduce((s, c) => s + enPesosCliente(c), 0)
+      : foto.porPagarCuentas.reduce((s, c) => s + c.monto, 0);
     // lo que hay ahora en cada caja (taquillas, Caja Fuerte…), por moneda y en pesos
     const cajasAhora = foto.cajas.map((c) => {
       const de = (codigo: string) => Number(c.saldos.find((x) => x.codigo === codigo)?.monto ?? 0);
@@ -231,9 +256,11 @@ export function CapitalPage() {
     const divisasFuera = m.dolaresFuera.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
     const porPagarUsd = m.dolaresPorPagar.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
     const conf = (codigo: string) => Number(foto.confirmaciones.find((c) => c.codigo === codigo)?.total ?? 0);
-    const confCop = conf("COP");
-    const confVes = conf("VES");
-    const confUsd = conf("USD") + conf("USDT");
+    // los cuadres viejos restaban las confirmaciones aparte, por moneda; los nuevos las traen en la lista de por pagar
+    const aparte = !foto.confirmacionesEnLista;
+    const confCop = aparte ? conf("COP") : 0;
+    const confVes = aparte ? conf("VES") : 0;
+    const confUsd = aparte ? conf("USD") + conf("USDT") : 0;
     const restar = m.restarConfirmaciones;
 
     const usdEnCaja = divisasCajas.filter((d) => d.codigo === "USD").reduce((s, d) => s + d.cantidad, 0) + divisasFuera.reduce((s, d) => s + d.cantidad, 0);
@@ -246,6 +273,8 @@ export function CapitalPage() {
     const capitalDivisa = usdEnCaja - usdPorPagar;
     const capitalDivisaCop = divisasCop - usdPorPagarCop;
     return {
+      sinRetirar,
+      sinRetirarCop,
       tasaDolar,
       tasaEuro,
       tasaBs,
@@ -605,6 +634,7 @@ export function CapitalPage() {
               columna="Le debo"
               vacio="No le debo a nadie."
               total={t.porPagarCuentas}
+              noSuma={manual.restarConfirmaciones ? undefined : "Confirmaciones · no han venido a retirar"}
             />
             <h3>Por pagar sin relacionar</h3>
             <p className="cap-sub">Lo que debo y todavía no está en ninguna cuenta del sistema.</p>
@@ -622,6 +652,17 @@ export function CapitalPage() {
             </div>
             <label className="cap-confirmaciones">
               <input type="checkbox" checked={manual.restarConfirmaciones} onChange={(e) => cambiar("restarConfirmaciones", e.target.checked)} disabled={soloLectura} />
+              {foto.confirmacionesEnLista ? (
+                <span>
+                  Contar en el capital lo que no han venido a retirar
+                  <small>
+                    {t.sinRetirar.length
+                      ? `${t.sinRetirar.length} ${t.sinRetirar.length === 1 ? "cliente" : "clientes"} con confirmaciones sin pagar: ${pesos(t.sinRetirarCop)} en pesos. Van en la lista de arriba, en su grupo.`
+                      : "No hay confirmaciones sin pagar."}{" "}
+                    Incluye las viejas que se pagaron por fuera y no se marcaron.
+                  </small>
+                </span>
+              ) : (
               <span>
                 Restar las confirmaciones sin pagar
                 <small>
@@ -631,6 +672,7 @@ export function CapitalPage() {
                   · Incluye las viejas que se pagaron por fuera y no se marcaron.
                 </small>
               </span>
+              )}
             </label>
           </section>
 
@@ -1086,7 +1128,8 @@ export function CapitalPage() {
 }
 
 /** A dónde se va para ver la cuenta del cliente (su hoja, con sus movimientos). */
-const rutaCuenta = (c: ClienteSaldo) => (c.modulo === "POR_COBRAR" ? `/cuentas-por-cobrar-pagar?cuenta=${c.id}` : `/cuentas-corrientes?cuenta=${c.id}`);
+const rutaCuenta = (c: ClienteSaldo) =>
+  c.modulo === "POR_COBRAR" ? `/cuentas-por-cobrar-pagar?cuenta=${c.id}` : c.modulo === "CAJA" ? `/cajas-confirmaciones?cuenta=${c.id}` : `/cuentas-corrientes?cuenta=${c.id}`;
 
 /**
  * Los clientes con saldo, por grupos (los de Cuentas por Cobrar por su grupo; los de Cuentas Corrientes por lo que
@@ -1099,6 +1142,7 @@ function ListaSaldos({
   columna,
   vacio,
   total,
+  noSuma,
 }: {
   clientes: ClienteSaldo[] | undefined;
   viejos: { nombre: string; pesos: number }[]; // los cuadres viejos: por grupo
@@ -1106,6 +1150,7 @@ function ListaSaldos({
   columna: string;
   vacio: string;
   total: number;
+  noSuma?: string; // un grupo que se ve pero no entra en el total
 }) {
   const [buscar, setBuscar] = useState("");
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
@@ -1153,6 +1198,7 @@ function ListaSaldos({
                     <td>
                       <button type="button" aria-expanded={abierto(g.nombre)}>
                         <span className="cap-grupo-flecha">{abierto(g.nombre) ? "▾" : "▸"}</span> {g.nombre} <small>({g.clientes.length})</small>
+                        {g.nombre === noSuma && <small className="cap-no-suma">no se suma al capital</small>}
                       </button>
                     </td>
                     <td />

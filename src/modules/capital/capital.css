@@ -233,3 +233,4 @@
   .cap-todo-junto strong { font-size: 1.05rem; }
   .cap-todo-junto small { white-space: normal; }
 }
+.cap-no-suma { margin-left: 6px; padding: 1px 7px; border-radius: 8px; background: #fff4e0; color: #a8531f; font-weight: 600; }
