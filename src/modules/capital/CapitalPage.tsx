@@ -537,6 +537,7 @@ export function CapitalPage() {
           {/* ---------- Las cajas, con lo que tienen ahora ---------- */}
           <section className="cap-bloque oscuro ancho">
             <h2>Cajas · lo que hay ahora</h2>
+            <div className="cap-tabla">
             <table>
               <thead>
                 <tr>
@@ -570,6 +571,7 @@ export function CapitalPage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </section>
 
           {/* ---------- Por cobrar: cada cliente que me debe ---------- */}
@@ -586,6 +588,7 @@ export function CapitalPage() {
               total={t.porCobrar}
             />
             <h3>Por cobrar fuera del sistema</h3>
+            <div className="cap-tabla">
             <table>
               <tbody>{tablaFilas("cobrarFuera", "Nombre (ej. Kilbet 130$)", "Monto en pesos")}</tbody>
               <tfoot>
@@ -596,6 +599,7 @@ export function CapitalPage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </section>
 
           {/* ---------- Por pagar ---------- */}
@@ -612,6 +616,7 @@ export function CapitalPage() {
               total={t.porPagarCuentas}
             />
             <h3>Por pagar fuera del sistema</h3>
+            <div className="cap-tabla">
             <table>
               <tbody>{tablaFilas("pagarFuera", "Nombre", "Monto en pesos")}</tbody>
               <tfoot>
@@ -622,6 +627,7 @@ export function CapitalPage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
             <label className="cap-confirmaciones">
               <input type="checkbox" checked={manual.restarConfirmaciones} onChange={(e) => cambiar("restarConfirmaciones", e.target.checked)} disabled={soloLectura} />
               <span>
@@ -653,6 +659,7 @@ export function CapitalPage() {
           {/* ---------- Cuentas de bancos de la empresa ---------- */}
           <section className="cap-bloque morado ancho">
             <h2>Cuentas de bancos</h2>
+            <div className="cap-tabla">
             <table>
               <thead>
                 <tr>
@@ -756,6 +763,7 @@ export function CapitalPage() {
                   ))}
               </tbody>
             </table>
+            </div>
             <p className="cap-nota-bancos">
               Se carga lo que cada cuenta tiene hoy y desde ahí el sistema la lleva: las confirmaciones pagadas por otro método salen de ahí. Lo de cada cuenta
               entra solo en Pesos, Bolívares o Dólares según su moneda.
@@ -765,6 +773,7 @@ export function CapitalPage() {
           {/* ---------- Bolívares ---------- */}
           <section className="cap-bloque magenta">
             <h2>Bolívares</h2>
+            <div className="cap-tabla">
             <table>
               <thead>
                 <tr>
@@ -802,11 +811,13 @@ export function CapitalPage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </section>
 
           {/* ---------- Pesos ---------- */}
           <section className="cap-bloque cian">
             <h2>Pesos</h2>
+            <div className="cap-tabla">
             <table>
               <thead>
                 <tr>
@@ -852,11 +863,13 @@ export function CapitalPage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </section>
 
           {/* ---------- Dólares y pesos ---------- */}
           <section className="cap-bloque verde ancho">
             <h2>Dólares y pesos</h2>
+            <div className="cap-tabla">
             <table>
               <thead>
                 <tr>
@@ -906,7 +919,9 @@ export function CapitalPage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
             <h3>Dólares por pagar</h3>
+            <div className="cap-tabla">
             <table>
               <tbody>{tablaDivisas("dolaresPorPagar", "Nombre (ej. Jesús Herrera)")}</tbody>
               <tfoot>
@@ -919,6 +934,7 @@ export function CapitalPage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </section>
 
           {/* ---------- El resumen ---------- */}
@@ -1033,6 +1049,7 @@ export function CapitalPage() {
             {cuadres.length === 0 ? (
               <p className="cap-vacio">Todavía no hay cuadres guardados.</p>
             ) : (
+              <div className="cap-tabla">
               <table>
                 <thead>
                   <tr>
@@ -1063,6 +1080,7 @@ export function CapitalPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </section>
         </div>
@@ -1102,6 +1120,7 @@ function ListaSaldos({
         </div>
       )}
       <div className="cap-lista-saldos">
+        <div className="cap-tabla">
         <table>
           <thead>
             <tr>
@@ -1145,7 +1164,9 @@ function ListaSaldos({
             )}
           </tbody>
         </table>
+        </div>
       </div>
+      <div className="cap-tabla">
       <table>
         <tfoot>
           <tr>
@@ -1156,6 +1177,7 @@ function ListaSaldos({
           </tr>
         </tfoot>
       </table>
+      </div>
     </>
   );
 }

@@ -23,9 +23,12 @@
 .cap-viendo button { padding: 6px 12px; border: 1px solid #c9a23e; border-radius: 8px; background: white; color: #7a5b00; font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
 .cap-cargando { margin: 30px 40px; color: #6b7280; }
 
-.cap-hoja { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; align-items: start; margin: 16px 40px 0; }
-.cap-bloque { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
-.cap-bloque.ancho { grid-column: span 2; }
+/* dos columnas en pantalla grande, una en tablet y teléfono (minmax(0, …) para que nada empuje el ancho) */
+.cap-hoja { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; margin: 16px 40px 0; }
+.cap-bloque { min-width: 0; background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
+.cap-bloque.ancho { grid-column: 1 / -1; }
+/* cada tabla se desliza de lado si no cabe (en el teléfono), sin romper la página */
+.cap-tabla { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .cap-bloque h2 { margin: 0; padding: 10px 14px; color: white; font-family: "Space Grotesk", sans-serif; font-size: 1rem; text-align: center; letter-spacing: 0.02em; }
 .cap-bloque.azul h2 { background: #1d39c4; }
 .cap-bloque.rojo h2 { background: #d0161e; }
@@ -80,12 +83,7 @@
 .cap-historial .cap-nota { color: #6b7280; font-size: 0.82rem; }
 .cap-historial button { padding: 5px 12px; border: 1px solid var(--color-navy); border-radius: 8px; background: white; color: var(--color-navy); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
 
-@media (max-width: 760px) {
-  .cap-barra { padding: 12px 14px 0; }
-  .cap-hero, .cap-hoja, .cap-error, .cap-ok, .cap-viendo { margin-left: 12px; margin-right: 12px; }
-  .cap-bloque.ancho { grid-column: auto; }
-  .cap-historial { overflow-x: auto; }
-}
+
 
 /* Cuentas de bancos de la empresa */
 .cap-bloque.morado h2 { background: #6d28d9; }
@@ -130,3 +128,43 @@
 .cap-saldar-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0; padding: 14px 16px; border-radius: 12px; background: #e8eefb; color: #1d39c4; font-size: 0.92rem; }
 .cap-saldar-total.debo { background: #fdf0ee; color: #b3261e; }
 .cap-saldar-total strong { font-family: "Space Grotesk", sans-serif; font-size: 1.5rem; }
+
+/* ---------- Tablet y teléfono ---------- */
+.cap-lista-saldos { overflow: auto; }
+.cap-lista-saldos .cap-tabla { overflow: visible; }
+@media (max-width: 1000px) {
+  .cap-hoja { grid-template-columns: minmax(0, 1fr); }
+  .cap-resumen { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .cap-barra { padding: 12px 12px 0; }
+  .cap-hero, .cap-hoja, .cap-error, .cap-ok, .cap-viendo { margin-left: 10px; margin-right: 10px; }
+  .cap-hero { flex-direction: column; align-items: stretch; padding: 16px; gap: 14px; }
+  .cap-hero h1 { font-size: 1.3rem; }
+  .cap-hero-icono { width: 42px; height: 42px; }
+  /* las tres tasas en una fila que ocupa todo el ancho */
+  .cap-tasas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .cap-tasas label { font-size: 0.64rem; }
+  .cap-tasas input { width: 100%; padding: 8px; font-size: 0.92rem; }
+  .cap-hoja { gap: 12px; }
+  .cap-bloque h2 { font-size: 0.95rem; }
+  .cap-bloque table, .cap-historial table { font-size: 0.82rem; }
+  .cap-bloque th { padding: 6px 8px; font-size: 0.68rem; }
+  .cap-bloque td { padding: 5px 8px; }
+  /* las tablas con muchas columnas no se aplastan: se deslizan de lado */
+  .cap-bloque.ancho .cap-tabla table, .cap-historial .cap-tabla table { min-width: 560px; }
+  .cap-lista-saldos table { min-width: 430px; }
+  .cap-lista-saldos { max-height: 360px; }
+  .cap-bloque td.num input { min-width: 80px; }
+  .cap-banco-links { gap: 2px 8px; }
+  .cap-banco-accion button { padding: 6px 9px; }
+  .cap-historial { padding: 12px; }
+  .cap-resumen-col { padding: 14px; }
+  .cap-resumen dl div { font-size: 0.86rem; }
+  .cap-capital { padding: 10px 12px; }
+  .cap-capital strong { font-size: 1.3rem; }
+  .cap-guardar { flex-direction: column; }
+  .cap-guardar input { max-width: none; min-width: 0; }
+  .cap-guardar button { justify-content: center; }
+}
+.cap-historial, .cap-resumen, .cap-resumen-col { min-width: 0; }
