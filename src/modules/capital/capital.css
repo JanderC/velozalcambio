@@ -238,3 +238,5 @@
 .cap-ir-taquilla a { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 6px; border-radius: 6px; background: #d0161e; color: white; font-weight: 700; text-decoration: none; }
 .cap-ir-taquilla a:hover { background: #a80f16; }
 .cap-en-vivo { margin-left: 10px; font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; color: #a7f3d0; }
+.cap-fecha-pend { display: block; margin-top: 1px; font-size: 0.72rem; color: #6b7280; }
+.cap-fecha-pend.vieja { color: #a8531f; font-weight: 600; }

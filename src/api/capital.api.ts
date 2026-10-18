@@ -27,6 +27,8 @@ export interface MovimientoBanco {
 
 export interface DatosDelSistema {
   cajas: CajaDelSistema[];
+  // de cada cliente de Confirmaciones: desde cuándo tiene confirmaciones sin pagar
+  sinRetirar?: { cuenta_id: number; desde: string; hasta: string; cantidad: number }[];
   // las cuentas de banco de la empresa y lo que tienen
   bancos?: BancoDelSistema[];
   // confirmaciones que se le deben a clientes y todavía no se pagaron, por moneda

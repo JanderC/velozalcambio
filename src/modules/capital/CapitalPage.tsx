@@ -51,6 +51,10 @@ interface ClienteSaldo {
   modulo: string;
   codigo: string;
   saldo: number; // sin signo
+  // Confirmaciones: de cuándo son las confirmaciones que no ha venido a retirar
+  desde?: string;
+  hasta?: string;
+  pendientes?: number;
   grupo?: string; // dónde va: el grupo de Cuentas por Cobrar o qué es en Cuentas Corrientes (los cuadres viejos no lo traen)
   pesosCuenta: number | null; // en pesos con la tasa de la cuenta (si no hay tasa arriba para esa moneda)
 }
@@ -202,15 +206,17 @@ export function CapitalPage() {
   const fotoActual: Foto | null = useMemo(() => {
     if (!sistema || !cuentas) return null;
     const conSaldo = cuentas.filter((c) => /[1-9]/.test(c.saldo_actual));
+    const fechas = new Map((sistema.sinRetirar ?? []).map((f) => [f.cuenta_id, f]));
     const aCliente = (c: CuentaCorrienteResumen): ClienteSaldo => {
       const p = enPesos(c);
+      const f = c.modulo === "CAJA" ? fechas.get(c.id) : undefined;
       const grupo =
         c.modulo === "CAJA"
           ? c.saldo_actual.startsWith("-") ? "Confirmaciones · pagado de más" : "Confirmaciones · no han venido a retirar"
           : c.modulo === "POR_COBRAR"
             ? `Cuentas por Cobrar · ${grupoDe(c)}`
             : `Cuentas Corrientes · ${TIPO_TERCERO[c.tercero_tipo] ?? "Otros"}`;
-      return { id: c.id, nombre: c.tercero_nombre, modulo: c.modulo, codigo: c.moneda_codigo, saldo: Math.abs(Number(c.saldo_actual)), grupo, pesosCuenta: p === null ? null : Math.abs(Number(p)) };
+      return { id: c.id, nombre: c.tercero_nombre, modulo: c.modulo, codigo: c.moneda_codigo, saldo: Math.abs(Number(c.saldo_actual)), grupo, ...(f ? { desde: f.desde, hasta: f.hasta, pendientes: f.cantidad } : {}), pesosCuenta: p === null ? null : Math.abs(Number(p)) };
     };
     // me debe: saldo positivo · le debo: saldo negativo. En Confirmaciones es al revés: positivo es lo que le debo
     const leDebo = (c: CuentaCorrienteResumen) => c.saldo_actual.startsWith("-") !== (c.modulo === "CAJA");
@@ -1208,7 +1214,10 @@ function ListaSaldos({
   const grupos = lista
     ? [...new Set(lista.map((c) => c.grupo ?? "Otros"))]
         .map((g) => {
-          const de = lista.filter((c) => (c.grupo ?? "Otros") === g).sort((a, b) => enPesosDe(b) - enPesosDe(a));
+          const de = lista
+            .filter((c) => (c.grupo ?? "Otros") === g)
+            // lo que no han venido a retirar: de lo más viejo a lo más nuevo; lo demás, del que más debe al que menos
+            .sort((a, b) => (a.desde && b.desde ? a.desde.localeCompare(b.desde) : enPesosDe(b) - enPesosDe(a)));
           return { nombre: g, clientes: de, total: de.reduce((s, c) => s + enPesosDe(c), 0) };
         })
         .sort((a, b) => b.total - a.total)
@@ -1259,6 +1268,7 @@ function ListaSaldos({
                           <Link to={rutaCuenta(c)} title="Ver su cuenta: movimientos y saldo">
                             {c.nombre}
                           </Link>
+                          {c.desde && <FechaPendiente desde={c.desde} hasta={c.hasta ?? c.desde} cantidad={c.pendientes ?? 1} />}
                         </td>
                         <td className="num">{c.codigo === "COP" ? pesos(c.saldo) : `${conDecimales(c.saldo)} ${c.codigo}`}</td>
                         <td className="num cap-calculado">
@@ -1392,5 +1402,20 @@ function TodoJunto({ t }: { t: Totales }) {
       </div>
       {falta ? <p className="cap-todo-falta">Falta alguna tasa: lo de esa moneda no entra en lo de “junto”.</p> : null}
     </div>
+  );
+}
+
+/** De cuándo es lo que no ha venido a retirar: "confirmada el 12 oct · hace 5 días" (lo viejo se resalta). */
+function FechaPendiente({ desde, hasta, cantidad }: { desde: string; hasta: string; cantidad: number }) {
+  const dia = (f: string) => new Date(f).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" });
+  const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+  const delDia = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(desde));
+  const dias = Math.round((Date.parse(hoy) - Date.parse(delDia)) / 86_400_000);
+  const hace = dias <= 0 ? "hoy" : dias === 1 ? "ayer" : `hace ${dias} días`;
+  const cuando = cantidad > 1 && dia(desde) !== dia(hasta) ? `${cantidad} confirmaciones · del ${dia(desde)} al ${dia(hasta)}` : `${cantidad > 1 ? `${cantidad} confirmaciones · ` : "confirmada el "}${dia(desde)}`;
+  return (
+    <small className={`cap-fecha-pend ${dias >= 3 ? "vieja" : ""}`} title={`La más vieja: ${new Date(desde).toLocaleString("es-CO", { timeZone: "America/Bogota" })}`}>
+      {cuando} · {hace}
+    </small>
   );
 }
