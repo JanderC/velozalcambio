@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { CheckCircle2, Image as IconoImagen, Landmark, Lock, LockOpen, Search, Wallet } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { Header } from "../../components/common/Header";
 import { MiDiaHoy } from "../rendimiento/MiDiaHoy";
 import { Modal } from "../../components/common/Modal";
@@ -54,7 +55,9 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
   // Taquilla 1, 2 o 3: misma pantalla, cada una con su caja
   usarTaquilla(numero);
   const [taquilla, setTaquilla] = useState<Taquilla | null>(null);
-  const [buscar, setBuscar] = useState("");
+  // ?buscar=: se llega ya buscando a ese cliente (desde Capital de giros, para pagarle)
+  const [parametros] = useSearchParams();
+  const [buscar, setBuscar] = useState(() => parametros.get("buscar") ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pagando, setPagando] = useState<number | null>(null);
   const [moviendo, setMoviendo] = useState<SaldoTaquilla | null>(null);

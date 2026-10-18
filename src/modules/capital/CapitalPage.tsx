@@ -1213,7 +1213,24 @@ function ListaSaldos({
                           </Link>
                         </td>
                         <td className="num">{c.codigo === "COP" ? pesos(c.saldo) : `${conDecimales(c.saldo)} ${c.codigo}`}</td>
-                        <td className="num cap-calculado">{pesos(enPesosDe(c))}</td>
+                        <td className="num cap-calculado">
+                          {pesos(enPesosDe(c))}
+                          {/* lo que no ha venido a retirar: se le paga en taquilla (se llega ya buscándolo) */}
+                          {c.modulo === "CAJA" && (
+                            <span className="cap-ir-taquilla">
+                              Pagar en taquilla:{" "}
+                              {[
+                                ["/taquilla", "1"],
+                                ["/taquilla-2", "2"],
+                                ["/taquilla-3", "3"],
+                              ].map(([ruta, n]) => (
+                                <Link key={n} to={`${ruta}?buscar=${encodeURIComponent(c.nombre)}`} title={`Ir a Taquilla ${n} con ${c.nombre} ya buscado, para pagarle`}>
+                                  {n}
+                                </Link>
+                              ))}
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                 </tbody>
