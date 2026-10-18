@@ -44,3 +44,15 @@
   .rend-lista { grid-template-columns: 1fr; }
   .rend-numero strong { font-size: 1.25rem; }
 }
+
+/* Lo que lleva hoy el usuario, arriba de taquilla y Confirmaciones */
+.rend-mi-dia { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 10px 40px 0; padding: 9px 14px; border-radius: 12px; background: linear-gradient(135deg, #0b0e13 0%, #14406f 100%); color: white; font-family: "Inter", sans-serif; font-size: 0.9rem; }
+.rend-mi-dia > svg { color: var(--color-gold); flex-shrink: 0; }
+.rend-mi-dia strong { font-family: "Space Grotesk", sans-serif; font-size: 1.25rem; color: var(--color-gold); margin: 0 2px; }
+.rend-mi-dia small { margin-left: 8px; color: rgba(255, 255, 255, 0.65); font-size: 0.78rem; }
+.rend-mi-dia em { font-style: normal; font-weight: 600; color: #a7f3d0; }
+.rend-mi-dia a { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: rgba(255, 255, 255, 0.85); font-size: 0.8rem; font-weight: 600; text-decoration: none; }
+.rend-mi-dia a:hover { color: white; text-decoration: underline; }
+@media (max-width: 760px) {
+  .rend-mi-dia { margin: 8px 12px 0; }
+}

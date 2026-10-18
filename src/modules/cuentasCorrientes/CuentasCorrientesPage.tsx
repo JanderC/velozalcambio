@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
+import { MiDiaHoy } from "../rendimiento/MiDiaHoy";
 import { useAuth } from "../../auth/useAuth";
 import { Link } from "react-router-dom";
 import { crearCuentaCorriente, getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
@@ -17,7 +18,7 @@ const TIPOS: { valor: string; etiqueta: string }[] = [
   { valor: "", etiqueta: "Todos" },
   { valor: "PROVEEDOR", etiqueta: "Proveedores" },
   { valor: "CLIENTE", etiqueta: "Clientes" },
-  { valor: "AMIGO", etiqueta: "Amigos" },
+  { valor: "AMIGO", etiqueta: "Amigos / Familia" },
   { valor: "EVENTUAL", etiqueta: "Eventuales" },
 ];
 
@@ -173,6 +174,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   return (
     <div className="cc-page">
       <Header />
+      {/* lo que lleva hoy: las confirmaciones que registró */}
+      {enConfirmaciones && <MiDiaHoy tipo="confirmaciones" />}
       {enConfirmaciones && (
         <div className="cc-buscador-top">
           <Search size={20} />

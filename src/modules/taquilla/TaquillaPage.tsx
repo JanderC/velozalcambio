@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { CheckCircle2, Image as IconoImagen, Landmark, Lock, LockOpen, Search, Wallet } from "lucide-react";
 import { Header } from "../../components/common/Header";
+import { MiDiaHoy } from "../rendimiento/MiDiaHoy";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { confirmarMovimientoCC, getUrlComprobante } from "../../api/cuentasCorrientes.api";
@@ -293,6 +294,8 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
   return (
     <div className="cc-page">
       <Header />
+      {/* lo que lleva hoy: los clientes que atendió */}
+      <MiDiaHoy tipo="taquilla" />
       {/* Arriba de todo: el buscador */}
       <div className="cc-buscador-top tq-buscador">
         <Search size={20} />
