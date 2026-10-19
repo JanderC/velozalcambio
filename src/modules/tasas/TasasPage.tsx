@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { PencilLine } from "lucide-react";
+import { ChevronDown, ChevronUp, PencilLine } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
 import { getTasasPublicas, getTrmColombia, getHistoricoMercado, type TasaPublica } from "../../api/tasas.api";
@@ -8,6 +8,7 @@ import { TrmColombiaPanel } from "./TrmColombiaPanel";
 import { TasaDelDiaPanel } from "./TasaDelDiaPanel";
 import { MercadoDashboard } from "./MercadoDashboard";
 import { TasasExternasPanel } from "./TasasExternasPanel";
+import { TableroTasas } from "./TableroTasas";
 import { ROLES_REGISTRO_TASAS } from "./tasas.roles";
 import "./tasas.css";
 
@@ -37,6 +38,8 @@ export function TasasPage() {
   const [tasasHoy, setTasasHoy] = useState<TasaPublica[]>([]);
   const [resumen, setResumen] = useState<ResumenEjecutivo | null>(null);
   const [seccionActiva, setSeccionActiva] = useState("seccion-tasa-dia");
+  // lo principal es la Tasa del día; la TRM, el mercado y las demás fuentes se abren con el botón
+  const [verMas, setVerMas] = useState(false);
 
   useEffect(() => {
     getTasasPublicas().then(setTasasHoy).catch(() => setTasasHoy([]));
@@ -63,7 +66,7 @@ export function TasasPage() {
       if (el) observer.observe(el);
     });
     return () => observer.disconnect();
-  }, []);
+  }, [verMas]);
 
   const tasaInternaPrincipal = tasasHoy[0] ?? null;
 
@@ -83,6 +86,19 @@ export function TasasPage() {
         )}
       </div>
 
+      {/* ---------- Lo principal: la Tasa del día, como se publica (y se actualiza ahí mismo) ---------- */}
+      <section className="tasas-seccion tasas-tablero">
+        <TableroTasas puedeEditar={puedeRegistrar} />
+      </section>
+
+      <div className="tasas-ver-mas">
+        <button type="button" onClick={() => setVerMas((v) => !v)} aria-expanded={verMas}>
+          {verMas ? <ChevronUp size={16} /> : <ChevronDown size={16} />} {verMas ? "Ocultar TRM y mercado" : "Ver TRM, mercado y otras fuentes"}
+        </button>
+      </div>
+
+      {verMas && (
+      <>
       {/* ---------- Resumen ejecutivo ---------- */}
       <div className="tasas-resumen-strip">
         <div className="resumen-item">
@@ -152,6 +168,8 @@ export function TasasPage() {
           )}
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }

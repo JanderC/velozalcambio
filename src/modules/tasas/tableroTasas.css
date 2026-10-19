@@ -1,0 +1,56 @@
+/* La "Tasa del día": la misma distribución que se publica, con los colores del sistema */
+.tt { display: grid; gap: 14px; padding: 20px; border-radius: 18px; background: linear-gradient(160deg, #0b0e13 0%, #10233d 55%, #14406f 100%); color: white; font-family: "Inter", sans-serif; box-shadow: 0 10px 30px rgba(11, 14, 19, 0.25); }
+.tt-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; }
+.tt-titulo span { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-gold); }
+.tt-titulo h2 { margin: 2px 0 0; font-family: "Space Grotesk", sans-serif; font-size: clamp(1.3rem, 2.6vw, 1.9rem); }
+.tt-fecha { display: flex; gap: 10px; }
+.tt-fecha div { display: grid; gap: 3px; }
+.tt-fecha span { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-gold); }
+.tt-fecha strong { padding: 6px 14px; border-radius: 8px; background: white; color: #0b0e13; font-family: "Space Grotesk", sans-serif; font-size: 1.15rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tt-acciones { display: flex; gap: 6px; }
+.tt-editar, .tt-guardar, .tt-cancelar { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 10px; font: inherit; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+.tt-editar { border: 1px solid rgba(244, 215, 81, 0.6); background: rgba(244, 215, 81, 0.12); color: var(--color-gold); }
+.tt-editar:hover { background: rgba(244, 215, 81, 0.22); }
+.tt-guardar { border: none; background: var(--color-gold); color: #0b0e13; }
+.tt-guardar:disabled { opacity: 0.6; }
+.tt-cancelar { padding: 10px; border: 1px solid rgba(255, 255, 255, 0.3); background: transparent; color: white; }
+.tt-por { margin: -6px 0 0; font-size: 0.76rem; color: rgba(255, 255, 255, 0.6); }
+.tt-error { margin: 0; padding: 8px 12px; border-radius: 8px; background: rgba(252, 165, 165, 0.15); color: #fecaca; font-size: 0.86rem; }
+.tt-ok { margin: 0; padding: 8px 12px; border-radius: 8px; background: rgba(134, 239, 172, 0.15); color: #bbf7d0; font-size: 0.86rem; }
+
+.tt-cuerpo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.tt-bloque { padding: 14px 16px 16px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.04); min-width: 0; }
+.tt-bloque h3 { width: fit-content; margin: -26px auto 10px; padding: 4px 18px; border-radius: 8px; background: var(--color-gold); color: #0b0e13; font-family: "Space Grotesk", sans-serif; font-size: 1.15rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.tt-bloque h4 { margin: 0 0 8px; text-align: center; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-gold); }
+.tt-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; }
+.tt-dos > div + div { padding-left: 18px; border-left: 1px solid rgba(255, 255, 255, 0.14); }
+.tt-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.tt-etiqueta { font-size: 0.82rem; font-weight: 600; color: rgba(255, 255, 255, 0.85); text-transform: uppercase; white-space: nowrap; }
+.tt-valor, .tt-fila input { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 92px; padding: 6px 10px; border-radius: 8px; background: white; color: #0b0e13; font-family: "Space Grotesk", sans-serif; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tt-fila input { width: 104px; min-width: 0; border: 2px solid var(--color-gold); text-align: center; }
+.tt-fila input:focus { outline: none; box-shadow: 0 0 0 3px rgba(244, 215, 81, 0.35); }
+.tt-fila.grande { justify-content: center; height: calc(100% - 26px); margin: 0; }
+.tt-fila.grande .tt-valor, .tt-fila.grande input { min-width: 130px; padding: 18px 16px; font-size: 1.6rem; }
+.tt-euro-venta { display: flex; flex-direction: column; }
+.tt-sube { color: #16a34a; }
+.tt-baja { color: #dc2626; }
+.tt-otras { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding-top: 18px; }
+.tt-otra { display: grid; align-content: start; justify-items: center; gap: 6px; padding: 0 10px; min-width: 0; }
+.tt-otra + .tt-otra { border-left: 1px solid rgba(255, 255, 255, 0.14); }
+.tt-otra h3 { margin: 0 0 6px; font-size: 0.95rem; padding: 3px 14px; }
+.tt-otra .tt-fila { flex-direction: column; justify-content: center; gap: 4px; margin: 0; }
+.tt-otra .tt-etiqueta { font-size: 0.7rem; color: rgba(255, 255, 255, 0.7); }
+.tt-nota { margin: 0; font-size: 0.8rem; color: rgba(255, 255, 255, 0.65); }
+
+@media (max-width: 760px) {
+  .tt { padding: 14px; gap: 12px; }
+  .tt-cuerpo { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .tt-bloque { padding: 12px; }
+  .tt-dos > div + div { padding-left: 10px; }
+  .tt-dos { gap: 6px 10px; }
+  .tt-valor, .tt-fila input { min-width: 0; font-size: 1rem; padding: 5px 8px; }
+  .tt-fila input { width: 84px; }
+  .tt-etiqueta { font-size: 0.72rem; }
+  .tt-otras { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
+  .tt-otra:nth-child(3) { border-left: none; }
+}

@@ -264,3 +264,11 @@
 /* ---------- Secciones ---------- */
 .tasas-seccion { scroll-margin-top: 56px; }
 .tasas-vacio-texto { font-family: "Inter", sans-serif; color: #6b7280; }
+
+/* La Tasa del día como lo principal; lo demás se abre con el botón */
+.tasas-tablero { max-width: 980px; margin-left: auto; margin-right: auto; }
+.tasas-ver-mas { display: flex; justify-content: center; margin: 4px 0 18px; }
+.tasas-ver-mas button { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border: 1px solid #d7dbe2; border-radius: 20px; background: white; color: var(--color-navy); font: inherit; font-weight: 600; cursor: pointer; }
+.tasas-ver-mas button:hover { background: #f2f5fa; }
+.tasas-tablero { padding: 20px 16px 0; box-sizing: content-box; }
+@media (max-width: 760px) { .tasas-tablero { padding: 12px 10px 0; } }
