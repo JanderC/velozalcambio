@@ -9,6 +9,7 @@ import { TasaDelDiaPanel } from "./TasaDelDiaPanel";
 import { MercadoDashboard } from "./MercadoDashboard";
 import { TasasExternasPanel } from "./TasasExternasPanel";
 import { TableroTasas } from "./TableroTasas";
+import { ComisionesPorMedio } from "./ComisionesPorMedio";
 import { ROLES_REGISTRO_TASAS } from "./tasas.roles";
 import "./tasas.css";
 
@@ -89,6 +90,7 @@ export function TasasPage() {
       {/* ---------- Lo principal: la Tasa del día, como se publica (y se actualiza ahí mismo) ---------- */}
       <section className="tasas-seccion tasas-tablero">
         <TableroTasas puedeEditar={puedeRegistrar} />
+        <ComisionesPorMedio puedeEditar={puedeRegistrar} />
       </section>
 
       <div className="tasas-ver-mas">

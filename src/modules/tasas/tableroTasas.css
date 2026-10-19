@@ -72,3 +72,21 @@
 .td-pref { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.8rem; color: rgba(255, 255, 255, 0.75); }
 .td-pref button { padding: 5px 11px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 14px; background: transparent; color: white; font: inherit; font-size: 0.78rem; cursor: pointer; }
 .td-pref button.activo { background: var(--color-gold); border-color: var(--color-gold); color: #0b0e13; font-weight: 700; }
+
+/* Comisiones por medio (Confirmaciones) */
+.cpm { margin-top: 16px; padding: 16px 18px; border-radius: 16px; background: white; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); font-family: "Inter", sans-serif; }
+.cpm header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-bottom: 12px; }
+.cpm h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-family: "Space Grotesk", sans-serif; color: var(--color-navy-dark); }
+.cpm header p { flex: 1; min-width: 220px; margin: 0; font-size: 0.82rem; color: #6b7280; }
+.cpm-acciones { display: flex; gap: 6px; }
+.cpm header button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border: 1px solid #d7dbe2; border-radius: 8px; background: white; color: var(--color-navy); font: inherit; font-size: 0.84rem; font-weight: 600; cursor: pointer; }
+.cpm header button.si { background: var(--color-navy); border-color: var(--color-navy); color: white; }
+.cpm-error { margin: 0 0 10px; color: #b3261e; font-size: 0.84rem; }
+.cpm-grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.cpm-grupo { display: grid; gap: 6px; align-content: start; padding: 12px; border-radius: 12px; background: #f7f8fa; }
+.cpm-grupo h4 { margin: 0 0 2px; font-size: 0.86rem; color: var(--color-navy-dark); }
+.cpm-grupo label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.84rem; color: #374151; }
+.cpm-grupo label b { font-variant-numeric: tabular-nums; }
+.cpm-campo { display: inline-flex; align-items: center; gap: 4px; }
+.cpm-campo input { width: 96px; padding: 5px 8px; border: 1px solid #d7dbe2; border-radius: 6px; font: inherit; text-align: right; }
+.cpm-grupo > small { font-size: 0.74rem; color: #8a93a3; }

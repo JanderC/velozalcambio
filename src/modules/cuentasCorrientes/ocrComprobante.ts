@@ -13,6 +13,8 @@ export interface DatosComprobante {
   remitente: string | null;
   destinatario?: string | null; // a quién se le envió
   fuente?: "ia" | "local"; // quién la leyó: la IA del servidor o el lector del navegador
+  metodo?: string | null; // qué es (Nequi, Zelle, Remitly…): lo dice la IA
+  texto?: string; // el texto leído en el navegador (para reconocer el método sin IA)
 }
 
 // El motor de OCR pesa unos MB: se carga la primera vez que se usa y queda listo para las siguientes
@@ -192,7 +194,7 @@ function buscarBanco(texto: string): string | null {
 export function extraerDatos(texto: string): DatosComprobante {
   const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const { monto, moneda } = buscarMonto(lineas, texto);
-  return { referencia: buscarReferencia(lineas), monto, moneda, fecha: buscarFecha(texto), banco: buscarBanco(texto), remitente: null, destinatario: buscarDestinatario(lineas) };
+  return { referencia: buscarReferencia(lineas), monto, moneda, fecha: buscarFecha(texto), banco: buscarBanco(texto), remitente: null, destinatario: buscarDestinatario(lineas), texto };
 }
 
 /** Lee la imagen de un comprobante en el navegador (OCR): referencia, monto y fecha de la transacción. */
@@ -288,6 +290,8 @@ async function leerLocal(imagen: File): Promise<DatosComprobante> {
     banco: mejor.banco ?? otro.banco,
     remitente: mejor.remitente ?? otro.remitente,
     destinatario: mejor.destinatario ?? otro.destinatario,
+    texto: `${mejor.texto ?? ""}
+${otro.texto ?? ""}`,
   };
 }
 
@@ -322,7 +326,12 @@ async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
       if (e instanceof ApiError && (e.status === 501 || e.status === 403)) iaPausadaHasta = Date.now() + 5 * 60_000;
     }
   }
-  if (deLaIA && deLaIA.monto && deLaIA.referencia) return { ...deLaIA, fuente: "ia" };
+  // con monto y referencia gana la IA; igual se espera un momento el texto local, por si la IA no dijo qué método es
+  if (deLaIA && deLaIA.monto && deLaIA.referencia) {
+    if (deLaIA.metodo) return { ...deLaIA, fuente: "ia" };
+    const otro = await Promise.race([local, new Promise<null>((r) => setTimeout(() => r(null), 4_000))]);
+    return { ...deLaIA, texto: otro?.d?.texto, fuente: "ia" };
+  }
   const { d: delNavegador, error } = await local;
   if (!deLaIA) {
     if (!delNavegador) throw error ?? new Error("No se pudo leer la imagen.");
@@ -337,6 +346,8 @@ async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
     banco: deLaIA.banco ?? delNavegador.banco,
     remitente: deLaIA.remitente ?? delNavegador.remitente,
     destinatario: deLaIA.destinatario ?? delNavegador.destinatario,
+    metodo: deLaIA.metodo,
+    texto: delNavegador.texto,
     fuente: "ia",
   };
 }

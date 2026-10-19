@@ -634,3 +634,10 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-calculadora-enviar { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: none; border-radius: 7px; background: var(--color-navy); color: white; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
 .cc-enviar-hecho { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 12px 14px; border-radius: 10px; background: #e8f6ec; color: #166534; font-size: 0.92rem; line-height: 1.45; }
 .cc-enviar-hecho svg { flex-shrink: 0; margin-top: 2px; }
+
+/* Confirmaciones: no se reconoció el método de la captura */
+.cc-pregunta-metodo { display: grid; gap: 8px; margin-top: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid #f0c36d; background: #fffbea; font-size: 0.86rem; color: #3f2d00; }
+.cc-pregunta-metodo > span { font-weight: 600; }
+.cc-pregunta-metodo .cc-chips button { background: white; border: 1px solid #f0c36d; color: #3f2d00; font-weight: 600; }
+.cc-pregunta-metodo .cc-chips button:hover { background: #fff3c4; }
+.cc-pregunta-metodo .cc-pregunta-otro { background: transparent !important; border-style: dashed !important; font-weight: 500 !important; }

@@ -37,6 +37,7 @@ import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
 import { EnviarAConfirmacionesModal } from "./EnviarAConfirmacionesModal";
 import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
+import { METODOS, comisionPara, detectarMetodo, nombreMetodo, type Metodo } from "./metodoPago";
 import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
 import { VariasTransferencias, calcularResumen, transferenciaVacia, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
@@ -1480,6 +1481,29 @@ function FilaNueva({
   // Confirmaciones: pasa a taquilla (como siempre) o se le paga ya por otro método, desde una cuenta de la empresa
   const [pago, setPago] = useState<PagoElegido>(PAGO_POR_TAQUILLA);
   const [partes, setPartes] = useState<ParteReparto[]>(() => partesIniciales("COP", "VES"));
+  // ---------- Confirmaciones: la captura dice el método (Nequi, Zelle, Remitly…), y con él el medio y la comisión ----------
+  const [preguntaMetodo, setPreguntaMetodo] = useState<{ total: string | null; referencia: string | null } | null>(null);
+  function aplicarMetodo(metodo: Metodo, total: string | null, referenciaLeida: string | null) {
+    setPreguntaMetodo(null);
+    const m = METODOS.find((x) => x.clave === metodo)!;
+    // el medio de arriba se elige solo
+    const medio = medios.find((x) => x.nombre === m.medio);
+    if (medio && medio.id !== medioMov.id) onElegirMedio?.(medio.id);
+    // Western: la referencia es el MTCN
+    if (m.medio === "WESTERN_UNION" && referenciaLeida && /^\d{8,12}$/.test(referenciaLeida.replace(/\D/g, ""))) setMtcn(referenciaLeida.replace(/\D/g, ""));
+    const c = comisionPara(metodo, total, tablero?.actual?.valores);
+    if (!c) return `${nombreMetodo(metodo)} (sin comisión configurada: escribila)`;
+    // con comisión: lo enviado va en la cantidad y se le descuenta el %
+    if (total) {
+      setCantidad(formatearMonto(total));
+      setMontoDirecto("");
+    }
+    setEnCobro(false);
+    setEsPorcentaje(true);
+    setTasa(c.pct);
+    return `${nombreMetodo(metodo)}: comisión ${c.pct}% (${c.regla})`;
+  }
+
   async function cargarComprobantes(archivos: File[]) {
     if (!archivos.length) return;
     setError(null);
@@ -1525,6 +1549,12 @@ function FilaNueva({
         // de la captura quedaba escondido en otro día). Si es de otro día, se avisa y se cambia a mano en "Fecha".
         const fechaLeida = l.primera?.fecha;
         if (fechaLeida && fechaLeida < hoyBogota()) partes.push(`la captura es del ${fechaCorta(`${fechaLeida}T12:00:00-05:00`)} (el movimiento queda con la fecha de hoy)`);
+      }
+      // Confirmaciones: qué método es (y su comisión); si no se reconoce, se pregunta
+      if (enConfirmaciones && !sumando) {
+        const metodo = detectarMetodo(l.primera);
+        if (metodo) partes.unshift(aplicarMetodo(metodo, l.total, l.referencias[0] ?? null));
+        else setPreguntaMetodo({ total: l.total, referencia: l.referencias[0] ?? null });
       }
       setAvisoLectura(
         (partes.length
@@ -2567,6 +2597,29 @@ function FilaNueva({
       </div>
 
       {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
+      {/* no se reconoció el método de la captura: se elige y se aplica su medio y su comisión */}
+      {preguntaMetodo && (
+        <div className="cc-pregunta-metodo" role="group" aria-label="Método de pago de la captura">
+          <span>No reconocí el método de esta captura. ¿Por dónde llegó?</span>
+          <div className="cc-chips">
+            {METODOS.map((m) => (
+              <button
+                key={m.clave}
+                type="button"
+                onClick={() => {
+                  const texto = aplicarMetodo(m.clave, preguntaMetodo.total, preguntaMetodo.referencia);
+                  setAvisoLectura((a) => `${texto}. ${a ?? ""}`.trim());
+                }}
+              >
+                {m.nombre}
+              </button>
+            ))}
+            <button type="button" className="cc-pregunta-otro" onClick={() => setPreguntaMetodo(null)}>
+              Otro (lo elijo yo)
+            </button>
+          </div>
+        </div>
+      )}
       {imagenesAdjuntas.length > 0 && (
         <p className="cc-imagen-adjunta">
           <IconoImagen size={14} />{" "}

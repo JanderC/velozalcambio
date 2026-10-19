@@ -46,7 +46,8 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
   async function guardar(e?: FormEvent) {
     e?.preventDefault();
     if (!editando) return;
-    const limpio: ValoresTablero = {};
+    // lo que no se edita acá (las comisiones por medio) queda como está
+    const limpio: ValoresTablero = Object.fromEntries(Object.entries(valores).filter(([k]) => !(k in editando)));
     for (const [k, v] of Object.entries(editando)) {
       const g = paraGuardar(v);
       if (g) limpio[k] = g;
