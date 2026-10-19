@@ -272,3 +272,16 @@ td .cap-menu { margin-left: 6px; }
   .cap-banco-cierre input { max-width: 110px; }
   .cap-cierre-barra { margin: 8px 8px 0; }
 }
+
+/* ¿El capital sube o baja? (franja chica arriba) */
+.cap-tend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 10px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
+.cap-tend-linea path { stroke: var(--color-gold); }
+.cap-tend-linea circle { fill: var(--color-gold); }
+.cap-tend-dato { display: grid; gap: 1px; min-width: 0; }
+.cap-tend-dato span { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+.cap-tend-dato strong { display: inline-flex; align-items: center; gap: 4px; font-family: "Space Grotesk", sans-serif; font-size: 1.02rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cap-tend-dato small { font-size: 0.72rem; color: rgba(255, 255, 255, 0.7); }
+.cap-tend-dato.sube strong { color: #86efac; }
+.cap-tend-dato.baja strong { color: #fca5a5; }
+.cap-tend-vacio { margin: 0; font-size: 0.78rem; color: rgba(255, 255, 255, 0.6); }
+@media (max-width: 760px) { .cap-tend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); } .cap-tend-linea { display: none; } .cap-tend-dato strong { font-size: 0.86rem; } }

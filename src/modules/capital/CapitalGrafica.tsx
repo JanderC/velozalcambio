@@ -44,7 +44,7 @@ export function CapitalGrafica({ cuadres }: { cuadres: CuadreResumen[] }) {
     return <p className="cap-graf-vacio">Cuando haya al menos dos cuadres guardados, aquí se ve si el capital sube o baja.</p>;
   }
 
-  const alto = 220;
+  const alto = 170;
   const m = { arriba: 16, abajo: 28, izq: 76, der: 16 };
   const min = Math.min(...puntos.map((p) => p.total));
   const max = Math.max(...puntos.map((p) => p.total));

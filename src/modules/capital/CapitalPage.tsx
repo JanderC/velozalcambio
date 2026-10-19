@@ -9,6 +9,7 @@ import { formatearMonto, leerNumero } from "../../utils/montos";
 import { enPesos, grupoDe } from "../cuentasPorCobrarPagar/cobrar";
 import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
 import { CapitalGrafica } from "./CapitalGrafica";
+import { CapitalTendencia } from "./CapitalTendencia";
 import { CuadroBancos, MenuBanco } from "./CuadroBancos";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import "./capital.css";
@@ -559,6 +560,8 @@ export function CapitalPage() {
           </div>
         </div>
         {t && <TotalesPorMoneda t={t} />}
+        {/* ¿sube o baja? el capital de ahora contra los cuadres guardados, en una franja chica */}
+        {t && !viendo && (t.tasaDolar || !t.capitalDivisa) && <CapitalTendencia actual={t.capitalCop + t.capitalDivisaCop} cuadres={cuadres} />}
         <div className="cap-referencia">
           <span className="cap-referencia-titulo">
             Tasas de referencia
