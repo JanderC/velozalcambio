@@ -10,6 +10,8 @@ import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, type PagoElegido } from "./PagoConfirmacion";
+import { METODOS, comisionPara, detectarMetodo, nombreMetodo, type Metodo } from "./metodoPago";
+import { useTablero } from "../tasas/tablero";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
 const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
@@ -24,6 +26,7 @@ export function NuevaCuentaModal({
   enLinea = false,
   inicial,
   medio = null,
+  onElegirMedio,
   onPersonalizar,
   onCreada,
   onCerrar,
@@ -36,6 +39,8 @@ export function NuevaCuentaModal({
   inicial?: { nombre?: string; telefono?: string; cedula?: string };
   // el medio elegido arriba en Confirmaciones: banco de la cuenta y moneda del movimiento
   medio?: Canal | null;
+  // Confirmaciones: al reconocer la captura (Nequi, Zelle…) se elige solo el medio de arriba
+  onElegirMedio?: (canalId: number) => void;
   onPersonalizar: () => void;
   onCreada: (c: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
@@ -186,6 +191,22 @@ export function NuevaCuentaModal({
   // La imagen se guarda con el movimiento, para verla después (en la hoja y en Taquilla)
   // El cliente puede mandar el monto en varias transferencias: se cargan varias capturas, se suman y se guardan juntas
   const [imagenesAdjuntas, setImagenesAdjuntas] = useState<File[]>([]);
+  // ---------- Confirmaciones: la captura dice el método, y con él el medio y la comisión ----------
+  const tablero = useTablero();
+  const [preguntaMetodo, setPreguntaMetodo] = useState<{ total: string | null; referencia: string | null } | null>(null);
+  function aplicarMetodo(metodo: Metodo, total: string | null, referenciaLeida: string | null) {
+    setPreguntaMetodo(null);
+    const m = METODOS.find((x) => x.clave === metodo)!;
+    const canal = canales.find((c) => c.nombre === m.medio);
+    if (canal && canal.id !== medio?.id) onElegirMedio?.(canal.id);
+    if (m.medio === "WESTERN_UNION" && referenciaLeida && /^\d{8,12}$/.test(referenciaLeida.replace(/\D/g, ""))) setMovMtcn(referenciaLeida.replace(/\D/g, ""));
+    const c = comisionPara(metodo, total, tablero?.actual?.valores);
+    if (!c) return `${nombreMetodo(metodo)} (sin comisión configurada: escribila)`;
+    setMovFormula("comision");
+    setMovValor(c.pct);
+    return `${nombreMetodo(metodo)}: comisión ${c.pct}% (${c.regla})`;
+  }
+
   async function cargarComprobantes(archivos: File[]) {
     if (!archivos.length) return;
     setError(null);
@@ -210,7 +231,16 @@ export function NuevaCuentaModal({
       if (quien) setMovPersona(quien);
       if (l.referencias.length) partes.push(`referencia ${l.referencias.join(" / ")}`);
       // si el comprobante está en otra moneda que la del medio elegido, se avisa: la cuenta no se cambia sola
-      const otraMoneda = l.moneda && medio && l.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${l.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
+      // Confirmaciones: qué método es (y su comisión); si no se reconoce, se pregunta
+      let detectado = false;
+      if (modulo === "CAJA" && !sumando) {
+        const metodo = detectarMetodo(l.primera);
+        if (metodo) {
+          partes.unshift(aplicarMetodo(metodo, l.total, l.referencias[0] ?? null));
+          detectado = true;
+        } else setPreguntaMetodo({ total: l.total, referencia: l.referencias[0] ?? null });
+      }
+      const otraMoneda = !detectado && l.moneda && medio && l.moneda !== codigoMedio ? ` Ojo: el comprobante está en ${l.moneda} y el medio elegido se mueve en ${codigoMedio}.` : "";
       setAvisoLectura(
         (partes.length
           ? `${sumando ? "Se sumó otra captura" : "Leído de la imagen"}${l.conIA ? " con IA" : ""}: ${partes.join(", ")}. Revisalo antes de crear.${otraMoneda}`
@@ -584,6 +614,28 @@ export function NuevaCuentaModal({
             </label>
             <small className="cc-primer-mov-nota">O pegá la captura con Ctrl+V en cualquier parte de la pantalla.</small>
             {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
+            {preguntaMetodo && (
+              <div className="cc-pregunta-metodo" role="group" aria-label="Método de pago de la captura">
+                <span>No reconocí el método de esta captura. ¿Por dónde llegó?</span>
+                <div className="cc-chips">
+                  {METODOS.map((m) => (
+                    <button
+                      key={m.clave}
+                      type="button"
+                      onClick={() => {
+                        const texto = aplicarMetodo(m.clave, preguntaMetodo.total, preguntaMetodo.referencia);
+                        setAvisoLectura((a) => `${texto}. ${a ?? ""}`.trim());
+                      }}
+                    >
+                      {m.nombre}
+                    </button>
+                  ))}
+                  <button type="button" className="cc-pregunta-otro" onClick={() => setPreguntaMetodo(null)}>
+                    Otro (lo elijo yo)
+                  </button>
+                </div>
+              </div>
+            )}
             {imagenesAdjuntas.length > 0 && (
               <p className="cc-imagen-adjunta">
                 {imagenesAdjuntas.length === 1
