@@ -36,6 +36,8 @@ import { EditarClienteModal } from "./EditarClienteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
 import { EnviarAConfirmacionesModal } from "./EnviarAConfirmacionesModal";
+import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
+import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
 import { VariasTransferencias, calcularResumen, transferenciaVacia, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
@@ -1414,6 +1416,26 @@ function FilaNueva({
   const movEnOtraMoneda = !enConfirmaciones && monedaMov !== cuenta.moneda_codigo;
   const otraMoneda = enConfirmaciones ? entregaEn !== cuenta.moneda_codigo : movEnOtraMoneda && aparte;
   const codigoMonto = otraMoneda ? (enConfirmaciones ? entregaEn : monedaMov) : cuenta.moneda_codigo;
+  // ---------- La tasa del día (la que se publica): se propone; si se usa otra, se pregunta si se guarda ----------
+  const tablero = useTablero();
+  const { usuario: yo } = useAuth();
+  const puedeTablero = yo?.rol === "ADMIN" || yo?.rol === "ASESOR";
+  const sugerencias = sugerenciasDeTasa(tablero, {
+    medio: enConfirmaciones ? medioMov.nombre : null,
+    moneda: enConfirmaciones ? null : monedaMov,
+    entrega: enConfirmaciones ? entregaEn : null,
+    // en Confirmaciones "Venta" resta; en las cuentas, el egreso es lo que se le vende
+    venta: enConfirmaciones ? resta : !resta,
+    referencia,
+    porcentaje: esPorcentaje,
+  });
+  const principal = sugerencias.find((s) => s.porcentaje === esPorcentaje) ?? null;
+  const [propuesta, setPropuesta] = useState<PropuestaTasa | null>(null);
+  const [avisoTasa, setAvisoTasa] = useState<string | null>(null);
+  const avisarTasa = (t: string) => {
+    setAvisoTasa(t);
+    setTimeout(() => setAvisoTasa(null), 6000);
+  };
   const [montoDirecto, setMontoDirecto] = useState("");
   const [masOpciones, setMasOpciones] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -1535,6 +1557,19 @@ function FilaNueva({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasaPuesta, referenciaPuesta]);
+
+  // Sin tasa propia de la cuenta, viene puesta la tasa del día que aplica (se puede cambiar a mano)
+  // (si lo que está puesto lo puso el tablero y cambia el medio o la moneda, se cambia por la que aplica ahora)
+  const tasaDelTablero = useRef("");
+  useEffect(() => {
+    if (!principal || principal.porDefecto || principal.porcentaje || esPorcentaje || enCobro || clienteConComision || tasaPuesta) return;
+    setTasa((t) => {
+      if (t.trim() && t !== tasaDelTablero.current) return t;
+      tasaDelTablero.current = principal.valor;
+      return principal.valor;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [principal?.clave, principal?.valor, esPorcentaje, enCobro, clienteConComision, tasaPuesta]);
 
   // Al pasar a "Comisión %" se propone el último porcentaje usado (queda guardado en este equipo)
   function activarPorcentaje() {
@@ -2090,6 +2125,20 @@ function FilaNueva({
     const tasaQueQueda = tasaModificada && !otraMoneda ? (mantenerTasa ? nEscrita! : recientes.tasaHabitual) : null;
     const tasaSiguiente = tasaModificada && mantenerTasa && !otraMoneda ? formatearMonto(nEscrita!) : tasaPuesta;
     setRecientes((r) => (tasaModificada && mantenerTasa && !otraMoneda ? { ...r, tasaHabitual: nEscrita! } : r));
+    // Se usó otra tasa que la del día: se guarda o no según lo que respondió (se pregunta una sola vez)
+    if (
+      yo &&
+      puedeTablero &&
+      principal &&
+      !principal.porDefecto &&
+      !principal.porcentaje &&
+      !esPorcentaje &&
+      !enCobro &&
+      nEscrita &&
+      /[1-9]/.test(nEscrita) &&
+      Number(nEscrita) !== Number(principal.valor.replace(/\./g, "").replace(",", "."))
+    )
+      decidirTasaUsada(yo.id, { clave: principal.clave, etiqueta: principal.etiqueta, nueva: nEscrita, actual: principal.valor }, setPropuesta, avisarTasa);
     setMantenerTasa(true);
     setComisionIncluida(false);
     setSinComision(false);
@@ -2572,6 +2621,26 @@ function FilaNueva({
           </div>
         );
       })()}
+
+      {/* la tasa del día que aplica: se toca y se pone (si se quiere otra, se escribe) */}
+      {!exonerado && !enCobro && (
+        <ChipsTasaDelDia
+          sugerencias={sugerencias.filter((s) => s.porcentaje === esPorcentaje)}
+          actual={tasa}
+          onElegir={(s) => setTasa(s.valor)}
+        />
+      )}
+      {propuesta && yo && (
+        <AvisoGuardarTasa
+          usuarioId={yo.id}
+          propuesta={propuesta}
+          onListo={(t) => {
+            setPropuesta(null);
+            if (t) avisarTasa(t);
+          }}
+        />
+      )}
+      {avisoTasa && <p className="cc-aviso-lectura">{avisoTasa}</p>}
 
       {llevaConfirmacion && (
         <label className={`cc-check cc-confirmada ${confirmada ? "si" : ""}`}>

@@ -15,6 +15,8 @@ import {
   type Taquilla,
 } from "../../api/taquilla.api";
 import { DolaresPorBillete } from "./DolaresPorBillete";
+import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
+import { ChipsTasaDelDia } from "../tasas/TasasDelDia";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 
@@ -91,6 +93,19 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
   const [imagenVista, setImagenVista] = useState<string | null>(null);
+  // La tasa del día que aplica (según la moneda que trae y en qué se le entrega): viene puesta y se puede cambiar
+  const tablero = useTablero();
+  const sugerencias = sugerenciasDeTasa(tablero, { moneda: monedaMonto, entrega: monedaResultado, venta: tipo === "EGRESO", porcentaje: formula === "comision" });
+  const principalTasa = sugerencias.find((s) => s.porcentaje === (formula === "comision")) ?? null;
+  const tasaDelTablero = useRef("");
+  useEffect(() => {
+    if (!principalTasa || principalTasa.porDefecto || principalTasa.porcentaje || formula === "comision") return;
+    setValor((v) => {
+      if (v.trim() && v !== tasaDelTablero.current) return v;
+      tasaDelTablero.current = principalTasa.valor;
+      return principalTasa.valor;
+    });
+  }, [principalTasa?.clave, principalTasa?.valor, formula]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cargarComprobante(archivo: File | undefined) {
     if (!archivo) return;
@@ -354,6 +369,8 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
             <output className="tq-operacion-total neutro">{resultado ? dinero(resultado, monedaResultado) : "—"}</output>
           </label>
         </div>
+
+        <ChipsTasaDelDia sugerencias={sugerencias.filter((s) => s.porcentaje === (formula === "comision"))} actual={valor} onElegir={(s) => setValor(s.valor)} />
 
         {/* Lo que pasa con la caja, dicho claro */}
         <div className={`tq-operacion-caja ${porBanco ? "banco" : tipo === "EGRESO" ? "egreso" : ""}`}>

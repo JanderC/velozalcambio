@@ -2,6 +2,8 @@ import { useState, type FormEvent } from "react";
 import { ArrowDownRight, ArrowUpRight, Check, PencilLine, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { DOLAR_COMPRA, DOLAR_VENTA, EURO_COMPRA, EURO_VENTA, OTRAS, escrita, guardarTablero, tendencia, useTablero, type Casilla, type Tablero, type ValoresTablero } from "./tablero";
+import { PreferenciaTasaUsada } from "./TasasDelDia";
+import { useAuth } from "../../auth/useAuth";
 import "./tableroTasas.css";
 
 const fechaCorta = (f: string) => new Date(f).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -26,6 +28,7 @@ function paraGuardar(texto: string) {
  */
 export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
   const tablero = useTablero();
+  const { usuario } = useAuth();
   const [editando, setEditando] = useState<ValoresTablero | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +145,7 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
         </section>
       </div>
       {editando && <p className="tt-nota">Escribe cada tasa como se publica (3.200 · 3,5 · 5%). Al guardar, la fecha y la hora se actualizan solas.</p>}
+      {puedeEditar && usuario && !editando && <PreferenciaTasaUsada usuarioId={usuario.id} />}
       {!tablero?.actual && !editando && <p className="tt-nota">Todavía no hay tasas del día{puedeEditar ? ": toca “Actualizar tasas” para cargarlas." : "."}</p>}
     </form>
   );

@@ -54,3 +54,21 @@
   .tt-otras { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
   .tt-otra:nth-child(3) { border-left: none; }
 }
+
+/* Las tasas del día en los formularios (taquilla, Confirmaciones, cuentas) */
+.td-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.td-chips > span { display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; font-weight: 700; color: #a8531f; }
+.td-chips button { display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 10px; border: 1px solid #f0c36d; border-radius: 14px; background: #fffbea; color: #3f2d00; font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; font-variant-numeric: tabular-nums; }
+.td-chips button small { font-size: 0.68rem; font-weight: 600; color: #7a5b00; }
+.td-chips button.principal { border-color: #c9a23e; }
+.td-chips button.activo { background: #f4d751; border-color: #c9a23e; }
+.td-chips button:hover { background: #fff3c4; }
+.td-propuesta { display: grid; gap: 8px; margin-top: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid #c9a23e; background: #fffbea; color: #3f2d00; font-size: 0.86rem; }
+.td-propuesta p { margin: 0; }
+.td-propuesta > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.td-propuesta button { padding: 7px 12px; border: 1px solid #c9a23e; border-radius: 8px; background: white; color: #3f2d00; font: inherit; font-weight: 600; cursor: pointer; }
+.td-propuesta button.si { background: var(--color-navy); border-color: var(--color-navy); color: white; }
+.td-propuesta small { font-size: 0.74rem; color: #7a5b00; }
+.td-pref { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.8rem; color: rgba(255, 255, 255, 0.75); }
+.td-pref button { padding: 5px 11px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 14px; background: transparent; color: white; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.td-pref button.activo { background: var(--color-gold); border-color: var(--color-gold); color: #0b0e13; font-weight: 700; }

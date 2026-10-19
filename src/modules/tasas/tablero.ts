@@ -118,6 +118,8 @@ export interface Sugerencia {
   etiqueta: string; // "Dólar venta 100-50"
   valor: string; // como se escribe en el formulario
   porcentaje: boolean;
+  // sin nada que diga qué tasa es (ni medio, ni moneda, ni referencia): se muestran, pero no se ponen solas
+  porDefecto?: boolean;
 }
 const NOMBRES: Record<string, string> = {
   "dolar.compra.100-50": "Dólar compra 100-50",
@@ -132,6 +134,7 @@ const NOMBRES: Record<string, string> = {
   "euro.compra.500": "Euro compra 500",
   "euro.venta": "Euro venta",
   bs: "Bolívares",
+  "zelle.ajuste": "Zelle (ajuste)",
   zelle: "Zelle",
   western: "Western",
   "usdt.compra": "USDT compra",
@@ -152,21 +155,33 @@ export function sugerenciasDeTasa(
   const medio = (c.medio ?? "").toUpperCase();
   const ref = (c.referencia ?? "").toLowerCase();
   const monedas = [c.moneda, c.entrega].map((m) => (m ?? "").toUpperCase());
+  // llega y se entrega en la misma moneda: no hay tasa que proponer
+  if (c.moneda && c.entrega && monedas[0] === monedas[1] && !medio && !ref.trim()) return [];
+  let porDefecto = false;
   let claves: string[];
-  if (c.porcentaje) claves = medio === "WESTERN_UNION" || /western/.test(ref) ? ["western"] : ["western"];
+  // en comisión %: Western (5 %) o el ajuste de Zelle (−10 %); en los demás no hay un % del día
+  if (c.porcentaje) claves = medio === "ZELLE" || /zelle/.test(ref) ? ["zelle.ajuste"] : medio === "WESTERN_UNION" || /western/.test(ref) ? ["western"] : [];
   else if (medio === "ZELLE" || /zelle/.test(ref)) claves = ["zelle"];
   else if (medio === "WESTERN_UNION" || /western/.test(ref)) claves = ["western"];
   else if (medio === "USDT" || monedas.includes("USDT") || /usdt/.test(ref)) claves = c.venta ? ["usdt.venta", "usdt.compra"] : ["usdt.compra", "usdt.venta"];
   else if (medio === "BOLIVARES" || monedas.includes("VES") || /\bbs\b|bss|bol[ií]var/.test(ref)) claves = ["bs"];
   else if (monedas.includes("EUR") || /euro/.test(ref))
     claves = c.venta ? ["euro.venta", ...EURO_COMPRA.map((x) => x.clave)] : [...EURO_COMPRA.map((x) => x.clave), "euro.venta"];
-  else if (medio === "BANCOLOMBIA" || medio === "NEQUI") claves = ["dolar.venta.bancolombia", "dolar.venta.100-50"];
+  // por Bancolombia o Nequi llegan pesos: hay tasa si se entregan dólares (los bolívares ya salieron arriba)
+  else if (medio === "BANCOLOMBIA" || medio === "NEQUI") claves = monedas.includes("USD") ? ["dolar.venta.bancolombia", "dolar.venta.100-50"] : [];
   else if (monedas.includes("USD") || /d[oó]lar|usd/.test(ref))
     claves = c.venta ? [...DOLAR_VENTA.map((x) => x.clave), ...DOLAR_COMPRA.map((x) => x.clave)] : [...DOLAR_COMPRA.map((x) => x.clave), ...DOLAR_VENTA.map((x) => x.clave)];
-  else claves = c.venta ? ["dolar.venta.100-50", "dolar.compra.100-50", "bs", "zelle", "usdt.venta"] : ["dolar.compra.100-50", "dolar.venta.100-50", "bs", "zelle", "usdt.compra"];
+  else {
+    porDefecto = true;
+    claves = c.venta ? ["dolar.venta.100-50", "dolar.compra.100-50", "bs", "zelle", "usdt.venta"] : ["dolar.compra.100-50", "dolar.venta.100-50", "bs", "zelle", "usdt.compra"];
+  }
   return claves
     .filter((k) => numeroDe(v[k]) !== null)
-    .map((k) => ({ clave: k, etiqueta: nombreDeTasa(k), valor: escrita(v[k]), porcentaje: /%/.test(v[k] ?? "") || k === "western" }));
+    .map((k) => {
+      const porcentaje = /%/.test(v[k] ?? "") || k === "western";
+      // un % se usa como comisión: sin el signo (el −10 % de Zelle es una comisión de 10)
+      return { clave: k, etiqueta: nombreDeTasa(k), valor: porcentaje ? escrita(v[k]).replace(/^-/, "") : escrita(v[k]), porcentaje, porDefecto };
+    });
 }
 
 // ---------- ¿guardar la tasa que se cambió a mano? (se pregunta una vez y se recuerda la respuesta) ----------

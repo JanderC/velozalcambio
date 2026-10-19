@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import { escrita, useTablero } from "../tasas/tablero";
 import { ApiError } from "../../api/client";
 import { crearOperacionTaquilla, type Taquilla } from "../../api/taquilla.api";
 import { formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
@@ -27,6 +28,18 @@ function dinero(monto: string, codigo: Entrega) {
 }
 
 type Precios = Record<string, string>; // "USD>COP:grandes" -> "3.900"
+// de qué casilla de la Tasa del día sale el precio de cada clase de billete (pagando en pesos)
+const DEL_DIA: Record<string, string> = {
+  "USD>COP:grandes": "dolar.compra.100-50",
+  "USD>COP:chicos": "dolar.compra.20-10-5",
+  "USD>COP:deteriorados": "dolar.compra.deteriorado",
+  "venta:USD>COP:grandes": "dolar.venta.100-50",
+  "venta:USD>COP:chicos": "dolar.venta.menor",
+  "EUR>COP:grandes": "euro.compra.200-100",
+  "EUR>COP:chicos": "euro.compra.50-20-10-5",
+  "venta:EUR>COP:grandes": "euro.venta",
+  "venta:EUR>COP:chicos": "euro.venta",
+};
 function preciosGuardados(): Precios {
   try {
     return JSON.parse(localStorage.getItem(CLAVE_PRECIOS) ?? "{}") as Precios;
@@ -45,7 +58,14 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
   const [entregaElegida, setEntregaElegida] = useState<Entrega>("COP");
   // no se entrega en la misma moneda que se recibe
   const entrega: Entrega = entregaElegida === divisa ? "COP" : entregaElegida;
-  const [precios, setPrecios] = useState<Precios>(preciosGuardados);
+  // el precio de cada clase: lo que se escriba ahora; si no, la tasa del día; si no, el último usado en este equipo
+  const [precios, setPrecios] = useState<Precios>({});
+  const guardados = useMemo(preciosGuardados, []);
+  const tablero = useTablero();
+  const delDia = (clave: string) => {
+    const v = tablero?.actual?.valores[DEL_DIA[clave] ?? ""];
+    return v ? escrita(v) : undefined;
+  };
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
   // si se le entrega efectivo sale de la caja; si la divisa es un pago, solo entra
   const [seEntrega, setSeEntrega] = useState(true);
@@ -62,7 +82,7 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
   const filas = CLASES[divisa].map((c) => {
     const escrito = cantidades[`${divisa}:${c.clave}`] ?? "";
     const cantidad = escrito.trim() ? leerNumero(escrito)?.replace(/^-/, "") ?? null : null;
-    const precioEscrito = precios[clavePrecio(c.clave)] ?? "";
+    const precioEscrito = precios[clavePrecio(c.clave)] ?? delDia(clavePrecio(c.clave)) ?? guardados[clavePrecio(c.clave)] ?? "";
     const precio = precioEscrito.trim() ? leerNumero(precioEscrito)?.replace(/^-/, "") ?? null : null;
     const valida = !!cantidad && /[1-9]/.test(cantidad);
     const subtotal = valida && precio && /[1-9]/.test(precio) ? multiplicarDecimales(cantidad!, precio, decimales) : null;
@@ -103,7 +123,7 @@ export function DolaresPorBillete({ abierta, onCambio }: { abierta: boolean; onC
         })
       );
       try {
-        localStorage.setItem(CLAVE_PRECIOS, JSON.stringify(precios));
+        localStorage.setItem(CLAVE_PRECIOS, JSON.stringify({ ...guardados, ...precios }));
       } catch {
         // no es grave: solo no se recuerdan los precios
       }
