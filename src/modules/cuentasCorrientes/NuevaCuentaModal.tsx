@@ -10,8 +10,8 @@ import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, type PagoElegido } from "./PagoConfirmacion";
-import { METODOS, comisionPara, detectarMetodo, nombreMetodo, type Metodo } from "./metodoPago";
-import { useTablero } from "../tasas/tablero";
+import { METODOS, comisionPara, detectarMetodo, nombreMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
+import { escrita, useTablero } from "../tasas/tablero";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
 const ETIQUETA_MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
@@ -198,8 +198,15 @@ export function NuevaCuentaModal({
     setPreguntaMetodo(null);
     const m = METODOS.find((x) => x.clave === metodo)!;
     const canal = canales.find((c) => c.nombre === m.medio);
-    if (canal && canal.id !== medio?.id) onElegirMedio?.(canal.id);
+    if (canal) onElegirMedio?.(canal.id);
     if (m.medio === "WESTERN_UNION" && referenciaLeida && /^\d{8,12}$/.test(referenciaLeida.replace(/\D/g, ""))) setMovMtcn(referenciaLeida.replace(/\D/g, ""));
+    const claveTasa = tasaDelMetodo(metodo);
+    if (claveTasa) {
+      const v = tablero?.actual?.valores[claveTasa];
+      setMovFormula("tasa");
+      if (v) setMovValor(escrita(v));
+      return `${nombreMetodo(metodo)}${v ? `: tasa del día ${escrita(v)}` : ""}`;
+    }
     const c = comisionPara(metodo, total, tablero?.actual?.valores);
     if (!c) return `${nombreMetodo(metodo)} (sin comisión configurada: escribila)`;
     setMovFormula("comision");

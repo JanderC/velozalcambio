@@ -5,12 +5,14 @@ import type { ValoresTablero } from "../tasas/tablero";
  * Los métodos de pago que llegan a Confirmaciones, reconocidos por la captura: cada uno con su medio (el botón de
  * arriba) y su comisión. Las comisiones se configuran en Tasas ("Comisiones por medio") y quedan para todos.
  */
-export type Metodo = "NEQUI" | "BANCOLOMBIA" | "ZELLE" | "REMITLY" | "WESTERN_BANCOLOMBIA" | "WESTERN_TAQUILLA" | "PAGO_FACTURA" | "BANCOLOMBIA_INTERNACIONAL";
+export type Metodo = "NEQUI" | "BANCOLOMBIA" | "ZELLE" | "BOLIVARES" | "USDT" | "REMITLY" | "WESTERN_BANCOLOMBIA" | "WESTERN_TAQUILLA" | "PAGO_FACTURA" | "BANCOLOMBIA_INTERNACIONAL";
 
 export const METODOS: { clave: Metodo; nombre: string; medio: string }[] = [
   { clave: "NEQUI", nombre: "Nequi", medio: "NEQUI" },
   { clave: "BANCOLOMBIA", nombre: "Bancolombia", medio: "BANCOLOMBIA" },
   { clave: "ZELLE", nombre: "Zelle", medio: "ZELLE" },
+  { clave: "BOLIVARES", nombre: "Bolívares (banco de Venezuela)", medio: "BOLIVARES" },
+  { clave: "USDT", nombre: "USDT (Binance)", medio: "USDT" },
   { clave: "REMITLY", nombre: "Remitly", medio: "BANCOLOMBIA" },
   { clave: "WESTERN_BANCOLOMBIA", nombre: "Western a Bancolombia", medio: "WESTERN_UNION" },
   { clave: "WESTERN_TAQUILLA", nombre: "Western en taquilla", medio: "WESTERN_UNION" },
@@ -18,6 +20,8 @@ export const METODOS: { clave: Metodo; nombre: string; medio: string }[] = [
   { clave: "BANCOLOMBIA_INTERNACIONAL", nombre: "Bancolombia internacional", medio: "BANCOLOMBIA" },
 ];
 export const nombreMetodo = (m: Metodo) => METODOS.find((x) => x.clave === m)?.nombre ?? m;
+/** Los que van con la tasa del día (no con comisión): bolívares y USDT. La clave de su tasa en el tablero. */
+export const tasaDelMetodo = (m: Metodo): string | null => (m === "BOLIVARES" ? "bs" : m === "USDT" ? "usdt.compra" : null);
 
 /** ¿Qué es esta captura? Lo dice la IA si la leyó; si no, se busca en el texto leído en el navegador. */
 export function detectarMetodo(d: DatosComprobante | null): Metodo | null {
@@ -31,6 +35,9 @@ export function detectarMetodo(d: DatosComprobante | null): Metodo | null {
   if (/total al destinatario|id de transferencia|importe de la transferencia/.test(t)) return "BANCOLOMBIA_INTERNACIONAL";
   if (/n[uú]mero de env[ií]o|importe enviado|obtiene/.test(t) || /^ES\d{8,}$/.test(ref)) return "WESTERN_BANCOLOMBIA";
   if (/western union/.test(t)) return "WESTERN_TAQUILLA";
+  // bancos de Venezuela y pago móvil: bolívares
+  if (d.moneda === "VES" || /banco de venezuela|banesco|mercantil|provincial|bancamiga|banco nacional de cr[eé]dito|\bbnc\b|bicentenario|venezolano de cr[eé]dito|banplus|pago m[oó]vil|bol[ií]vares|\bbs\.?\s?\d/.test(t)) return "BOLIVARES";
+  if (d.moneda === "USDT" || /binance|usdt|tether|trc-?20|bep-?20/.test(t)) return "USDT";
   if (/zelle|safebalance|chase|bank of america|wells fargo|jpm|registrado como|inscrit[oa] como|estamos enviando tu dinero|lo recibir[aá] en unos minutos/.test(t)) return "ZELLE";
   if (/nequi|env[ií]o a banco|escanea este qr/.test(t) || /^M\d{7,}$/.test(ref)) return "NEQUI";
   if (/bancolombia|transferencia exitosa|producto destino|producto origen/.test(t)) return "BANCOLOMBIA";
@@ -118,5 +125,9 @@ export function comisionPara(metodo: Metodo, monto: string | null, v: ValoresTab
       return fija("com.facturas");
     case "BANCOLOMBIA_INTERNACIONAL":
       return fija("com.internacional");
+    // bolívares y USDT van con la tasa del día, no con comisión
+    case "BOLIVARES":
+    case "USDT":
+      return null;
   }
 }

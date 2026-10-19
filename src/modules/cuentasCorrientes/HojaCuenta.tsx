@@ -37,7 +37,8 @@ import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
 import { EnviarAConfirmacionesModal } from "./EnviarAConfirmacionesModal";
 import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
-import { METODOS, comisionPara, detectarMetodo, nombreMetodo, type Metodo } from "./metodoPago";
+import { METODOS, comisionPara, detectarMetodo, nombreMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
+import { escrita } from "../tasas/tablero";
 import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
 import { VariasTransferencias, calcularResumen, transferenciaVacia, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
@@ -1488,9 +1489,23 @@ function FilaNueva({
     const m = METODOS.find((x) => x.clave === metodo)!;
     // el medio de arriba se elige solo
     const medio = medios.find((x) => x.nombre === m.medio);
-    if (medio && medio.id !== medioMov.id) onElegirMedio?.(medio.id);
+    // se marca arriba siempre (aunque sea el medio con que se registró el cliente)
+    if (medio) onElegirMedio?.(medio.id);
     // Western: la referencia es el MTCN
     if (m.medio === "WESTERN_UNION" && referenciaLeida && /^\d{8,12}$/.test(referenciaLeida.replace(/\D/g, ""))) setMtcn(referenciaLeida.replace(/\D/g, ""));
+    // bolívares y USDT: lo que llega va en la cantidad, con la tasa del día
+    const claveTasa = tasaDelMetodo(metodo);
+    if (claveTasa) {
+      const v = tablero?.actual?.valores[claveTasa];
+      if (total) {
+        setCantidad(formatearMonto(total));
+        setMontoDirecto("");
+      }
+      setEnCobro(false);
+      setEsPorcentaje(false);
+      if (v) setTasa(escrita(v));
+      return `${nombreMetodo(metodo)}${v ? `: tasa del día ${escrita(v)}` : ""}`;
+    }
     const c = comisionPara(metodo, total, tablero?.actual?.valores);
     if (!c) return `${nombreMetodo(metodo)} (sin comisión configurada: escribila)`;
     // con comisión: lo enviado va en la cantidad y se le descuenta el %
