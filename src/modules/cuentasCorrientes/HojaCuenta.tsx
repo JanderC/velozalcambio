@@ -673,14 +673,14 @@ export function HojaCuenta({
               <button type="button" className="cc-mover cc-eliminar" onClick={eliminar}>
                 Eliminar
               </button>
-              {(cuenta.modulo === "CORRIENTE" || cuenta.modulo === "POR_PAGAR") && (
+              {(cuenta.modulo === "CORRIENTE" || cuenta.modulo === "POR_PAGAR" || (cuenta.modulo === "POR_COBRAR" && saldoActual.startsWith("-"))) && (
                 <button
                   type="button"
                   className="cc-mover cc-a-confirmaciones"
                   onClick={() => setEnviandoAConf(saldoActual.startsWith("-") ? saldoActual.slice(1) : "")}
                   title="Pasar a Confirmaciones lo que se le debe, cobrándole comisión o con una tasa: allá se le paga en taquilla"
                 >
-                  <Send size={13} /> {cuenta.modulo === "POR_PAGAR" ? "Enviar a taquilla" : "Enviar a Confirmaciones"}
+                  <Send size={13} /> {cuenta.modulo === "CORRIENTE" ? "Enviar a Confirmaciones" : "Enviar a taquilla"}
                 </button>
               )}
             </span>
@@ -1013,9 +1013,9 @@ export function HojaCuenta({
             }} title="Borra las marcas y la meta guardadas de este día">
               Quitar marcas
             </button>
-            {(cuenta.modulo === "CORRIENTE" || cuenta.modulo === "POR_PAGAR") && puedeAnular && (
+            {(cuenta.modulo === "CORRIENTE" || cuenta.modulo === "POR_PAGAR" || cuenta.modulo === "POR_COBRAR") && puedeAnular && (
               <button type="button" className="cc-calculadora-enviar" onClick={() => setEnviandoAConf(sumaMonto.replace(/^-/, ""))} title="Pasar el total de lo marcado a Confirmaciones, con comisión o tasa">
-                <Send size={13} /> {cuenta.modulo === "POR_PAGAR" ? "Enviar a taquilla" : "Enviar a Confirmaciones"}
+                <Send size={13} /> {cuenta.modulo === "CORRIENTE" ? "Enviar a Confirmaciones" : "Enviar a taquilla"}
               </button>
             )}
           </div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowUpRight, CircleCheckBig, HandCoins, MessageCircle, Plus, Search, Share2, UserPlus } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CircleCheckBig, HandCoins, MessageCircle, Plus, Search, Send, Share2, UserPlus } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
@@ -15,6 +15,7 @@ import { SIN_GRUPO, detalleMoneda, dinero, enPesos, fechaDeHoy, grupoDe, gruposD
 import { NuevoClienteCobrarModal } from "./NuevoClienteCobrarModal";
 import { TransferenciaCobrarModal } from "./TransferenciaCobrarModal";
 import { PagoTotalCobrarModal } from "./PagoTotalCobrarModal";
+import { EnviarAConfirmacionesModal } from "../cuentasCorrientes/EnviarAConfirmacionesModal";
 import { generarReporteCobrar } from "./reporteCobrar";
 import "./cuentasPorCobrar.css";
 
@@ -76,6 +77,15 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
   }, [todas, buscar]);
   const delGrupo = useCallback((lista: CuentaCorrienteResumen[], g: string) => lista.filter((c) => mismoGrupo(grupoDe(c), g)), []);
   const general = useMemo(() => totalEnPesos(todas), [todas]);
+  // Cuentas por Cobrar: a veces el cliente me manda de más y soy yo el que le debe. Eso va aparte, y se le envía a
+  // taquilla para que venga a recogerlo.
+  const lesDebo = useMemo(() => (pagar ? [] : todas.filter((c) => c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual))), [todas, pagar]);
+  const meDeben = useMemo(() => (pagar ? todas : todas.filter((c) => !c.saldo_actual.startsWith("-"))), [todas, pagar]);
+  const totalCobrar = useMemo(() => totalEnPesos(meDeben), [meDeben]);
+  const totalLesDebo = useMemo(() => totalEnPesos(lesDebo), [lesDebo]);
+  const [verLesDebo, setVerLesDebo] = useState(false);
+  const [enviandoId, setEnviandoId] = useState<number | null>(null);
+  const enviando = enviandoId !== null ? (todas.find((c) => c.id === enviandoId) ?? null) : null;
   const otrasMonedas = useMemo(() => totalesPorMoneda(todas), [todas]);
   const abierta = abiertaId !== null ? (todas.find((c) => c.id === abiertaId) ?? null) : null;
   const buscando = buscar.trim() !== "";
@@ -190,13 +200,28 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
         </div>
         <div className="cxc-hero-total">
           <span>{pagar ? "Total que debo" : "Total por cobrar"}</span>
-          <strong>{dinero(ver(general.total), "COP")}</strong>
+          <strong>{dinero(ver(pagar ? general.total : totalCobrar.total), "COP")}</strong>
           <small>
             COP
             {otrasMonedas.length > 0 && ` · incluye ${otrasMonedas.map((m) => dinero(ver(m.total), m.codigo)).join(" + ")}`}
             {general.sinTasa > 0 && ` · ${general.sinTasa} sin tasa a pesos`}
           </small>
         </div>
+        {!pagar && (
+          <button
+            type="button"
+            className={`cxc-hero-debo ${lesDebo.length ? "" : "vacio"} ${verLesDebo ? "abierto" : ""}`}
+            onClick={() => setVerLesDebo((v) => !v)}
+            disabled={!lesDebo.length}
+            title="Clientes a los que les debo: se les envía a taquilla para que vengan a recoger"
+          >
+            <span>Total por pagar</span>
+            <strong>{dinero(totalLesDebo.total.replace(/^-/, ""), "COP")}</strong>
+            <small>
+              {lesDebo.length ? `${lesDebo.length} ${lesDebo.length === 1 ? "cliente" : "clientes"} · ${verLesDebo ? "ocultar" : "ver y enviar a taquilla"}` : "no le debo a nadie"}
+            </small>
+          </button>
+        )}
         <div className="cxc-hero-acciones">
           {puedeEditar && !pagar && (
             <button type="button" className="cxc-btn-oro" onClick={() => setTransfiriendo(true)} title="Le hicimos una transferencia a alguien: se pega la captura y queda en su cuenta por cobrar">
@@ -228,6 +253,31 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
 
       {error && <p className="cxc-error">{error}</p>}
       {!cuentas && !error && <p className="cxc-aviso">Cargando…</p>}
+
+      {verLesDebo && lesDebo.length > 0 && (
+        <section className="cxc-les-debo" aria-label="Clientes a los que les debo">
+          <header>
+            <h2>Les debo · por enviar a taquilla</h2>
+            <span>{dinero(totalLesDebo.total.replace(/^-/, ""), "COP")}</span>
+          </header>
+          <ul>
+            {lesDebo.map((c) => (
+              <li key={c.id}>
+                <button type="button" className="cxc-les-debo-nombre" onClick={() => setAbiertaId(c.id)} title="Abrir su hoja">
+                  {c.tercero_nombre}
+                  <small>{grupoDe(c)}</small>
+                </button>
+                <strong>{dinero(c.saldo_actual.replace(/^-/, ""), c.moneda_codigo)}</strong>
+                {puedeEditar && (
+                  <button type="button" className="cxc-enviar" onClick={() => setEnviandoId(c.id)}>
+                    <Send size={14} /> Enviar a taquilla
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {cuentas && (
         <div className="cxc-tablero">
@@ -271,6 +321,19 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
                           </td>
                           <td className={`num ${pesos !== null && ver(pesos).startsWith("-") ? "favor" : ""}`}>{pesos === null ? <span className="cxc-sin-tasa">sin tasa</span> : dinero(ver(pesos), "COP")}</td>
                           <td className="cxc-wa">
+                            {puedeEditar && !pagar && c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEnviandoId(c.id);
+                                }}
+                                title={`Le debo ${dinero(c.saldo_actual.replace(/^-/, ""), c.moneda_codigo)}: enviárselo a taquilla para que venga a recogerlo`}
+                                aria-label={`Enviar a taquilla lo que le debo a ${c.tercero_nombre}`}
+                              >
+                                <Send size={15} />
+                              </button>
+                            )}
                             {puedeEditar && debe(c) && (
                               <button
                                 type="button"
@@ -375,6 +438,15 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
             setPagandoId(null);
             void cargar();
           }}
+        />
+      )}
+
+      {enviando && (
+        <EnviarAConfirmacionesModal
+          cuenta={enviando}
+          montoInicial={enviando.saldo_actual.replace(/^-/, "")}
+          onCerrar={() => setEnviandoId(null)}
+          onEnviado={() => void cargar()}
         />
       )}
 

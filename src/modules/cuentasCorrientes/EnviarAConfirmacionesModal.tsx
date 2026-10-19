@@ -31,7 +31,7 @@ export function EnviarAConfirmacionesModal({
   onCerrar: () => void;
 }) {
   // desde Cuentas por Pagar se dice "Enviar a taquilla": va a Confirmaciones y de ahí sale en todas las taquillas
-  const desdePagar = cuenta.modulo === "POR_PAGAR";
+  const desdePagar = cuenta.modulo === "POR_PAGAR" || cuenta.modulo === "POR_COBRAR";
   const [monto, setMonto] = useState(montoInicial ? conPuntos(montoInicial.replace(/^-/, "").replace(".", ",")) : "");
   const [formula, setFormula] = useState<Formula>("COMISION");
   const [valor, setValor] = useState("");
@@ -179,7 +179,7 @@ export function EnviarAConfirmacionesModal({
           <strong>{resultado && /[1-9]/.test(resultado) ? dineroEn(resultado, codigoEntrega) : "—"}</strong>
         </p>
         <p className="cc-modal-nota">
-          {nMonto ? `En ${desdePagar ? "Cuentas por Pagar" : "Cuentas Corrientes"} se anotan los ${formatearMonto(nMonto)} ${cuenta.moneda_codigo} enviados: ahí deja de debérsele eso. ` : ""}En Confirmaciones queda como una confirmación ya verificada, lista para pagarle en taquilla o por otro método.
+          {nMonto ? `En ${cuenta.modulo === "POR_PAGAR" ? "Cuentas por Pagar" : cuenta.modulo === "POR_COBRAR" ? "Cuentas por Cobrar" : "Cuentas Corrientes"} se anotan los ${formatearMonto(nMonto)} ${cuenta.moneda_codigo} enviados: ahí deja de debérsele eso. ` : ""}En Confirmaciones queda como una confirmación ya verificada, lista para pagarle en taquilla o por otro método.
         </p>
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">

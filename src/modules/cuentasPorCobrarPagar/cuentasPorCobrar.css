@@ -149,3 +149,23 @@
 .cxc-parte-resumen { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0; padding: 9px 12px; border-radius: 9px; background: #fff6d6; color: #7a5b00; font-size: 0.88rem; }
 .cxc-parte-resumen.ok { background: #e8f6ec; color: #166534; }
 .cxc-parte-resumen.mal { background: #fdf0ee; color: #b3261e; }
+
+/* Lo que les debo a clientes de Cuentas por Cobrar: aparte, para enviarlo a taquilla */
+.cxc-hero-debo { display: grid; justify-items: end; gap: 2px; padding: 10px 14px; border: 1px solid rgba(252, 165, 165, 0.5); border-radius: 12px; background: rgba(252, 165, 165, 0.1); color: white; font: inherit; text-align: right; cursor: pointer; }
+.cxc-hero-debo:hover:not(:disabled), .cxc-hero-debo.abierto { background: rgba(252, 165, 165, 0.2); }
+.cxc-hero-debo:disabled { cursor: default; opacity: 0.65; }
+.cxc-hero-debo span { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #fca5a5; }
+.cxc-hero-debo strong { font-family: "Space Grotesk", sans-serif; font-size: clamp(1.3rem, 2.4vw, 1.9rem); line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cxc-hero-debo small { font-size: 0.76rem; color: rgba(255, 255, 255, 0.72); }
+.cxc-les-debo { margin: 16px 28px 0; padding: 14px 16px; border-radius: 14px; background: #fff5f5; border: 1px solid #fecaca; }
+.cxc-les-debo header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.cxc-les-debo h2 { margin: 0; font-family: "Space Grotesk", sans-serif; font-size: 1rem; color: #991b1b; }
+.cxc-les-debo header span { font-weight: 700; color: #991b1b; font-variant-numeric: tabular-nums; }
+.cxc-les-debo ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cxc-les-debo li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; border-radius: 10px; background: white; }
+.cxc-les-debo-nombre { flex: 1; min-width: 140px; display: grid; justify-items: start; padding: 0; border: none; background: none; font: inherit; font-weight: 600; color: var(--color-navy-dark); text-align: left; cursor: pointer; }
+.cxc-les-debo-nombre small { font-weight: 400; font-size: 0.74rem; color: #6b7280; }
+.cxc-les-debo li > strong { font-variant-numeric: tabular-nums; color: #991b1b; }
+.cxc-enviar { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: none; border-radius: 8px; background: #b91c1c; color: white; font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.cxc-enviar:hover { background: #991b1b; }
+@media (max-width: 720px) { .cxc-hero-debo { justify-items: start; text-align: left; } .cxc-les-debo { margin: 12px 10px 0; } }
