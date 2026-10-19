@@ -112,6 +112,15 @@ export const MODULOS: ModuloConfig[] = [
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
   },
   {
+    id: "cuentas-por-pagar",
+    titulo: "Cuentas por Pagar",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: FileText,
+    ruta: "/cuentas-por-pagar",
+    rolesPermitidos: ["ADMIN", "ASESOR"],
+  },
+  {
     id: "clientes",
     titulo: "Clientes",
     categoria: "Gestión financiera",

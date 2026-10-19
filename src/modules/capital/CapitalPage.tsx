@@ -127,15 +127,16 @@ export function CapitalPage() {
     try {
       // por cobrar y por pagar salen de Cuentas Corrientes, de Cuentas por Cobrar y de Confirmaciones (lo confirmado que
       // todavía no han venido a retirar)
-      const [s, corrientes, cobrar, confirmaciones, lista] = await Promise.all([
+      const [s, corrientes, cobrar, porPagar, confirmaciones, lista] = await Promise.all([
         capitalApi.sistema(),
         getCuentasCorrientes({ vista: "corrientes" }),
         getCuentasCorrientes({ vista: "cobrar" }),
+        getCuentasCorrientes({ vista: "pagar" }),
         getCuentasCorrientes({ vista: "cajas" }),
         capitalApi.cuadres(),
       ]);
       setSistema(s);
-      setCuentas([...corrientes, ...cobrar, ...confirmaciones]);
+      setCuentas([...corrientes, ...cobrar, ...porPagar, ...confirmaciones]);
       setCuadres(lista);
       return lista;
     } catch (e) {
@@ -216,6 +217,8 @@ export function CapitalPage() {
           ? c.saldo_actual.startsWith("-") ? "Confirmaciones · pagado de más" : "Confirmaciones · no han venido a retirar"
           : c.modulo === "POR_COBRAR"
             ? `Cuentas por Cobrar · ${grupoDe(c)}`
+            : c.modulo === "POR_PAGAR"
+            ? `Cuentas por Pagar · ${grupoDe(c)}`
             : `Cuentas Corrientes · ${TIPO_TERCERO[c.tercero_tipo] ?? "Otros"}`;
       return { id: c.id, nombre: c.tercero_nombre, modulo: c.modulo, codigo: c.moneda_codigo, saldo: Math.abs(Number(c.saldo_actual)), grupo, ...(f ? { desde: f.desde, hasta: f.hasta, pendientes: f.cantidad } : {}), pesosCuenta: p === null ? null : Math.abs(Number(p)) };
     };
@@ -1014,7 +1017,7 @@ export function CapitalPage() {
 
 /** A dónde se va para ver la cuenta del cliente (su hoja, con sus movimientos). */
 const rutaCuenta = (c: ClienteSaldo) =>
-  c.modulo === "POR_COBRAR" ? `/cuentas-por-cobrar-pagar?cuenta=${c.id}` : c.modulo === "CAJA" ? `/cajas-confirmaciones?cuenta=${c.id}` : `/cuentas-corrientes?cuenta=${c.id}`;
+  c.modulo === "POR_COBRAR" ? `/cuentas-por-cobrar-pagar?cuenta=${c.id}` : c.modulo === "POR_PAGAR" ? `/cuentas-por-pagar?cuenta=${c.id}` : c.modulo === "CAJA" ? `/cajas-confirmaciones?cuenta=${c.id}` : `/cuentas-corrientes?cuenta=${c.id}`;
 
 /**
  * Los clientes con saldo, por grupos (los de Cuentas por Cobrar por su grupo; los de Cuentas Corrientes por lo que

@@ -30,15 +30,19 @@ export function NuevoClienteCobrarModal({
   grupos,
   grupoInicial,
   monedas,
+  modulo = "POR_COBRAR",
   onCreado,
   onCerrar,
 }: {
   grupos: string[];
   grupoInicial: string;
+  // por cobrar (me debe) o por pagar (le debo)
+  modulo?: "POR_COBRAR" | "POR_PAGAR";
   monedas: Moneda[];
   onCreado: (cuenta: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
 }) {
+  const pagar = modulo === "POR_PAGAR";
   const elegibles = grupos.filter((g) => g !== SIN_GRUPO);
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -78,7 +82,7 @@ export function NuevoClienteCobrarModal({
         ...(existente
           ? { terceroId: existente.id, usarExistente: true }
           : { nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE" as const, telefono: telefono.trim() || undefined } }),
-        modulo: "POR_COBRAR" as const,
+        modulo,
         grupoCobro: grupoFinal,
         monedaId: cop.id,
       };
@@ -90,14 +94,16 @@ export function NuevoClienteCobrarModal({
       });
       if (conMovimiento && total) {
         try {
+          // por pagar: lo que le debo va en negativo (como en una cuenta corriente)
+          const signo = pagar ? "-" : "";
           await registrarMovimientoCC({
             cuentaId: cuenta.id,
             terceroId: cuenta.tercero_id,
             canalId: cuenta.canal_id,
             monedaId: cuenta.moneda_id,
-            tipo: "CARGO",
-            descripcion: referencia.trim() || "Saldo por cobrar",
-            ...(conTasa ? { cantidadBase: nCantidad!, tasa: nTasa! } : { monto: nCantidad! }),
+            tipo: pagar ? "ABONO" : "CARGO",
+            descripcion: referencia.trim() || (pagar ? "Saldo por pagar" : "Saldo por cobrar"),
+            ...(conTasa ? { cantidadBase: `${signo}${nCantidad!}`, tasa: nTasa! } : { monto: `${signo}${nCantidad!}` }),
           });
         } catch (err) {
           // el cliente ya quedó creado: se avisa y el movimiento se anota desde su hoja
@@ -113,7 +119,7 @@ export function NuevoClienteCobrarModal({
   }
 
   return (
-    <Modal titulo="Nuevo cliente por cobrar" onCerrar={onCerrar}>
+    <Modal titulo={pagar ? "Nuevo cliente por pagar" : "Nuevo cliente por cobrar"} onCerrar={onCerrar}>
       <form className="cc-modal cxc-form" onSubmit={guardar}>
         {existente ? (
           <p className="cc-elegido">
@@ -132,7 +138,7 @@ export function NuevoClienteCobrarModal({
               Teléfono (para enviarle el saldo por WhatsApp)
               <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="ej. 314 349 8481" inputMode="tel" autoComplete="off" />
             </label>
-            <AvisoClienteExistente lista={existentes.lista} modulo="POR_COBRAR" onDescartar={existentes.descartar} onUsar={setExistente} />
+            <AvisoClienteExistente lista={existentes.lista} modulo={modulo} onDescartar={existentes.descartar} onUsar={setExistente} />
           </>
         )}
         <label>
@@ -140,7 +146,7 @@ export function NuevoClienteCobrarModal({
           <select value={grupo} onChange={(e) => setGrupo(e.target.value)}>
             {elegibles.map((g) => (
               <option key={g} value={g}>
-                Cuentas por Cobrar {g}
+                {pagar ? "Cuentas por Pagar" : "Cuentas por Cobrar"} {g}
               </option>
             ))}
             <option value={NUEVO}>+ Crear un grupo nuevo…</option>
@@ -176,8 +182,8 @@ export function NuevoClienteCobrarModal({
             <small>
               {total
                 ? conTasa
-                  ? `${formatearMonto(nCantidad!)} × ${formatearMonto(nTasa!)} = ${dinero(total, "COP")} por cobrar`
-                  : `${dinero(total, "COP")} por cobrar`
+                  ? `${formatearMonto(nCantidad!)} × ${formatearMonto(nTasa!)} = ${dinero(total, "COP")} ${pagar ? "por pagar" : "por cobrar"}`
+                  : `${dinero(total, "COP")} ${pagar ? "por pagar" : "por cobrar"}`
                 : "Como en Cuentas Corrientes: el monto en pesos, o la cantidad (dólares, bolívares…) con su tasa."}
             </small>
           </div>

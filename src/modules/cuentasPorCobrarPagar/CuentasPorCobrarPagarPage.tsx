@@ -25,9 +25,14 @@ const NUEVO_GRUPO = "__nuevo__";
  * Cada grupo es una tabla "Nombre Cliente / Monto COP" con su total; al tocar un cliente se abre su hoja, que se
  * lleva igual que una cuenta corriente (cargos, abonos, WhatsApp, reporte).
  */
-export function CuentasPorCobrarPagarPage() {
+export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar" | "pagar" }) {
   const { usuario } = useAuth();
   const puedeEditar = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
+  // Cuentas por Pagar: el mismo tablero, con lo que le debo a cada cliente (en positivo) y "Enviar a taquilla" en su hoja
+  const pagar = modo === "pagar";
+  const NOMBRE = pagar ? "Cuentas por Pagar" : "Cuentas por Cobrar";
+  // lo que le debo está en negativo: acá se muestra en positivo
+  const ver = (v: string) => (!pagar ? v : v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ? `-${v}` : v);
   const [cuentas, setCuentas] = useState<CuentaCorrienteResumen[] | null>(null);
   const [monedas, setMonedas] = useState<Moneda[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -40,19 +45,19 @@ export function CuentasPorCobrarPagarPage() {
   const [pagandoId, setPagandoId] = useState<number | null>(null); // el cliente que paga todo lo que debe
   const [pagosHechos, setPagosHechos] = useState(0); // al pagar con la hoja abierta, la hoja se vuelve a cargar
   const pagando = pagandoId !== null ? ((cuentas ?? []).find((c) => c.id === pagandoId) ?? null) : null;
-  const debe = (c: CuentaCorrienteResumen) => !c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual);
+  const debe = (c: CuentaCorrienteResumen) => !pagar && !c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual);
   const [reporte, setReporte] = useState<{ blob: Blob; url: string } | null>(null);
   const [generando, setGenerando] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
-      setCuentas(await getCuentasCorrientes({ vista: "cobrar" }));
+      setCuentas(await getCuentasCorrientes({ vista: modo }));
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudieron cargar las cuentas por cobrar.");
+      setError(e instanceof ApiError ? e.message : `No se pudieron cargar las ${NOMBRE.toLowerCase()}.`);
     }
-  }, []);
+  }, [modo, NOMBRE]);
   useEffect(() => {
     void cargar();
     getMonedas()
@@ -117,7 +122,7 @@ export function CuentasPorCobrarPagarPage() {
         <Header />
         <div className="cxc-barra-cliente">
           <button type="button" className="cxc-volver" onClick={() => setAbiertaId(null)}>
-            <ArrowLeft size={16} /> Volver a Cuentas por Cobrar
+            <ArrowLeft size={16} /> Volver a {NOMBRE}
           </button>
           {puedeEditar && debe(abierta) && (
             <button type="button" className="cxc-pagar-todo" onClick={() => setPagandoId(abierta.id)} title="El cliente paga todo lo que debe: se anota el abono por el saldo completo">
@@ -177,23 +182,23 @@ export function CuentasPorCobrarPagarPage() {
             <HandCoins size={26} />
           </span>
           <div>
-            <h1>Cuentas por Cobrar</h1>
+            <h1>{NOMBRE}</h1>
             <p>
               {todas.length} {todas.length === 1 ? "cliente" : "clientes"} en {grupos.filter((g) => g !== SIN_GRUPO).length} grupos · al {fechaDeHoy()}
             </p>
           </div>
         </div>
         <div className="cxc-hero-total">
-          <span>Total por cobrar</span>
-          <strong>{dinero(general.total, "COP")}</strong>
+          <span>{pagar ? "Total que debo" : "Total por cobrar"}</span>
+          <strong>{dinero(ver(general.total), "COP")}</strong>
           <small>
             COP
-            {otrasMonedas.length > 0 && ` · incluye ${otrasMonedas.map((m) => dinero(m.total, m.codigo)).join(" + ")}`}
+            {otrasMonedas.length > 0 && ` · incluye ${otrasMonedas.map((m) => dinero(ver(m.total), m.codigo)).join(" + ")}`}
             {general.sinTasa > 0 && ` · ${general.sinTasa} sin tasa a pesos`}
           </small>
         </div>
         <div className="cxc-hero-acciones">
-          {puedeEditar && (
+          {puedeEditar && !pagar && (
             <button type="button" className="cxc-btn-oro" onClick={() => setTransfiriendo(true)} title="Le hicimos una transferencia a alguien: se pega la captura y queda en su cuenta por cobrar">
               <ArrowUpRight size={17} /> Registrar transferencia
             </button>
@@ -203,9 +208,11 @@ export function CuentasPorCobrarPagarPage() {
               <UserPlus size={17} /> Nuevo cliente
             </button>
           )}
+          {!pagar && (
           <button type="button" className="cxc-btn-claro" onClick={compartirReporte} disabled={generando || !cuentas}>
             <Share2 size={16} /> {generando ? "Generando…" : "Compartir reporte"}
           </button>
+          )}
         </div>
       </header>
 
@@ -230,10 +237,10 @@ export function CuentasPorCobrarPagarPage() {
             if (buscando && lista.length === 0) return null;
             const total = totalEnPesos(lista);
             return (
-              <section key={g} className="cxc-grupo" aria-label={`Cuentas por Cobrar ${g}`}>
+              <section key={g} className="cxc-grupo" aria-label={`${NOMBRE} ${g}`}>
                 <header>
                   <h2>
-                    Cuentas por Cobrar <b>{g}</b>
+                    {NOMBRE} <b>{g}</b>
                   </h2>
                   <span className="cxc-cuantos">{lista.length}</span>
                   {puedeEditar && g !== SIN_GRUPO && (
@@ -262,7 +269,7 @@ export function CuentasPorCobrarPagarPage() {
                             <span className="cxc-nombre">{c.tercero_nombre}</span>
                             {detalle && <small>{detalle}</small>}
                           </td>
-                          <td className={`num ${pesos?.startsWith("-") ? "favor" : ""}`}>{pesos === null ? <span className="cxc-sin-tasa">sin tasa</span> : dinero(pesos, "COP")}</td>
+                          <td className={`num ${pesos !== null && ver(pesos).startsWith("-") ? "favor" : ""}`}>{pesos === null ? <span className="cxc-sin-tasa">sin tasa</span> : dinero(ver(pesos), "COP")}</td>
                           <td className="cxc-wa">
                             {puedeEditar && debe(c) && (
                               <button
@@ -277,6 +284,7 @@ export function CuentasPorCobrarPagarPage() {
                                 <CircleCheckBig size={16} />
                               </button>
                             )}
+                            {!pagar && (
                             <a
                               href={enlaceWhatsApp(telefono, mensaje)}
                               onClick={(e) => {
@@ -291,6 +299,7 @@ export function CuentasPorCobrarPagarPage() {
                             >
                               <MessageCircle size={16} />
                             </a>
+                            )}
                           </td>
                         </tr>
                       );
@@ -304,7 +313,7 @@ export function CuentasPorCobrarPagarPage() {
                   <tfoot>
                     <tr>
                       <td>Total</td>
-                      <td className="num">{dinero(total.total, "COP")}</td>
+                      <td className="num">{dinero(ver(total.total), "COP")}</td>
                       <td />
                     </tr>
                   </tfoot>
@@ -318,8 +327,8 @@ export function CuentasPorCobrarPagarPage() {
 
       {/* El resumen, como al pie del Excel: el total de cada grupo y el total general */}
       {cuentas && !buscando && (
-        <section className="cxc-resumen" aria-label="Total por cobrar">
-          <h2>Total por cobrar</h2>
+        <section className="cxc-resumen" aria-label={pagar ? "Total que debo" : "Total por cobrar"}>
+          <h2>{pagar ? "Total que debo" : "Total por cobrar"}</h2>
           <table>
             <tbody>
               {grupos.map((g) => {
@@ -329,7 +338,7 @@ export function CuentasPorCobrarPagarPage() {
                     <td>
                       {g} <span>{lista.length}</span>
                     </td>
-                    <td className="num">{dinero(totalEnPesos(lista).total, "COP")}</td>
+                    <td className="num">{dinero(ver(totalEnPesos(lista).total), "COP")}</td>
                   </tr>
                 );
               })}
@@ -337,7 +346,7 @@ export function CuentasPorCobrarPagarPage() {
             <tfoot>
               <tr>
                 <td>Total</td>
-                <td className="num">{dinero(general.total, "COP")}</td>
+                <td className="num">{dinero(ver(general.total), "COP")}</td>
               </tr>
             </tfoot>
           </table>
@@ -349,6 +358,7 @@ export function CuentasPorCobrarPagarPage() {
           grupos={grupos}
           grupoInicial={creandoEn}
           monedas={monedas}
+          modulo={pagar ? "POR_PAGAR" : "POR_COBRAR"}
           onCerrar={() => setCreandoEn(null)}
           onCreado={() => {
             setCreandoEn(null);

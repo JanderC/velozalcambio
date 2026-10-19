@@ -30,6 +30,8 @@ export function EnviarAConfirmacionesModal({
   onEnviado: () => void;
   onCerrar: () => void;
 }) {
+  // desde Cuentas por Pagar se dice "Enviar a taquilla": va a Confirmaciones y de ahí sale en todas las taquillas
+  const desdePagar = cuenta.modulo === "POR_PAGAR";
   const [monto, setMonto] = useState(montoInicial ? conPuntos(montoInicial.replace(/^-/, "").replace(".", ",")) : "");
   const [formula, setFormula] = useState<Formula>("COMISION");
   const [valor, setValor] = useState("");
@@ -101,7 +103,7 @@ export function EnviarAConfirmacionesModal({
 
   if (hecho) {
     return (
-      <Modal titulo="Enviado a Confirmaciones" onCerrar={onCerrar}>
+      <Modal titulo={desdePagar ? "Enviado a taquilla" : "Enviado a Confirmaciones"} onCerrar={onCerrar}>
         <div className="cc-modal">
           <p className="cc-enviar-hecho">
             <CheckCircle2 size={18} /> {cuenta.tercero_nombre} quedó en Confirmaciones con <b>{dineroEn(hecho.resultado, hecho.moneda)}</b> por pagarle. Ya sale en taquilla para pagárselo (o se le paga por otro método desde Confirmaciones).
@@ -117,7 +119,7 @@ export function EnviarAConfirmacionesModal({
   }
 
   return (
-    <Modal titulo="Enviar a Confirmaciones" onCerrar={onCerrar}>
+    <Modal titulo={desdePagar ? "Enviar a taquilla" : "Enviar a Confirmaciones"} onCerrar={onCerrar}>
       <form className="cc-modal" onSubmit={enviar}>
         <label>
           Cuánto se pasa ({cuenta.moneda_codigo})
@@ -177,7 +179,7 @@ export function EnviarAConfirmacionesModal({
           <strong>{resultado && /[1-9]/.test(resultado) ? dineroEn(resultado, codigoEntrega) : "—"}</strong>
         </p>
         <p className="cc-modal-nota">
-          {nMonto ? `En Cuentas Corrientes se anotan los ${formatearMonto(nMonto)} ${cuenta.moneda_codigo} enviados: ahí deja de debérsele eso. ` : ""}En Confirmaciones queda como una confirmación ya verificada, lista para pagarle en taquilla o por otro método.
+          {nMonto ? `En ${desdePagar ? "Cuentas por Pagar" : "Cuentas Corrientes"} se anotan los ${formatearMonto(nMonto)} ${cuenta.moneda_codigo} enviados: ahí deja de debérsele eso. ` : ""}En Confirmaciones queda como una confirmación ya verificada, lista para pagarle en taquilla o por otro método.
         </p>
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">
@@ -185,7 +187,7 @@ export function EnviarAConfirmacionesModal({
             Cancelar
           </button>
           <button type="submit" className="cc-guardar" disabled={enviando}>
-            {enviando ? "Enviando…" : "Enviar a Confirmaciones"}
+            {enviando ? "Enviando…" : desdePagar ? "Enviar a taquilla" : "Enviar a Confirmaciones"}
           </button>
         </div>
       </form>

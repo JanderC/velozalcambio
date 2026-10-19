@@ -139,8 +139,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
       setError((e as Error).message);
     }
   }
-  const NOMBRE_MODULO: Record<string, string> = { POR_COBRAR: "Cuentas por Cobrar", CAJA: "Confirmaciones" };
-  const RUTA_MODULO: Record<string, string> = { POR_COBRAR: "/cuentas-por-cobrar-pagar", CAJA: "/cajas-confirmaciones" };
+  const NOMBRE_MODULO: Record<string, string> = { POR_COBRAR: "Cuentas por Cobrar", POR_PAGAR: "Cuentas por Pagar", CAJA: "Confirmaciones" };
+  const RUTA_MODULO: Record<string, string> = { POR_COBRAR: "/cuentas-por-cobrar-pagar", POR_PAGAR: "/cuentas-por-pagar", CAJA: "/cajas-confirmaciones" };
 
   // Totales por moneda: lo que me deben y lo que debo
   const resumen = useMemo(() => {

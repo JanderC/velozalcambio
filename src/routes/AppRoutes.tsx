@@ -37,7 +37,8 @@ export function AppRoutes() {
         <Route path="/" element={<LauncherPage />} />
         <Route path="/caja" element={<CajaPage />} />
         <Route path="/tasas" element={<TasasPage />} />
-        <Route path="/cuentas-por-cobrar-pagar" element={<CuentasPorCobrarPagarPage />} />
+        <Route path="/cuentas-por-cobrar-pagar" element={<CuentasPorCobrarPagarPage key="cobrar" />} />
+        <Route path="/cuentas-por-pagar" element={<CuentasPorCobrarPagarPage key="pagar" modo="pagar" />} />
         <Route path="/clientes" element={<ClientesPage />} />
         <Route path="/clientes/:id" element={<ClienteFichaPage />} />
         <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />

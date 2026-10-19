@@ -10,7 +10,7 @@ export interface Categoria {
   nombre: string;
 }
 
-export type ModuloCuenta = "CORRIENTE" | "POR_COBRAR" | "CAJA";
+export type ModuloCuenta = "CORRIENTE" | "POR_COBRAR" | "POR_PAGAR" | "CAJA";
 
 export interface CuentaCorrienteResumen {
   id: number;
@@ -276,7 +276,7 @@ export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }
 
-export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string; vista?: "corrientes" | "cobrar" | "cajas" }) {
+export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string; vista?: "corrientes" | "cobrar" | "pagar" | "cajas" }) {
   const params = new URLSearchParams();
   if (filtros.vista) params.set("vista", filtros.vista);
   if (filtros.terceroId) params.set("terceroId", String(filtros.terceroId));

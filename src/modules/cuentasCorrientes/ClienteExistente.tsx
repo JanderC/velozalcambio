@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { UserCheck } from "lucide-react";
 import { buscarClientesExistentes, type ClienteExistente } from "../../api/cuentasCorrientes.api";
 
-export const NOMBRE_DEL_MODULO: Record<string, string> = { CORRIENTE: "Cuentas Corrientes", POR_COBRAR: "Cuentas por Cobrar", CAJA: "Confirmaciones" };
+export const NOMBRE_DEL_MODULO: Record<string, string> = { CORRIENTE: "Cuentas Corrientes", POR_COBRAR: "Cuentas por Cobrar", POR_PAGAR: "Cuentas por Pagar", CAJA: "Confirmaciones" };
 
 /**
  * Mientras se escribe el nombre o el teléfono de un cliente nuevo: ¿ya existe en el sistema (en cualquier módulo)?

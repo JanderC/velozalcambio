@@ -26,7 +26,7 @@ export function MoverMovimientoModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const vista = cuenta.modulo === "POR_COBRAR" ? "cobrar" : cuenta.modulo === "CAJA" ? "cajas" : "corrientes";
+    const vista = cuenta.modulo === "POR_COBRAR" ? "cobrar" : cuenta.modulo === "POR_PAGAR" ? "pagar" : cuenta.modulo === "CAJA" ? "cajas" : "corrientes";
     getCuentasCorrientes({ vista })
       .then((lista) => setCuentas(lista.filter((c) => c.id !== cuenta.id && c.modulo === cuenta.modulo && c.moneda_id === cuenta.moneda_id)))
       .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudieron cargar las cuentas."));
