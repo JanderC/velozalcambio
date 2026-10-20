@@ -119,6 +119,8 @@ export const MODULOS: ModuloConfig[] = [
     icono: FileText,
     ruta: "/cuentas-por-pagar",
     rolesPermitidos: ["ADMIN", "ASESOR"],
+    // oculto por ahora (lo pidió David): para volver a mostrarlo, quitar esta marca
+    oculto: true,
   },
   {
     id: "clientes",
