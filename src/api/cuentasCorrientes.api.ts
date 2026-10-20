@@ -417,3 +417,10 @@ export function enviarAConfirmaciones(
 ) {
   return api.post<{ confirmacionId: number; corrienteId: number; cuentaConfirmacionesId: number; resultado: string; moneda: string }>(`/cuentas-corrientes/${cuentaId}/enviar-a-confirmaciones`, d);
 }
+
+/** El texto de una captura leído en el servidor: respaldo cuando el navegador no puede leerla. */
+export function leerTextoEnServidor(imagen: File) {
+  const formData = new FormData();
+  formData.append("imagen", imagen);
+  return api.postForm<{ texto: string }>("/cuentas-corrientes/leer-texto", formData);
+}

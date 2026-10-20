@@ -2,7 +2,7 @@
 // si no está configurada o falla, se lee en el propio navegador (OCR), sin IA ni claves: se saca el texto
 // de la imagen y se busca en él el monto, el número de referencia y la fecha.
 import { ApiError } from "../../api/client";
-import { leerComprobanteConIA } from "../../api/cuentasCorrientes.api";
+import { leerComprobanteConIA, leerTextoEnServidor } from "../../api/cuentasCorrientes.api";
 
 export interface DatosComprobante {
   referencia: string | null;
@@ -311,9 +311,18 @@ export async function leerComprobante(imagen: File): Promise<DatosComprobante> {
 }
 
 async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
-  const local = leerLocal(imagen).then(
-    (d) => ({ d, error: null as Error | null }),
-    (e: unknown) => ({ d: null, error: e as Error })
+  // Si el navegador no puede leerla (no descargó el lector, poca memoria), la lee el servidor con el mismo lector
+  // (si el navegador se queda pensando más de 30 segundos, también pasa al servidor)
+  const local = Promise.race([leerLocal(imagen), new Promise<never>((_, rechazar) => setTimeout(() => rechazar(new Error("El lector del navegador tardó demasiado")), 30_000))]).then(
+    (d) => ({ d: d as DatosComprobante | null, error: null as Error | null }),
+    async (e: unknown) => {
+      try {
+        const { texto } = await leerTextoEnServidor(await achicar(imagen, 2000));
+        return { d: extraerDatos(texto) as DatosComprobante | null, error: null as Error | null };
+      } catch {
+        return { d: null as DatosComprobante | null, error: e as Error };
+      }
+    }
   );
   let deLaIA: DatosComprobante | null = null;
   if (Date.now() >= iaPausadaHasta) {
