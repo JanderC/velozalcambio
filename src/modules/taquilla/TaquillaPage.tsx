@@ -27,6 +27,8 @@ import {
 import { formatearMonto, leerNumero, pctDeComision, sumarDecimales } from "../../utils/montos";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import { OperacionesTaquilla } from "./OperacionesTaquilla";
+import { AvisoClienteModal } from "../../components/whatsapp/AvisoClienteModal";
+import { mensajeParaCliente } from "./mensajeCliente";
 import "./taquilla.css";
 
 const NOMBRE_MONEDA: Record<string, string> = { COP: "Pesos", USD: "Dólares", EUR: "Euros" };
@@ -110,6 +112,10 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
     };
   }, [buscar, taquilla]);
 
+  // Lo que se le avisa al cliente cuando se le entrega o se le confirma: sale una ventana con el mensaje ya escrito
+  const [aviso, setAviso] = useState<{ titulo: string; resumen: string; nombre: string; telefono: string | null; mensaje: string; moneda: string } | null>(null);
+  const referenciaDe = (s: SolicitudTaquilla) => (s.descripcion ?? "").split(" · ")[1]?.trim() || null;
+
   // En efectivo descuenta de la caja; por Bancolombia no la toca (solo queda contado arriba)
   async function pagar(s: SolicitudTaquilla, medio: MedioTaquilla = "EFECTIVO") {
     const pregunta =
@@ -122,6 +128,19 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
       setTaquilla(await pagarSolicitud(s.id, medio));
       setDetalle(null);
       setError(null);
+      setAviso({
+        titulo: "Transacción entregada",
+        resumen: `Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre}${medio !== "EFECTIVO" ? ` ${textoMedio(medio)}` : " en efectivo"}.`,
+        nombre: s.cliente_nombre,
+        telefono: s.cliente_telefono,
+        moneda: s.moneda_codigo,
+        mensaje: mensajeParaCliente({
+          nombre: s.cliente_nombre,
+          que: "entregada",
+          detalle: [`Monto: ${dinero(s.monto, s.moneda_codigo)}`, medio === "EFECTIVO" ? "Entregado en efectivo" : `Pagado ${textoMedio(medio)}`],
+          referencia: referenciaDe(s),
+        }),
+      });
     } catch (e) {
       const mensaje = e instanceof ApiError ? e.message : "No se pudo registrar el pago.";
       setError(/saldo insuficiente/i.test(mensaje) ? `La caja de taquilla no tiene ${dinero(s.monto, s.moneda_codigo)} para pagarle a ${s.cliente_nombre}. Sumale efectivo a la caja primero.` : mensaje);
@@ -136,6 +155,14 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
     setPagando(s.id);
     try {
       await confirmarMovimientoCC(s.id);
+      setAviso({
+        titulo: "Transacción confirmada",
+        resumen: `La transferencia de ${s.cliente_nombre} por ${dinero(s.monto, s.moneda_codigo)} quedó confirmada.`,
+        nombre: s.cliente_nombre,
+        telefono: s.cliente_telefono,
+        moneda: s.moneda_codigo,
+        mensaje: mensajeParaCliente({ nombre: s.cliente_nombre, que: "lista", detalle: [`Monto a recibir: ${dinero(s.monto, s.moneda_codigo)}`], referencia: referenciaDe(s) }),
+      });
       const nueva = await getTaquilla();
       setTaquilla(nueva);
       // el detalle abierto se actualiza: ahora muestra Se pagó
@@ -490,6 +517,17 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
             setCerrando(false);
             setError(null);
           }}
+        />
+      )}
+      {aviso && (
+        <AvisoClienteModal
+          titulo={aviso.titulo}
+          resumen={aviso.resumen}
+          nombre={aviso.nombre}
+          telefono={aviso.telefono}
+          mensaje={aviso.mensaje}
+          monedaCodigo={aviso.moneda}
+          onCerrar={() => setAviso(null)}
         />
       )}
     </div>

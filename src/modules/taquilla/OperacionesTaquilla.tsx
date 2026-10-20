@@ -15,6 +15,8 @@ import {
   type Taquilla,
 } from "../../api/taquilla.api";
 import { DolaresPorBillete } from "./DolaresPorBillete";
+import { AvisoClienteModal } from "../../components/whatsapp/AvisoClienteModal";
+import { mensajeParaCliente } from "./mensajeCliente";
 import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
 import { ChipsTasaDelDia } from "../tasas/TasasDelDia";
 import { dividirDecimales, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
@@ -106,6 +108,19 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
       return principalTasa.valor;
     });
   }, [principalTasa?.clave, principalTasa?.valor, formula]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Al confirmar o entregar, la ventana con el mensaje para el cliente (desde el WhatsApp vinculado)
+  const [aviso, setAviso] = useState<OperacionTaquilla | null>(null);
+  const avisoDe = (o: OperacionTaquilla) => ({
+    titulo: o.tipo === "EGRESO" ? "Transacción entregada" : "Transacción confirmada",
+    resumen: `${o.tipo === "EGRESO" ? "Entregado" : "Confirmado"}: ${cuentaDe(o)}${o.cliente_nombre ? ` · ${o.cliente_nombre}` : ""}`,
+    mensaje: mensajeParaCliente({
+      nombre: o.cliente_nombre,
+      que: o.tipo === "EGRESO" ? "entregada" : "confirmada",
+      // lo que se escribió en la descripción va tal cual; si no hay, la cuenta del movimiento
+      detalle: [o.descripcion?.trim() || cuentaDe(o)],
+    }),
+  });
 
   async function cargarComprobante(archivo: File | undefined) {
     if (!archivo) return;
@@ -223,6 +238,11 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
           confirmada: tipo === "INGRESO" ? confirmada : undefined,
         });
       onCambio(creada);
+      // ya entregada (egreso) o confirmada: se le avisa al cliente
+      if (tipo === "EGRESO" || confirmada) {
+        const o = creada.operaciones.find((x) => x.id === creada.operacionId);
+        if (o) setAviso(o);
+      }
       // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
       if (imagenAdjunta) {
         await subirComprobanteOperacion(creada.operacionId, imagenAdjunta)
@@ -257,6 +277,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
     setOcupado(o.id);
     try {
       onCambio(cual === "confirmar" ? await confirmarOperacionTaquilla(o.id) : await anularOperacionTaquilla(o.id));
+      if (cual === "confirmar") setAviso({ ...o, estado: "CONFIRMADA" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo completar.");
     } finally {
@@ -549,6 +570,15 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
             <img src={imagenVista} alt="Imagen del comprobante" />
           </div>
         </Modal>
+      )}
+      {aviso && (
+        <AvisoClienteModal
+          {...avisoDe(aviso)}
+          nombre={aviso.cliente_nombre ?? "el cliente"}
+          telefono={aviso.cliente_telefono}
+          monedaCodigo={aviso.moneda_resultado ?? aviso.moneda_codigo}
+          onCerrar={() => setAviso(null)}
+        />
       )}
     </section>
   );

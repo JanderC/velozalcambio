@@ -1,0 +1,15 @@
+/* Taquilla confirmó o entregó: el mensaje para el cliente, desde el WhatsApp vinculado */
+.aviso-cliente { display: grid; gap: 12px; }
+.aviso-cliente-ok { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: #e8f6ec; color: #166534; font-weight: 600; }
+.aviso-cliente label { display: grid; gap: 4px; font-size: 0.86rem; font-weight: 600; color: #374151; }
+.aviso-cliente textarea, .aviso-cliente input { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid #d7dbe2; border-radius: 8px; font: inherit; font-weight: 400; font-size: 0.92rem; }
+.aviso-cliente textarea { resize: vertical; line-height: 1.45; }
+.aviso-cliente label small { font-weight: 400; color: #6b7280; font-size: 0.78rem; }
+.aviso-cliente-lineas { display: grid; gap: 6px; }
+.aviso-cliente-lineas > span { font-size: 0.86rem; font-weight: 600; color: #374151; }
+.aviso-cliente-punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+.aviso-cliente-punto.on { background: #22c55e; }
+.aviso-cliente-alerta { color: #a8531f; font-size: 0.78rem; }
+.aviso-cliente-acciones { flex-wrap: wrap; }
+.aviso-cliente-acciones .cc-guardar { display: inline-flex; align-items: center; gap: 6px; }
+.aviso-cliente-abrir { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
