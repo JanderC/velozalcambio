@@ -66,7 +66,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   const [canalId, setCanalId] = useState<number | "">("");
   const [tipo, setTipo] = useState("");
   const [sentido, setSentido] = useState("");
-  const [buscar, setBuscar] = useState("");
+  // ?buscar=: se llega ya buscando (desde Atención de Solicitudes, para registrar el comprobante de ese cliente)
+  const [buscar, setBuscar] = useState(() => new URLSearchParams(window.location.search).get("buscar") ?? "");
   const [cuentas, setCuentas] = useState<CuentaCorrienteResumen[]>([]);
   // ?cuenta=: se entra directo a esa cuenta (desde Capital de giros)
   const [parametros] = useSearchParams();

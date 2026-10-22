@@ -6,6 +6,7 @@ import { ClienteAccionesPanel } from "./ClienteAccionesPanel";
 import { Header } from "../../components/common/Header";
 import { AccordionSection } from "../../components/common/AccordionSection";
 import { TIPOS_DOCUMENTO } from "../../api/terceros.api";
+import { BandejaSolicitudes } from "./BandejaSolicitudes";
 
 export function CajaPage() {
   const [query, setQuery] = useState("");
@@ -71,8 +72,11 @@ const [tipoDocumento, setTipoDocumento] = useState<string>(TIPOS_DOCUMENTO[0]);
       <Header />
       <div className="caja-header">
         <h1>Atención de Solicitudes</h1>
-        <p>Buscá al cliente para ver sus cuentas o registrarle una operación.</p>
+        <p>Lo que piden los clientes por WhatsApp, para atenderlo rápido. Abajo, el buscador de clientes.</p>
       </div>
+
+      {/* Lo principal: la bandeja de lo que piden por WhatsApp */}
+      <BandejaSolicitudes />
 
       {!clienteSeleccionado && (
   <AccordionSection titulo="Búsqueda de Clientes" icono={<Search size={18} />}>
@@ -92,7 +96,6 @@ const [tipoDocumento, setTipoDocumento] = useState<string>(TIPOS_DOCUMENTO[0]);
           value={query}
           onChange={(e) => handleBuscar(e.target.value)}
           placeholder="Ingresá el número o el nombre"
-          autoFocus
         />
       </label>
       <div className="busqueda-documento-botones">
