@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ChevronDown, ChevronUp, PencilLine } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { useAuth } from "../../auth/useAuth";
 import { getTasasPublicas, getTrmColombia, getHistoricoMercado, type TasaPublica } from "../../api/tasas.api";
@@ -80,11 +79,7 @@ export function TasasPage() {
           <h1>Tablero de Tasas</h1>
           <p>Consulta rápida para atender al cliente: precios del día, TRM oficial y mercado venezolano.</p>
         </div>
-        {puedeRegistrar && (
-          <Link to="/tasas/registro" className="tasas-header-accion">
-            <PencilLine size={16} /> Registrar tasas del día
-          </Link>
-        )}
+
       </div>
 
       {/* ---------- Lo principal: la Tasa del día, como se publica (y se actualiza ahí mismo) ---------- */}

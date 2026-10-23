@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { RequireAuth } from "../auth/RequireAuth";
 import { RequireRole } from "../auth/RequireRole";
 import { LoginPage } from "../auth/LoginPage";
@@ -13,7 +13,6 @@ import { CuentasCorrientesPage } from "../modules/cuentasCorrientes/CuentasCorri
 import { TaquillaPage } from "../modules/taquilla/TaquillaPage";
 import { CajaFuertePage } from "../modules/cajaFuerte/CajaFuertePage";
 import { TasasPage } from "../modules/tasas/TasasPage";
-import { RegistroTasasPage } from "../modules/tasas/RegistroTasasPage";
 import { ROLES_REGISTRO_TASAS } from "../modules/tasas/tasas.roles";
 import { CierreCajaPage } from "../modules/cierreCaja/CierreCajaPage";
 import { ReportesPage } from "../modules/reportes/ReportesPage";
@@ -52,7 +51,8 @@ export function AppRoutes() {
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />
         <Route element={<RequireRole roles={ROLES_REGISTRO_TASAS} />}>
-          <Route path="/tasas/registro" element={<RegistroTasasPage />} />
+          {/* la carga de tasas es en el tablero: el registro viejo lleva allá */}
+          <Route path="/tasas/registro" element={<Navigate to="/tasas" replace />} />
         </Route>
         {/* Mismos roles que el backend acepta en POST /transacciones/cambio */}
         <Route element={<RequireRole roles={["ADMIN", "ASESOR", "CAJERO"]} />}>

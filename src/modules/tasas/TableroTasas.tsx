@@ -10,15 +10,18 @@ const fechaCorta = (f: string) => new Date(f).toLocaleDateString("es-CO", { time
 const hora = (f: string) => new Date(f).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" });
 
 /** Lo que se escribe -> como se guarda: "3.200" -> "3200" · "3,5" -> "3.5" · "5 %" -> "5%" */
-function paraGuardar(texto: string) {
+function paraGuardar(texto: string): string | null {
   const t = texto.trim();
   if (!t) return "";
   const pct = t.includes("%");
   const signo = t.startsWith("-") ? "-" : "";
-  let n = t.replace(/[%\s-]/g, "");
+  // fuera lo que no es número ($, Bs, espacios, letras)
+  let n = t.replace(/[^\d.,]/g, "");
+  if (!/\d/.test(n)) return null;
   // con coma es decimal; con puntos solos son miles (3.200)
   n = n.includes(",") ? n.replace(/\./g, "").replace(",", ".") : /^\d{1,3}(\.\d{3})+$/.test(n) ? n.replace(/\./g, "") : n;
-  return `${signo}${n}${pct ? "%" : ""}`;
+  const final = `${signo}${n}${pct ? "%" : ""}`;
+  return /^-?\d*([.,]\d+)?%?$/.test(final) ? final : null;
 }
 
 /**
@@ -50,6 +53,10 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
     const limpio: ValoresTablero = Object.fromEntries(Object.entries(valores).filter(([k]) => !(k in editando)));
     for (const [k, v] of Object.entries(editando)) {
       const g = paraGuardar(v);
+      if (g === null) {
+        const c = [...DOLAR_COMPRA, ...DOLAR_VENTA, ...EURO_COMPRA, EURO_VENTA, ...OTRAS.flatMap((o) => o.casillas)].find((x) => x.clave === k);
+        return setError(`"${v}" no es un número (${c?.etiqueta ?? k}). Escríbelo como 3.200 · 3,5 · 5%.`);
+      }
       if (g) limpio[k] = g;
     }
     setGuardando(true);

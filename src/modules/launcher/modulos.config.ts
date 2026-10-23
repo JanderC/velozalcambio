@@ -92,6 +92,8 @@ export const MODULOS: ModuloConfig[] = [
     icono: PencilLine,
     ruta: "/tasas/registro",
     rolesPermitidos: ROLES_REGISTRO_TASAS,
+    // ya no se usa: las tasas se actualizan en el tablero de Tasas
+    oculto: true,
   },
   {
     id: "cuentas-empresa",
