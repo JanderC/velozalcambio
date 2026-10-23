@@ -1952,7 +1952,7 @@ function FilaNueva({
     const cuentas = partes.map((p) => calcularParte(p, codigoLlega));
     const mala = cuentas.find((c) => c.error);
     if (mala) return setError(mala.error);
-    if (new Set(partes.map((p) => p.moneda)).size !== partes.length) return setError("Cada moneda va una sola vez en el reparto.");
+    // dos partes pueden ir en la misma moneda (ej. una parte en pesos con tasa y otra en pesos con comisión)
     const repartidoTotal = cuentas.reduce((suma, c) => sumarDecimales(suma, c.cantidad!), "0");
     if (nCantidad && Number(sinSigno(nCantidad)) !== Number(repartidoTotal)) {
       return setError(`Las partes suman ${formatearMonto(repartidoTotal)} ${codigoLlega} y en Cantidad dice ${formatearMonto(sinSigno(nCantidad))}. Ajustá las partes (o dejá Cantidad vacía).`);

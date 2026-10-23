@@ -67,7 +67,6 @@ export function RepartoMonedas({
   const repartido = cuentas.reduce((suma, c) => (c.cantidad ? sumarDecimales(suma, c.cantidad) : suma), "0");
   const resto = totalEnviado ? sumarDecimales(totalEnviado, `-${repartido}`) : null;
   const cambiar = (i: number, cambio: Partial<ParteReparto>) => onCambio(partes.map((p, j) => (j === i ? { ...p, ...cambio } : p)));
-  const libres = (i: number) => monedas.filter((m) => m.codigo === partes[i]!.moneda || !partes.some((p) => p.moneda === m.codigo));
 
   return (
     <div className="cc-reparto" role="group" aria-label="Pago repartido en varias monedas">
@@ -82,7 +81,7 @@ export function RepartoMonedas({
             <label>
               Se entrega en
               <select value={p.moneda} onChange={(e) => cambiar(i, { moneda: e.target.value })}>
-                {libres(i).map((m) => (
+                {monedas.map((m) => (
                   <option key={m.id} value={m.codigo}>
                     {m.nombre} ({m.codigo})
                   </option>
@@ -138,12 +137,13 @@ export function RepartoMonedas({
         );
       })}
       <div className="cc-reparto-pie">
-        {partes.length < monedas.length && (
+        {partes.length < 8 && (
           <button
             type="button"
             className="cc-reparto-agregar"
             onClick={() => {
-              const libre = monedas.find((m) => !partes.some((p) => p.moneda === m.codigo));
+              // la siguiente parte propone una moneda que no esté usada (si todas lo están, pesos): se puede repetir
+              const libre = monedas.find((m) => !partes.some((p) => p.moneda === m.codigo)) ?? monedas.find((m) => m.codigo === "COP") ?? monedas[0];
               if (libre) onCambio([...partes, { cantidad: "", moneda: libre.codigo, operador: "x", tasa: "" }]);
             }}
           >
