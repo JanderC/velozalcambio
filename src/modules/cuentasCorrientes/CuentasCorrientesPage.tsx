@@ -73,6 +73,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   const [parametros] = useSearchParams();
   const [seleccionadaId, setSeleccionadaId] = useState<number | null>(() => Number(parametros.get("cuenta")) || null);
   // el movimiento encontrado con el buscador: la hoja abre ese día y lo resalta
+  // recién creado desde Confirmaciones para cargarle varias transferencias o un pago repartido
+  const [abrirCon, setAbrirCon] = useState<{ cuentaId: number; modo: "varias" | "repartido" } | null>(null);
   const [irA, setIrA] = useState<{ cuentaId: number; id: number; fecha: string; clave: number } | null>(null);
   const abrir = (c: CuentaCorrienteResumen) => {
     setSeleccionadaId(c.id);
@@ -405,6 +407,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
             key={seleccionada.id}
             cuenta={seleccionada}
             irA={irA && irA.cuentaId === seleccionada.id ? irA : null}
+            abrirCon={abrirCon && abrirCon.cuentaId === seleccionada.id ? abrirCon.modo : null}
             onActualizar={cargar}
             onVolver={() => setSeleccionadaId(null)}
             medio={enConfirmaciones ? (canales.find((c) => c.id === canalId) ?? null) : null}
@@ -428,8 +431,9 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
               onElegirMedio={setCanalId}
               onPersonalizar={() => setPersonalizando(true)}
               onCerrar={() => {}}
-              onCreada={async (c) => {
+              onCreada={async (c, seguirCon) => {
                 await cargar();
+                setAbrirCon(seguirCon ? { cuentaId: c.id, modo: seguirCon } : null);
                 setSeleccionadaId(c.id);
               }}
             />

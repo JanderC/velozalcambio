@@ -42,7 +42,8 @@ export function NuevaCuentaModal({
   // Confirmaciones: al reconocer la captura (Nequi, Zelle…) se elige solo el medio de arriba
   onElegirMedio?: (canalId: number) => void;
   onPersonalizar: () => void;
-  onCreada: (c: CuentaCorrienteResumen) => void;
+  // seguirCon: Confirmaciones, el cliente se creó para cargarle varias transferencias o un pago repartido en su hoja
+  onCreada: (c: CuentaCorrienteResumen, seguirCon?: "varias" | "repartido") => void;
   onCerrar: () => void;
 }) {
   const [modo, setModo] = useState<"nuevo" | "existente">("nuevo");
@@ -279,6 +280,45 @@ export function NuevaCuentaModal({
     document.addEventListener("paste", alPegar);
     return () => document.removeEventListener("paste", alPegar);
   }, [enLinea]);
+
+  // Confirmaciones: varias transferencias o pago repartido. Se crea el cliente (sin movimiento) y se sigue en su hoja,
+  // donde se cargan las transferencias una por una o las partes en cada moneda.
+  async function crearYSeguir(seguirCon: "varias" | "repartido") {
+    setError(null);
+    if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
+    if (modo === "existente" && !tercero) return setError("Buscá y elegí al cliente.");
+    if (!medio) return setError("Elegí arriba el medio: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle.");
+    const cop = monedas.find((m) => m.codigo === "COP");
+    if (!cop) return setError("No se pudo cargar la moneda. Probá de nuevo.");
+    const datos = {
+      ...(modo === "existente"
+        ? { terceroId: tercero!.id, usarExistente: true }
+        : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
+      canalId: medio.id,
+      modulo,
+      referencia: referencia.trim() || undefined,
+      monedaId: cop.id,
+    };
+    setEnviando(true);
+    try {
+      const cuenta = await crearCuentaCorriente(datos).catch((err) => {
+        // ya hay un cliente con ese nombre: ¿es el mismo?
+        if (!(err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
+        if (!window.confirm(`Ya hay un cliente llamado "${nombre.trim()}" en el sistema.\n\n¿Es la misma persona? Aceptar: se usa ese cliente.\nCancelar: no se registra nada.`)) throw err;
+        return crearCuentaCorriente({ ...datos, usarExistente: true });
+      });
+      tocado.current = { nombre: false, telefono: false, cedula: false };
+      setNombre("");
+      setTelefono("");
+      setCedula("");
+      setReferencia("");
+      onCreada(cuenta, seguirCon);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo crear el cliente.");
+    } finally {
+      setEnviando(false);
+    }
+  }
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -574,6 +614,17 @@ export function NuevaCuentaModal({
         )}
 
         {/* El movimiento con el que llega el cliente: por tasa (cantidad × tasa) o con comisión descontada (monto − %) */}
+        {enLinea && (
+          <div className="cc-nuevo-varias">
+            <span>¿Mandó varias transferencias o lo quiere en varias monedas?</span>
+            <button type="button" onClick={() => void crearYSeguir("varias")} disabled={enviando} title="Se crea el cliente y se abre su hoja para cargar cada transferencia con su monto y su captura">
+              Varias transferencias
+            </button>
+            <button type="button" onClick={() => void crearYSeguir("repartido")} disabled={enviando} title="Se crea el cliente y se abre su hoja para repartir lo enviado en varias monedas">
+              Pago repartido en varias monedas
+            </button>
+          </div>
+        )}
         {enLinea && (
           <fieldset className="cc-primer-mov">
             <legend>Movimiento (opcional)</legend>

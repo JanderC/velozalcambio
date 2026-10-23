@@ -641,3 +641,9 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-pregunta-metodo .cc-chips button { background: white; border: 1px solid #f0c36d; color: #3f2d00; font-weight: 600; }
 .cc-pregunta-metodo .cc-chips button:hover { background: #fff3c4; }
 .cc-pregunta-metodo .cc-pregunta-otro { background: transparent !important; border-style: dashed !important; font-weight: 500 !important; }
+
+/* Cliente nuevo: varias transferencias o pago repartido (se sigue en su hoja) */
+.cc-nuevo-varias { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px; border: 1px dashed #c7d2fe; border-radius: 10px; background: #f5f7ff; font-size: 0.82rem; color: #374151; }
+.cc-nuevo-varias > span { flex-basis: 100%; font-weight: 600; }
+.cc-nuevo-varias button { padding: 6px 11px; border: 1px solid #c7d2fe; border-radius: 8px; background: white; color: var(--color-navy); font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.cc-nuevo-varias button:hover { background: #eef2ff; }

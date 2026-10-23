@@ -154,10 +154,13 @@ export function HojaCuenta({
   onElegirMedio,
   onAbrirCuenta,
   irA = null,
+  abrirCon = null,
 }: {
   cuenta: CuentaCorrienteResumen;
   // desde el buscador: ir al día de este movimiento y resaltarlo (clave cambia en cada búsqueda para volver a ir)
   irA?: { id: number; fecha: string; clave: number } | null;
+  // recién creado desde Confirmaciones: el formulario abre con varias transferencias o pago repartido marcado
+  abrirCon?: "varias" | "repartido" | null;
   onActualizar: () => void;
   onVolver: () => void;
   // Confirmaciones: el medio elegido arriba para el próximo movimiento. El cliente se registra una sola vez y cada
@@ -1329,6 +1332,7 @@ export function HojaCuenta({
           medios={medios}
           onElegirMedio={onElegirMedio}
           onOtraCuenta={onAbrirCuenta}
+          abrirCon={abrirCon}
           onGuardado={(abono) => {
             void cargar();
             onActualizar();
@@ -1357,6 +1361,7 @@ function FilaNueva({
   onElegirMedio,
   onGuardado,
   onOtraCuenta,
+  abrirCon = null,
 }: {
   cuenta: CuentaCorrienteResumen;
   medioElegido?: { id: number; nombre: string } | null;
@@ -1367,6 +1372,7 @@ function FilaNueva({
   medios?: { id: number; nombre: string }[];
   onElegirMedio?: (id: number | "") => void;
   onOtraCuenta?: (cuentaId: number) => void;
+  abrirCon?: "varias" | "repartido" | null;
 }) {
   const [fecha, setFecha] = useState(hoyBogota());
   const [referencia, setReferencia] = useState("");
@@ -1474,6 +1480,13 @@ function FilaNueva({
   // Confirmaciones armadas con varias transferencias: cada una con su monto, su fórmula y su captura
   const [varias, setVarias] = useState(false);
   const [transferencias, setTransferencias] = useState<Transferencia[]>([transferenciaVacia()]);
+  // cliente recién creado para cargarle varias transferencias o un pago repartido: abre así
+  useEffect(() => {
+    if (!abrirCon) return;
+    if (abrirCon === "varias") setVarias(true);
+    else setRepartido(true);
+    setAbierta(true);
+  }, [abrirCon]);
   // la comisión (o la tasa) va una sola vez sobre el total enviado
   const [formulaVarias, setFormulaVarias] = useState<FormulaGeneral>("%");
   const [valorVarias, setValorVarias] = useState("");
