@@ -17,6 +17,7 @@ import { ROLES_REGISTRO_TASAS } from "../modules/tasas/tasas.roles";
 import { CierreCajaPage } from "../modules/cierreCaja/CierreCajaPage";
 import { ReportesPage } from "../modules/reportes/ReportesPage";
 import { RendimientoPage } from "../modules/rendimiento/RendimientoPage";
+import { GastosPage } from "../modules/gastos/GastosPage";
 import { UsuariosPage } from "../modules/usuarios/UsuariosPage";
 import { NuevaTransaccionPage } from "../modules/nuevaTransaccion/NuevaTransaccionPage";
 import { WhatsAppPage } from "../modules/whatsapp/WhatsAppPage";
@@ -47,7 +48,8 @@ export function AppRoutes() {
         <Route path="/taquilla-3" element={<TaquillaPage key="taquilla-3" numero={3} />} />
         <Route path="/caja-fuerte" element={<CajaFuertePage />} />
         <Route path="/reportes" element={<ReportesPage />} />
-        <Route path="/rendimiento" element={<RendimientoPage />} />        <Route path="/solicitudes" element={<SolicitudesPage />} />
+        <Route path="/rendimiento" element={<RendimientoPage />} />
+        <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/transacciones" element={<TransaccionesPage />} />
         <Route path="/cierre-caja" element={<CierreCajaPage />} />
         <Route element={<RequireRole roles={ROLES_REGISTRO_TASAS} />}>
@@ -68,6 +70,8 @@ export function AppRoutes() {
         <Route path="/cuentas-empresa" element={<CuentasEmpresaPage />} />
         {/* Capital de giros: el cuadre de todo el negocio, solo administrador (se entra desde Cuentas por Cobrar) */}
         <Route path="/capital" element={<CapitalPage />} />
+        {/* Gastos administrativos: nómina, sueldos y egresos del negocio, solo administrador */}
+        <Route path="/gastos" element={<GastosPage />} />
         </Route>
         {/* Panel de chats: admin y asesor. Conexión y configuración de la IA: solo admin (lo decide la página y el backend) */}
         <Route element={<RequireRole roles={["ADMIN", "ASESOR"]} />}>

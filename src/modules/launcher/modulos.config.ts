@@ -16,6 +16,7 @@ import {
   Landmark,
   Vault,
   TrendingUp,
+  Receipt,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
 import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
@@ -203,6 +204,16 @@ export const MODULOS: ModuloConfig[] = [
     acento: ACENTO_FINANCIERO,
     icono: Landmark,
     ruta: "/capital",
+    rolesPermitidos: ["ADMIN"],
+  },
+  {
+    id: "gastos",
+    titulo: "Gastos administrativos",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: Receipt,
+    ruta: "/gastos",
+    // nómina, sueldos, gastos de oficina y cualquier egreso: solo el dueño
     rolesPermitidos: ["ADMIN"],
   },
   {
