@@ -429,9 +429,10 @@ export function HojaCuenta({
   const sumaMonto = delaSeleccion.reduce((suma, m) => sumarDecimales(suma, m.monto), "0");
   const hayCantidades = delaSeleccion.some((m) => !!m.cantidad_base);
   const comparaEn = metaEn ?? (hayCantidades ? "cantidad" : "monto");
-  const llevo = comparaEn === "cantidad" ? sumaCantidad : sumaMonto;
+  // lo que se lleva cuenta por su tamaño: si lo marcado son salidas (-2.268) también va completando la meta
+  const llevo = (comparaEn === "cantidad" ? sumaCantidad : sumaMonto).replace(/^-/, "");
   const nMeta = meta.trim() ? (leerNumero(meta)?.replace(/^-/, "") ?? null) : null;
-  const falta = nMeta ? sumarDecimales(nMeta, llevo.startsWith("-") ? llevo.slice(1) : `-${llevo}`) : null;
+  const falta = nMeta ? sumarDecimales(nMeta, `-${llevo}`) : null;
   function marcar(id: number) {
     setMarcados((actual) => {
       const nuevo = new Set(actual);
