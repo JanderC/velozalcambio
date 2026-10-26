@@ -10,7 +10,7 @@ import { enPesos, grupoDe } from "../cuentasPorCobrarPagar/cobrar";
 import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
 import { CapitalGrafica } from "./CapitalGrafica";
 import { CapitalTendencia } from "./CapitalTendencia";
-import { CuadroBancos, MenuBanco } from "./CuadroBancos";
+import { CuadroBancos } from "./CuadroBancos";
 import { CIERRE_INICIAL, CierreCajaFuerte, UsdtManual, cuentasDelCierre, filaCierre, type CierreManual, type FilaCierre } from "./CierreCajaFuerte";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import "./capital.css";
@@ -822,64 +822,9 @@ export function CapitalPage() {
           </CuadroBancos>
           <UsdtManual filas={manual.usdt} onCambio={(f) => cambiar("usdt", f)} soloLectura={soloLectura} tasaDolar={t.tasaDolar} />
 
-          {/* ---------- Dólares y pesos ---------- */}
+          {/* ---------- Dólares por pagar ---------- */}
           <section className="cap-bloque verde ancho">
-            <h2>Dólares y pesos</h2>
-            <div className="cap-tabla">
-            <table>
-              <thead>
-                <tr>
-                  <th>Caja</th>
-                  <th className="num">Cantidad</th>
-                  <th className="num">Tasa</th>
-                  <th className="num">Pesos</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {t.divisasCajas.map((d) => (
-                  <tr key={d.clave} className="cap-auto">
-                    <td>
-                      {d.nombre} <small>{d.codigo === "EUR" ? "euros · del sistema" : d.clave.startsWith("b") ? "cuenta de banco" : "del sistema"}</small>
-                      {d.clave.startsWith("b") && !soloLectura && (
-                        <MenuBanco onAccion={(accion) => setAccionBanco({ accion, bancoId: Number(d.clave.slice(1).split("-")[0]) })} />
-                      )}
-                    </td>
-                    <td className="num">
-                      {d.codigo === "EUR" ? "€" : "$"}
-                      {conDecimales(d.cantidad)}
-                    </td>
-                    <td className="num">
-                      <input
-                        value={manual.tasasCaja[d.clave] ?? ""}
-                        onChange={(e) => cambiar("tasasCaja", { ...manual.tasasCaja, [d.clave]: conPuntos(e.target.value) })}
-                        inputMode="decimal"
-                        placeholder={d.tasa ? formatearMonto(String(d.tasa)) : "tasa"}
-                        disabled={soloLectura}
-                        aria-label={`Tasa de ${d.nombre}`}
-                      />
-                    </td>
-                    <td className="num cap-calculado">{pesos(d.pesos)}</td>
-                    <td />
-                  </tr>
-                ))}
-                {tablaDivisas("dolaresFuera", "Otra caja o persona (ej. Caja 1 sencillo)")}
-              </tbody>
-              <tfoot>
-                <tr className="cap-fila-oscura">
-                  <td>Total</td>
-                  <td className="num">
-                    ${conDecimales(t.usdEnCaja)}
-                    {t.eurEnCaja ? ` · €${conDecimales(t.eurEnCaja)}` : ""}
-                  </td>
-                  <td />
-                  <td className="num">{pesos(t.divisasCop)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-            </div>
-            <h3>Dólares por pagar</h3>
+            <h2>Dólares por pagar</h2>
             <div className="cap-tabla">
             <table>
               <tbody>{tablaDivisas("dolaresPorPagar", "Nombre (ej. Jesús Herrera)")}</tbody>
