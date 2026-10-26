@@ -285,3 +285,14 @@ td .cap-menu { margin-left: 6px; }
 .cap-tend-dato.baja strong { color: #fca5a5; }
 .cap-tend-vacio { margin: 0; font-size: 0.78rem; color: rgba(255, 255, 255, 0.6); }
 @media (max-width: 760px) { .cap-tend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); } .cap-tend-linea { display: none; } .cap-tend-dato strong { font-size: 0.86rem; } }
+
+/* Cierre de la Caja Fuerte (a mano): lo del sistema al lado, como sugerencia que se copia tocándola */
+.cap-cierre-cf td:first-child { white-space: nowrap; }
+.cap-sugerido { margin-left: 8px; padding: 1px 7px; border: 1px dashed #c7d2fe; border-radius: 999px; background: #f5f7ff; color: #3730a3; font: inherit; font-size: 0.7rem; cursor: pointer; font-variant-numeric: tabular-nums; }
+.cap-sugerido:hover { background: #e0e7ff; }
+.cap-tasa-fija { color: #8a93a3; font-size: 0.8rem; }
+.cap-cierre-resta td.cap-calculado { color: #d0161e; }
+@media (max-width: 760px) {
+  .cap-cierre-cf td:first-child { white-space: normal; }
+  .cap-sugerido { display: inline-block; margin: 2px 0 0; }
+}

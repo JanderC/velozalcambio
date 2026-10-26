@@ -6,7 +6,7 @@ import type { AccionBanco } from "./BancoAccionModal";
 
 const pesos = (n: number) => `${n < 0 ? "−" : ""}$${formatearMonto(String(Math.round(Math.abs(n))))}`;
 const conDecimales = (n: number) => `${n < 0 ? "−" : ""}${formatearMonto(Math.abs(n).toFixed(2))}`;
-function conPuntos(escrito: string) {
+export function conPuntos(escrito: string) {
   let t = escrito.replace(/[^\d.,-]/g, "");
   const negativo = t.startsWith("-");
   t = t.replace(/-/g, "");

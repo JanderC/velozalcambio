@@ -11,6 +11,7 @@ import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
 import { CapitalGrafica } from "./CapitalGrafica";
 import { CapitalTendencia } from "./CapitalTendencia";
 import { CuadroBancos, MenuBanco } from "./CuadroBancos";
+import { CIERRE_INICIAL, CierreCajaFuerte, UsdtManual, cuentasDelCierre, filaCierre, type CierreManual, type FilaCierre } from "./CierreCajaFuerte";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import "./capital.css";
 
@@ -45,6 +46,8 @@ interface Manual {
   dolaresFuera: FilaDivisa[]; // dólares que no están en las cajas del sistema
   dolaresPorPagar: FilaDivisa[];
   restarConfirmaciones: boolean;
+  usdt: FilaCierre[]; // las cuentas de USDT, a mano (cuentan como dólares)
+  cierre: CierreManual; // el cierre de la Caja Fuerte, a mano
 }
 // un cliente con saldo: lo que me debe (o le debo), en la moneda de su cuenta
 interface ClienteSaldo {
@@ -88,7 +91,11 @@ const MANUAL_INICIAL: Manual = {
   dolaresFuera: [divisaVacia()],
   dolaresPorPagar: [divisaVacia()],
   restarConfirmaciones: false,
+  usdt: [filaCierre()],
+  cierre: CIERRE_INICIAL,
 };
+// lo guardado antes de que existiera alguna parte (USDT, cierre) se completa con lo vacío
+const completar = (m: Partial<Manual>): Manual => ({ ...MANUAL_INICIAL, ...m, cierre: { ...CIERRE_INICIAL, ...(m.cierre ?? {}) } });
 
 const num = (texto: string | undefined) => {
   const n = texto && texto.trim() ? leerNumero(texto) : null;
@@ -152,7 +159,7 @@ export function CapitalPage() {
     try {
       const b = await capitalApi.borrador();
       const m = (b?.datos as { manual?: Manual } | undefined)?.manual;
-      if (m) return { ...MANUAL_INICIAL, ...m };
+      if (m) return completar(m);
     } catch {
       // sin borrador: el último cuadre
     }
@@ -160,7 +167,7 @@ export function CapitalPage() {
     if (!ultimo) return MANUAL_INICIAL;
     const c = await capitalApi.cuadre(ultimo.id).catch(() => null);
     const m = (c?.datos as { manual?: Manual } | undefined)?.manual;
-    return m ? { ...MANUAL_INICIAL, ...m } : MANUAL_INICIAL;
+    return m ? completar(m) : MANUAL_INICIAL;
   }, []);
   // hasta que no llega lo guardado no se guarda nada (si no, se pisaría con la hoja vacía)
   const [manualListo, setManualListo] = useState(false);
@@ -308,7 +315,7 @@ export function CapitalPage() {
           })
       )
     );
-    const divisasFuera = m.dolaresFuera.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
+    const divisasFuera = [...m.dolaresFuera, ...m.usdt].map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
     const porPagarUsd = m.dolaresPorPagar.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
     const conf = (codigo: string) => Number(foto.confirmaciones.find((c) => c.codigo === codigo)?.total ?? 0);
     // los cuadres viejos restaban las confirmaciones aparte, por moneda; los nuevos las traen en la lista de por pagar
@@ -360,6 +367,23 @@ export function CapitalPage() {
     };
   }, [foto, manual]);
 
+  // Lo que dice el sistema para cada casilla del cierre (solo se sugiere: se copia tocándolo)
+  const sugerencias = useMemo(() => {
+    if (!t || !foto) return null;
+    const fuerte = foto.cajas.filter((c) => c.tipo === "FUERTE");
+    const deFuerte = (codigo: string) => fuerte.reduce((s, c) => s + Number(c.saldos.find((x) => x.codigo === codigo)?.monto ?? 0), 0);
+    return {
+      cop: deFuerte("COP"),
+      usd: deFuerte("USD"),
+      eur: deFuerte("EUR"),
+      porCobrar: t.porCobrar,
+      bancolombia: (foto.bancos ?? []).filter((b) => (b.moneda ?? "COP") === "COP").reduce((s, b) => s + Number(b.saldos.find((x) => x.codigo === "COP")?.monto ?? 0), 0),
+      bolivares: t.bolivaresCop,
+      pagarFuera: t.pagarFuera,
+      cobrarFuera: t.cobrarFuera,
+    };
+  }, [t, foto]);
+
   // el capital total, visto en pesos o en dólares
   const [verEn, setVerEn] = useState<"COP" | "USD">("COP");
 
@@ -389,6 +413,7 @@ export function CapitalPage() {
         pesos: manual.pesos.filter((f) => f.nombre.trim() || f.monto.trim()),
         dolaresFuera: manual.dolaresFuera.filter((f) => f.nombre.trim() || f.cantidad.trim()),
         dolaresPorPagar: manual.dolaresPorPagar.filter((f) => f.nombre.trim() || f.cantidad.trim()),
+        usdt: manual.usdt.filter((f) => f.nombre.trim() || f.cantidad.trim()),
       };
       await capitalApi.guardar({
         datos: { manual: limpio, sistema: fotoActual },
@@ -398,7 +423,7 @@ export function CapitalPage() {
         nota: nota.trim() || undefined,
       });
       setNota("");
-      setAviso(`Cuadre guardado: capital ${pesos(t.capitalCop)} en pesos y ${conDecimales(t.capitalDivisa)} USD en divisas.`);
+      setAviso(`Cuadre guardado: cierre de Caja Fuerte ${pesos(cuentasDelCierre(manual.cierre, t.tasaDolar, t.tasaEuro).total)} · capital ${pesos(t.capitalCop)} en pesos y ${conDecimales(t.capitalDivisa)} USD en divisas.`);
       setTimeout(() => setAviso(null), 7000);
       await cargar();
     } catch (e) {
@@ -456,7 +481,7 @@ export function CapitalPage() {
       const completo = await capitalApi.cuadre(c.id);
       const d = completo.datos as { manual?: Manual; sistema?: Foto };
       if (!d.manual || !d.sistema) return setError("Ese cuadre no tiene el detalle guardado.");
-      setManual({ ...MANUAL_INICIAL, ...d.manual });
+      setManual(completar(d.manual));
       setViendo({ id: c.id, fecha: c.created_at, usuario: c.usuario_nombre, nota: c.nota, foto: d.sistema });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
@@ -559,7 +584,6 @@ export function CapitalPage() {
             <p>{viendo ? `Cuadre guardado el ${fechaHora(viendo.fecha)} por ${viendo.usuario}${viendo.nota ? ` · ${viendo.nota}` : ""}` : "Lo del sistema sale solo; lo de afuera se llena a mano. Cada cuadre queda guardado."}</p>
           </div>
         </div>
-        {t && <TotalesPorMoneda t={t} />}
         {/* ¿sube o baja? el capital de ahora contra los cuadres guardados, en una franja chica */}
         {t && !viendo && (t.tasaDolar || !t.capitalDivisa) && <CapitalTendencia actual={t.capitalCop + t.capitalDivisaCop} cuadres={cuadres} />}
         <div className="cap-referencia">
@@ -616,6 +640,15 @@ export function CapitalPage() {
         <p className="cap-cargando">Cargando el capital…</p>
       ) : (
         <div className="cap-hoja">
+          {/* ---------- Cierre de la Caja Fuerte: todo a mano, con lo del sistema como sugerencia ---------- */}
+          <CierreCajaFuerte
+            valor={manual.cierre}
+            onCambio={(c) => cambiar("cierre", c)}
+            soloLectura={soloLectura}
+            tasaDolar={t.tasaDolar}
+            tasaEuro={t.tasaEuro}
+            sugerencias={sugerencias}
+          />
 
           {/* ---------- Las cajas, con lo que tienen ahora ---------- */}
           <section className="cap-bloque oscuro ancho">
@@ -787,6 +820,7 @@ export function CapitalPage() {
               Total bolívares <b>Bs {conDecimales(t.bolivares)}</b> · en pesos <b>{pesos(t.bolivaresCop)}</b>
             </p>
           </CuadroBancos>
+          <UsdtManual filas={manual.usdt} onCambio={(f) => cambiar("usdt", f)} soloLectura={soloLectura} tasaDolar={t.tasaDolar} />
 
           {/* ---------- Dólares y pesos ---------- */}
           <section className="cap-bloque verde ancho">
@@ -1185,36 +1219,6 @@ interface Totales {
 }
 const usd = (n: number) => `US$${conDecimales(n)}`;
 const eur = (n: number) => `€${conDecimales(n)}`;
-
-/** Lo que hay en cada moneda (cajas, bancos y lo anotado a mano), y cuánto vale en las otras con las tasas de referencia. */
-function TotalesPorMoneda({ t }: { t: Totales }) {
-  const pesosTotal = t.pesosCajas + t.pesosManual;
-  // todo pasa por pesos: X dólares = X × tasa dólar en pesos = (eso ÷ tasa euro) en euros
-  const aUsd = (cop: number) => (t.tasaDolar ? usd(cop / t.tasaDolar) : null);
-  const aEur = (cop: number) => (t.tasaEuro ? eur(cop / t.tasaEuro) : null);
-  const tarjetas = [
-    { clave: "cop", titulo: "Pesos", valor: pesos(pesosTotal), equivale: [aUsd(pesosTotal), aEur(pesosTotal)] },
-    { clave: "usd", titulo: "Dólares", valor: usd(t.usdEnCaja), equivale: t.tasaDolar ? [pesos(t.usdEnCaja * t.tasaDolar), aEur(t.usdEnCaja * t.tasaDolar)] : [] },
-    { clave: "eur", titulo: "Euros", valor: eur(t.eurEnCaja), equivale: t.tasaEuro ? [pesos(t.eurEnCaja * t.tasaEuro), aUsd(t.eurEnCaja * t.tasaEuro)] : [] },
-    ...(t.bolivares
-      ? [{ clave: "ves", titulo: "Bolívares", valor: `Bs. ${conDecimales(t.bolivares)}`, equivale: t.tasaBs ? [pesos(t.bolivares * t.tasaBs), aUsd(t.bolivares * t.tasaBs)] : [] }]
-      : []),
-  ];
-  return (
-    <div className="cap-monedas" aria-label="Total general por moneda">
-      {tarjetas.map((c) => {
-        const otras = c.equivale.filter(Boolean);
-        return (
-          <div key={c.clave} className={`cap-moneda ${c.clave}`}>
-            <span>Total en {c.titulo.toLowerCase()}</span>
-            <strong>{c.valor}</strong>
-            <small>{otras.length ? `≈ ${otras.join(" · ")}` : "escribí la tasa para ver cuánto vale"}</small>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 /** Todo lo que hay junto, en cada moneda, y el capital (lo que hay más lo que me deben, menos lo que debo). */
 function TodoJunto({ t }: { t: Totales }) {
