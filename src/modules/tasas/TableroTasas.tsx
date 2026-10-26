@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
-import { ArrowDownRight, ArrowUpRight, Check, PencilLine, X } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
+import { toBlob } from "html-to-image";
+import { ArrowDownRight, ArrowUpRight, Check, PencilLine, Share2, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { DOLAR_COMPRA, DOLAR_VENTA, EURO_COMPRA, EURO_VENTA, OTRAS, escrita, guardarTablero, tendencia, useTablero, type Casilla, type Tablero, type ValoresTablero } from "./tablero";
 import { PreferenciaTasaUsada } from "./TasasDelDia";
@@ -37,6 +38,50 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const valores = tablero?.actual?.valores ?? {};
+  const tarjeta = useRef<HTMLFormElement>(null);
+  const [compartiendo, setCompartiendo] = useState(false);
+
+  // La imagen del tablero para mandarla a los clientes: sin botones, avisos ni quién la actualizó
+  async function compartir() {
+    if (!tarjeta.current) return;
+    setCompartiendo(true);
+    setError(null);
+    try {
+      const blob = await toBlob(tarjeta.current, {
+        pixelRatio: 2,
+        backgroundColor: "#0b0e13",
+        filter: (n) => !(n instanceof HTMLElement && n.dataset.noImagen !== undefined),
+      });
+      if (!blob) throw new Error();
+      const dia = tablero?.actual ? fechaCorta(tablero.actual.actualizado).replace(/\//g, "-") : "hoy";
+      const archivo = new File([blob], `tasa-del-dia-${dia}.png`, { type: "image/png" });
+      // en el celular abre WhatsApp y las demás apps; en el computador se copia o se descarga
+      if (navigator.canShare?.({ files: [archivo] })) {
+        await navigator.share({ files: [archivo], title: "Tasa del día" }).catch(() => undefined);
+      } else if (navigator.clipboard && "ClipboardItem" in window) {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+          setAviso("Imagen copiada: pégala en el chat de WhatsApp (Ctrl+V).");
+        } catch {
+          descargar(archivo);
+        }
+        setTimeout(() => setAviso(null), 6000);
+      } else descargar(archivo);
+    } catch {
+      setError("No se pudo crear la imagen de las tasas.");
+    } finally {
+      setCompartiendo(false);
+    }
+  }
+  function descargar(archivo: File) {
+    const url = URL.createObjectURL(archivo);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = archivo.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setAviso("Imagen descargada: ya la puedes mandar por WhatsApp.");
+  }
 
   function empezar() {
     // se edita como se ve: 3.200, 5%
@@ -78,7 +123,7 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
   );
 
   return (
-    <form className="tt" onSubmit={guardar}>
+    <form className="tt" onSubmit={guardar} ref={tarjeta}>
       <header className="tt-cabeza">
         <div className="tt-titulo">
           <span>Tasa del día</span>
@@ -94,9 +139,14 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
             <strong>{tablero?.actual ? hora(tablero.actual.actualizado) : "—"}</strong>
           </div>
         </div>
+        {!editando && tablero?.actual && (
+          <button type="button" className="tt-editar" onClick={() => void compartir()} disabled={compartiendo} data-no-imagen>
+            <Share2 size={16} /> {compartiendo ? "Creando imagen…" : "Compartir imagen"}
+          </button>
+        )}
         {puedeEditar &&
           (editando ? (
-            <div className="tt-acciones">
+            <div className="tt-acciones" data-no-imagen>
               <button type="submit" className="tt-guardar" disabled={guardando}>
                 <Check size={16} /> {guardando ? "Guardando…" : "Guardar tasas"}
               </button>
@@ -105,14 +155,14 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
               </button>
             </div>
           ) : (
-            <button type="button" className="tt-editar" onClick={empezar}>
+            <button type="button" className="tt-editar" onClick={empezar} data-no-imagen>
               <PencilLine size={16} /> Actualizar tasas
             </button>
           ))}
       </header>
-      {tablero?.actual?.por && !editando && <p className="tt-por">Actualizada por {tablero.actual.por}</p>}
-      {error && <p className="tt-error">{error}</p>}
-      {aviso && <p className="tt-ok">{aviso}</p>}
+      {tablero?.actual?.por && !editando && <p className="tt-por" data-no-imagen>Actualizada por {tablero.actual.por}</p>}
+      {error && <p className="tt-error" data-no-imagen>{error}</p>}
+      {aviso && <p className="tt-ok" data-no-imagen>{aviso}</p>}
 
       <div className="tt-cuerpo">
         <section className="tt-bloque tt-dolar">
@@ -153,8 +203,12 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
         </section>
       </div>
       {editando && <p className="tt-nota">Escribe cada tasa como se publica (3.200 · 3,5 · 5%). Al guardar, la fecha y la hora se actualizan solas.</p>}
-      {puedeEditar && usuario && !editando && <PreferenciaTasaUsada usuarioId={usuario.id} />}
-      {!tablero?.actual && !editando && <p className="tt-nota">Todavía no hay tasas del día{puedeEditar ? ": toca “Actualizar tasas” para cargarlas." : "."}</p>}
+      {puedeEditar && usuario && !editando && (
+        <div data-no-imagen>
+          <PreferenciaTasaUsada usuarioId={usuario.id} />
+        </div>
+      )}
+      {!tablero?.actual && !editando && <p className="tt-nota" data-no-imagen>Todavía no hay tasas del día{puedeEditar ? ": toca “Actualizar tasas” para cargarlas." : "."}</p>}
     </form>
   );
 }
