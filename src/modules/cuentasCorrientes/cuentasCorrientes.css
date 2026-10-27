@@ -647,3 +647,6 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-nuevo-varias > span { flex-basis: 100%; font-weight: 600; }
 .cc-nuevo-varias button { padding: 6px 11px; border: 1px solid #c7d2fe; border-radius: 8px; background: white; color: var(--color-navy); font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
 .cc-nuevo-varias button:hover { background: #eef2ff; }
+
+/* Lo que dice la captura: "Aquí fue un pago por Bancolombia" */
+.cc-metodo-detectado { margin: 8px 0 0; padding: 9px 12px; border-radius: 8px; background: #e8f6ec; border: 1px solid #b7e1c3; color: #166534; font-weight: 700; font-size: 0.92rem; }

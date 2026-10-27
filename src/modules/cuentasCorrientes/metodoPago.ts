@@ -20,6 +20,15 @@ export const METODOS: { clave: Metodo; nombre: string; medio: string }[] = [
   { clave: "BANCOLOMBIA_INTERNACIONAL", nombre: "Bancolombia internacional", medio: "BANCOLOMBIA" },
 ];
 export const nombreMetodo = (m: Metodo) => METODOS.find((x) => x.clave === m)?.nombre ?? m;
+/** Cómo se dice en la referencia: "Pago de Bancolombia", "Pago de Western Union"… */
+const CORTO: Partial<Record<Metodo, string>> = {
+  BOLIVARES: "Bolívares",
+  USDT: "USDT",
+  WESTERN_BANCOLOMBIA: "Western Union",
+  WESTERN_TAQUILLA: "Western Union",
+  PAGO_FACTURA: "factura",
+};
+export const referenciaDelMetodo = (m: Metodo) => `Pago de ${CORTO[m] ?? nombreMetodo(m)}`;
 /** Los que van con la tasa del día (no con comisión): bolívares y USDT. La clave de su tasa en el tablero. */
 export const tasaDelMetodo = (m: Metodo): string | null => (m === "BOLIVARES" ? "bs" : m === "USDT" ? "usdt.compra" : null);
 

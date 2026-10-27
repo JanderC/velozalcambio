@@ -37,7 +37,7 @@ import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
 import { EnviarAConfirmacionesModal } from "./EnviarAConfirmacionesModal";
 import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
-import { METODOS, comisionPara, detectarMetodo, nombreMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
+import { METODOS, comisionPara, detectarMetodo, nombreMetodo, referenciaDelMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita } from "../tasas/tablero";
 import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
@@ -1498,6 +1498,8 @@ function FilaNueva({
   const [partes, setPartes] = useState<ParteReparto[]>(() => partesIniciales("COP", "VES"));
   // ---------- Confirmaciones: la captura dice el método (Nequi, Zelle, Remitly…), y con él el medio y la comisión ----------
   const [preguntaMetodo, setPreguntaMetodo] = useState<{ total: string | null; referencia: string | null } | null>(null);
+  // lo que dice la captura: "Aquí fue un pago por Bancolombia" (en todos los módulos)
+  const [metodoDetectado, setMetodoDetectado] = useState<string | null>(null);
   function aplicarMetodo(metodo: Metodo, total: string | null, referenciaLeida: string | null) {
     setPreguntaMetodo(null);
     const m = METODOS.find((x) => x.clave === metodo)!;
@@ -1579,11 +1581,16 @@ function FilaNueva({
         const fechaLeida = l.primera?.fecha;
         if (fechaLeida && fechaLeida < hoyBogota()) partes.push(`la captura es del ${fechaCorta(`${fechaLeida}T12:00:00-05:00`)} (el movimiento queda con la fecha de hoy)`);
       }
-      // Confirmaciones: qué método es (y su comisión); si no se reconoce, se pregunta
-      if (enConfirmaciones && !sumando) {
+      // Qué es la captura (Bancolombia, Nequi, Zelle…): se avisa y la referencia queda "Pago de Bancolombia"
+      if (!sumando) {
         const metodo = detectarMetodo(l.primera);
-        if (metodo) partes.unshift(aplicarMetodo(metodo, l.total, l.referencias[0] ?? null));
-        else setPreguntaMetodo({ total: l.total, referencia: l.referencias[0] ?? null });
+        setMetodoDetectado(metodo ? nombreMetodo(metodo) : null);
+        if (metodo) alCambiarReferencia(referenciaDelMetodo(metodo));
+        // Confirmaciones: además el medio de arriba y su comisión; si no se reconoce, se pregunta
+        if (enConfirmaciones) {
+          if (metodo) partes.unshift(aplicarMetodo(metodo, l.total, l.referencias[0] ?? null));
+          else setPreguntaMetodo({ total: l.total, referencia: l.referencias[0] ?? null });
+        }
       }
       setAvisoLectura(
         (partes.length
@@ -2625,6 +2632,7 @@ function FilaNueva({
         </button>
       </div>
 
+      {avisoLectura && metodoDetectado && <p className="cc-metodo-detectado">Aquí fue un pago por {metodoDetectado}</p>}
       {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
       {/* no se reconoció el método de la captura: se elige y se aplica su medio y su comisión */}
       {preguntaMetodo && (
@@ -2637,6 +2645,8 @@ function FilaNueva({
                 type="button"
                 onClick={() => {
                   const texto = aplicarMetodo(m.clave, preguntaMetodo.total, preguntaMetodo.referencia);
+                  setMetodoDetectado(m.nombre);
+                  alCambiarReferencia(referenciaDelMetodo(m.clave));
                   setAvisoLectura((a) => `${texto}. ${a ?? ""}`.trim());
                 }}
               >
