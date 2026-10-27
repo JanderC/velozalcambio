@@ -384,15 +384,12 @@ export function CapitalPage() {
     };
   }, [t, foto]);
 
-  // el capital total, visto en pesos o en dólares
-  const [verEn, setVerEn] = useState<"COP" | "USD">("COP");
 
   // ---------- Editar lo manual ----------
   const cambiar = <K extends keyof Manual>(clave: K, valor: Manual[K]) => setManual((m) => ({ ...m, [clave]: valor }));
   type ListaFilas = "cobrarFuera" | "pagarFuera" | "bolivares" | "pesos";
   type ListaDivisas = "dolaresFuera" | "dolaresPorPagar";
   const cambiarFila = (lista: ListaFilas, i: number, cambio: Partial<Fila>) => cambiar(lista, manual[lista].map((f, j) => (j === i ? { ...f, ...cambio } : f)));
-  const cambiarDivisa = (lista: ListaDivisas, i: number, cambio: Partial<FilaDivisa>) => cambiar(lista, manual[lista].map((f, j) => (j === i ? { ...f, ...cambio } : f)));
   const quitar = (lista: ListaFilas | ListaDivisas, i: number) => {
     const nueva = (manual[lista] as unknown[]).filter((_, j) => j !== i);
     cambiar(lista, (nueva.length ? nueva : [lista === "dolaresFuera" || lista === "dolaresPorPagar" ? divisaVacia() : filaVacia()]) as never);
@@ -519,45 +516,6 @@ export function CapitalPage() {
           <td colSpan={3}>
             <button type="button" onClick={() => cambiar(lista, [...manual[lista], filaVacia()])}>
               <Plus size={13} /> Agregar {decimales ? "banco o persona" : "fila"}
-            </button>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-
-  const tablaDivisas = (lista: ListaDivisas, etiqueta: string) => (
-    <>
-      {manual[lista].map((f, i) => {
-        const cantidad = num(f.cantidad);
-        const tasa = num(f.tasa) || (t?.tasaDolar ?? 0);
-        return (
-          <tr key={i}>
-            <td>
-              <input value={f.nombre} onChange={(e) => cambiarDivisa(lista, i, { nombre: e.target.value })} placeholder={etiqueta} disabled={soloLectura} aria-label={etiqueta} />
-            </td>
-            <td className="num">
-              <input value={f.cantidad} onChange={(e) => cambiarDivisa(lista, i, { cantidad: conPuntos(e.target.value) })} inputMode="decimal" placeholder="$ 0" disabled={soloLectura} aria-label="Dólares" />
-            </td>
-            <td className="num">
-              <input value={f.tasa} onChange={(e) => cambiarDivisa(lista, i, { tasa: conPuntos(e.target.value) })} inputMode="decimal" placeholder={t?.tasaDolar ? formatearMonto(String(t.tasaDolar)) : "tasa"} disabled={soloLectura} aria-label="Tasa" />
-            </td>
-            <td className="num cap-calculado">{cantidad ? pesos(cantidad * tasa) : "—"}</td>
-            <td className="cap-quitar">
-              {!soloLectura && (
-                <button type="button" onClick={() => quitar(lista, i)} aria-label="Quitar esta fila" title="Quitar">
-                  <X size={13} />
-                </button>
-              )}
-            </td>
-          </tr>
-        );
-      })}
-      {!soloLectura && (
-        <tr className="cap-agregar">
-          <td colSpan={5}>
-            <button type="button" onClick={() => cambiar(lista, [...manual[lista], divisaVacia()])}>
-              <Plus size={13} /> Agregar fila
             </button>
           </td>
         </tr>
@@ -782,119 +740,8 @@ export function CapitalPage() {
           </CuadroBancos>
           <UsdtManual filas={manual.usdt} onCambio={(f) => cambiar("usdt", f)} soloLectura={soloLectura} tasaDolar={t.tasaDolar} />
 
-          {/* ---------- Dólares por pagar ---------- */}
-          <section className="cap-bloque verde ancho">
-            <h2>Dólares por pagar</h2>
-            <div className="cap-tabla">
-            <table>
-              <tbody>{tablaDivisas("dolaresPorPagar", "Nombre (ej. Jesús Herrera)")}</tbody>
-              <tfoot>
-                <tr>
-                  <td>Total por pagar{manual.restarConfirmaciones && t.confUsd ? " (con confirmaciones en USD/USDT)" : ""}</td>
-                  <td className="num">${conDecimales(t.usdPorPagar)}</td>
-                  <td />
-                  <td className="num">{pesos(-t.usdPorPagarCop)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-            </div>
-          </section>
-
-          {/* ---------- El resumen ---------- */}
-          <section className="cap-resumen">
-            <div className="cap-resumen-col">
-              <dl>
-                <div>
-                  <dt>Por cobrar</dt>
-                  <dd>{pesos(t.porCobrar)}</dd>
-                </div>
-                <div>
-                  <dt>Cobrar fuera del sistema</dt>
-                  <dd>{pesos(t.cobrarFuera)}</dd>
-                </div>
-                <div className="neg">
-                  <dt>Por pagar</dt>
-                  <dd>{pesos(-(t.porPagarCuentas + t.pagarFuera + (manual.restarConfirmaciones ? t.confCop + t.confVes * t.tasaBs : 0)))}</dd>
-                </div>
-                <div>
-                  <dt>Bolívares (en pesos)</dt>
-                  <dd>{pesos(t.bolivaresCop)}</dd>
-                </div>
-                <div>
-                  <dt>Pesos en general</dt>
-                  <dd>{pesos(t.pesosCajas + t.pesosManual)}</dd>
-                </div>
-              </dl>
-              <div className="cap-capital">
-                <span>Capital</span>
-                <strong>{pesos(t.capitalCop)}</strong>
-              </div>
-            </div>
-            <div className="cap-resumen-col">
-              <dl>
-                <div>
-                  <dt>Total de dólares</dt>
-                  <dd>${conDecimales(t.usdEnCaja)}</dd>
-                </div>
-                <div className="neg">
-                  <dt>Dólares por pagar</dt>
-                  <dd>${conDecimales(-t.usdPorPagar)}</dd>
-                </div>
-                <div>
-                  <dt>Divisas en caja (en pesos)</dt>
-                  <dd>{pesos(t.divisasCop)}</dd>
-                </div>
-                <div className="neg">
-                  <dt>Dólares por pagar (en pesos)</dt>
-                  <dd>{pesos(-t.usdPorPagarCop)}</dd>
-                </div>
-              </dl>
-              <div className="cap-capital divisa">
-                <span>Capital divisa</span>
-                <strong>${conDecimales(t.capitalDivisa)}</strong>
-                <span>Capital COP</span>
-                <strong>{pesos(t.capitalDivisaCop)}</strong>
-              </div>
-            </div>
-            <div className="cap-resumen-col cap-total">
-              <div className="cap-ver-en" role="radiogroup" aria-label="Ver el capital en">
-                <span>Ver mi capital en</span>
-                <button type="button" role="radio" aria-checked={verEn === "COP"} className={verEn === "COP" ? "activo" : ""} onClick={() => setVerEn("COP")}>
-                  Pesos
-                </button>
-                <button type="button" role="radio" aria-checked={verEn === "USD"} className={verEn === "USD" ? "activo" : ""} onClick={() => setVerEn("USD")}>
-                  Dólares
-                </button>
-              </div>
-              {t.tasaDolar ? (
-                <>
-                  <dl>
-                    <div className={t.capitalCop < 0 ? "neg" : ""}>
-                      <dt>Lo de pesos{t.capitalCop < 0 ? " (es deuda)" : ""}</dt>
-                      <dd>{verEn === "COP" ? pesos(t.capitalCop) : `$${conDecimales(t.capitalCop / t.tasaDolar)} USD`}</dd>
-                    </div>
-                    <div className={t.capitalDivisa < 0 ? "neg" : ""}>
-                      <dt>Lo de dólares{t.capitalDivisa < 0 ? " (es deuda)" : ""}</dt>
-                      <dd>{verEn === "COP" ? pesos(t.capitalDivisaCop) : `$${conDecimales(t.capitalDivisa)} USD`}</dd>
-                    </div>
-                  </dl>
-                  <div className="cap-capital">
-                    <span>Capital total</span>
-                    <strong>
-                      {verEn === "COP" ? pesos(t.capitalCop + t.capitalDivisaCop) : `$${conDecimales(t.capitalCop / t.tasaDolar + t.capitalDivisa)}`}
-                    </strong>
-                    <span>{verEn === "COP" ? "En dólares" : "En pesos"}</span>
-                    <strong className="cap-otra">
-                      {verEn === "COP" ? `$${conDecimales(t.capitalCop / t.tasaDolar + t.capitalDivisa)}` : pesos(t.capitalCop + t.capitalDivisaCop)}
-                    </strong>
-                  </div>
-                  <small className="cap-total-nota">Con la tasa del dólar de arriba ({formatearMonto(String(t.tasaDolar))}): lo de pesos pasa a dólares dividiendo y lo de dólares a pesos multiplicando.</small>
-                </>
-              ) : (
-                <p className="cap-total-nota">Escribí la tasa del dólar arriba para ver el capital total en pesos y en dólares.</p>
-              )}
-            </div>
+          {/* ---------- Guardar el cuadre ---------- */}
+          <section className="cap-resumen cap-solo-guardar">
             {!soloLectura && (
               <div className="cap-guardar">
                 <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota del cuadre (opcional)" maxLength={500} />
