@@ -281,8 +281,9 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
                 </span>
               </div>
               <div className="tq-solicitud-monto">
-                <span>Recibe</span>
+                <span>{Number(s.pagado_parcial ?? 0) > 0 ? "Retira en efectivo" : "Recibe"}</span>
                 <strong>{dinero(s.monto, s.moneda_codigo)}</strong>
+                {Number(s.pagado_parcial ?? 0) > 0 && <small className="tq-ya-banco">ya recibió {dinero(s.pagado_parcial!, s.moneda_codigo)} por banco</small>}
               </div>
               {botonPagar(s)}
             </li>

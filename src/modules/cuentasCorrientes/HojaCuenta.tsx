@@ -27,6 +27,7 @@ import {
   registrarMovimientoCC,
   reactivarMovimientoCC,
   pagarConfirmacionOtroMetodo,
+  pagarParteConfirmacion,
   type CuentaCorrienteResumen,
   type EstadoCuenta,
   type FilaEstadoCuenta,
@@ -40,7 +41,7 @@ import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
 import { METODOS, comisionPara, detectarMetodo, nombreMetodo, referenciaDelMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita } from "../tasas/tablero";
 import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
-import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, type PagoElegido } from "./PagoConfirmacion";
+import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, avisoDePagoParcial, montoParte, type PagoElegido } from "./PagoConfirmacion";
 import { VariasTransferencias, calcularResumen, transferenciaVacia, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
@@ -1864,6 +1865,11 @@ function FilaNueva({
     if (pagarCon && !pagarCon.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga (o dejalo en \"Pasa a taquilla\").");
     if (pagarCon && llevaConfirmacion && !confirmada) return setError("Para pagarla ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
     const total = r.resultado;
+    const pagarParte = !resta && pago.modo === "parte" ? pago : null;
+    const nParte = pagarParte ? montoParte(pagarParte, total) : null;
+    if (pagarParte && !pagarParte.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga la parte por banco.");
+    if (pagarParte && !nParte) return setError(`Lo que va por banco tiene que ser un número menor que el total (${formatearMonto(total)}). Si es todo, elegí "Otro método de pago".`);
+    if (pagarParte && llevaConfirmacion && !confirmada) return setError("Para pagarle una parte ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
     const refs = transferencias.map((t) => t.referencia.trim()).filter(Boolean);
     const remitentes = [...new Set(transferencias.map((t) => t.remitente.trim()).filter(Boolean))];
     // la línea de la comisión o la tasa, igual en el resumen y en el aviso
@@ -1940,11 +1946,20 @@ function FilaNueva({
           setError(`La confirmación quedó registrada, pero no se pudo pagar por ${pagarCon.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);
         }
       }
+      let lineaParcial = "";
+      if (pagarParte && nParte) {
+        try {
+          const rp = await pagarParteConfirmacion(creado.movimiento.id, pagarParte.cajaId!, nParte);
+          lineaParcial = `\nPagado por ${pagarParte.nombre}: ${dineroEn(nParte, codigoMonto)}\nPara retirar en efectivo: ${dineroEn(rp.falta, codigoMonto)}`;
+        } catch (e) {
+          setError(`La confirmación quedó registrada, pero no se pudo pagar la parte por ${pagarParte.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó entera para pagar en taquilla.`);
+        }
+      }
       // el aviso para el cliente: cada transferencia y el total
       const texto =
         `Estimado(a), le informamos que ${enProceso ? "la operación está en proceso de confirmación" : pagadaPor ? "la operación ha sido confirmada y pagada" : resta ? "su compra ha sido registrada" : "la operación ha sido confirmada"}.\n\n` +
         `${resumen}\n\nTotal enviado: ${dineroEn(r.totalEnviado, codigoLlega)}${lineaFormula ? `\n${lineaFormula}` : ""}\n${resta ? "Monto" : "Recibe"}: ${dineroEn(total, codigoMonto)}` +
-        (pagadaPor ? `\nPagado por: ${pagadaPor}` : enProceso ? "\nEn breves minutos estará disponible" : resta ? "" : "\nDisponible para recoger");
+        (pagadaPor ? `\nPagado por: ${pagadaPor}` : lineaParcial ? lineaParcial : enProceso ? "\nEn breves minutos estará disponible" : resta ? "" : "\nDisponible para recoger");
       setTransferencias([transferenciaVacia()]);
       setVarias(false);
       setPago(PAGO_POR_TAQUILLA);
@@ -2105,6 +2120,12 @@ function FilaNueva({
     const pagarCon = enConfirmaciones && !resta && pago.modo === "otro" ? pago : null;
     if (pagarCon && !pagarCon.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga (o dejalo en \"Pasa a taquilla\").");
     if (pagarCon && llevaConfirmacion && !confirmada) return setError("Para pagarla ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
+    // una parte por banco y el resto en efectivo en taquilla
+    const pagarParte = enConfirmaciones && !resta && pago.modo === "parte" ? pago : null;
+    const nParte = pagarParte ? montoParte(pagarParte, monto) : null;
+    if (pagarParte && !pagarParte.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga la parte por banco.");
+    if (pagarParte && !nParte) return setError(`Lo que va por banco tiene que ser un número menor que el total (${monto ? formatearMonto(monto) : "—"}). Si es todo, elegí "Otro método de pago".`);
+    if (pagarParte && llevaConfirmacion && !confirmada) return setError("Para pagarle una parte ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
     // en otra moneda y convirtiendo: sin tasa no hay cómo pasarlo a la moneda de la cuenta
     if (movEnOtraMoneda && !aparte && !conTasa) return setError(`Para convertir ${monedaMov} a ${cuenta.moneda_codigo} hace falta la cantidad y la tasa (× o ÷). Si no se quiere convertir, elegí "Llevar aparte en ${monedaMov}".`);
     if (conCaja && cajaId === "") return setError(cajaObligatoria ? "Elegí qué caja alimenta este movimiento." : "Elegí la caja o banco que también se mueve.");
@@ -2280,6 +2301,16 @@ function FilaNueva({
           setError(`La confirmación quedó registrada, pero no se pudo pagar por ${pagarCon.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);
         }
       }
+      // una parte por banco: sale ya de esa cuenta y la taquilla ve solo lo que falta
+      let parcial: { banco: string; pagado: string; falta: string } | null = null;
+      if (pagarParte && nParte) {
+        try {
+          const r = await pagarParteConfirmacion(creado.movimiento.id, pagarParte.cajaId!, nParte);
+          parcial = { banco: pagarParte.nombre, pagado: nParte, falta: r.falta };
+        } catch (e) {
+          setError(`La confirmación quedó registrada, pero no se pudo pagar la parte por ${pagarParte.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó entera para pagar en taquilla.`);
+        }
+      }
       // la tasa queda guardada apenas se registra el movimiento, sin esperar a que suba la imagen
       if (tasaQueQueda) await guardarTasaHabitual(cuenta.id, tasaQueQueda).catch(() => {});
       // la imagen del comprobante queda guardada con el movimiento; si no sube, el movimiento igual quedó
@@ -2320,7 +2351,17 @@ function FilaNueva({
                       pagadaPor
                     ),
                   }
-                : {}),
+                : parcial
+                  ? {
+                      texto: avisoDePagoParcial(
+                        escrito.mtcn.replace(/\D/g, "").length >= 6 ? `MTCN ${escrito.mtcn.replace(/\D/g, "")}` : codigosDeReferencia(escrito.persona).join(" / "),
+                        dineroEn(montoConSigno.replace(/^-/, ""), codigoMonto),
+                        dineroEn(parcial.pagado, codigoMonto),
+                        parcial.banco,
+                        dineroEn(parcial.falta, codigoMonto)
+                      ),
+                    }
+                  : {}),
             }
           : datos.tipo === "ABONO" || /^\s*(abono|pago)/i.test(datos.descripcion)
             ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, ...envio }
@@ -2481,7 +2522,7 @@ function FilaNueva({
       {enConfirmaciones && repartido && (
         <RepartoMonedas llega={codigoLlega} monedas={monedas} partes={partes} totalEnviado={nCantidad ? sinSigno(nCantidad) : null} onCambio={setPartes} />
       )}
-      {enConfirmaciones && !resta && !repartido && <PagoConfirmacion valor={pago} onCambio={setPago} medioNombre={medioMov.nombre} />}
+      {enConfirmaciones && !resta && !repartido && <PagoConfirmacion valor={pago} onCambio={setPago} medioNombre={medioMov.nombre} total={varias ? null : monto} codigo={codigoMonto} />}
       {puedeElegirEntrega && !repartido && (
         <label className={`cc-entrega-en ${otraMoneda ? "otra" : ""}`}>
           ¿Qué moneda quiere el cliente? Se entrega en

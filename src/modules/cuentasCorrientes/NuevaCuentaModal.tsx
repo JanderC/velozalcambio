@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, codigosDeReferencia, crearCuentaCorriente, pagarConfirmacionOtroMetodo, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarMovimientoPorNumero, codigosDeReferencia, crearCuentaCorriente, pagarConfirmacionOtroMetodo, pagarParteConfirmacion, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
@@ -9,7 +9,7 @@ import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multipl
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
-import { PAGO_POR_TAQUILLA, PagoConfirmacion, type PagoElegido } from "./PagoConfirmacion";
+import { PAGO_POR_TAQUILLA, PagoConfirmacion, montoParte, type PagoElegido } from "./PagoConfirmacion";
 import { METODOS, comisionPara, detectarMetodo, nombreMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita, useTablero } from "../tasas/tablero";
 
@@ -329,6 +329,12 @@ export function NuevaCuentaModal({
     const pagarCon = enLinea && hayMovimiento && !movResta && movPago.modo === "otro" ? movPago : null;
     if (pagarCon && !pagarCon.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga (o dejalo en \"Pasa a taquilla\").");
     if (pagarCon && puedeQuedarPendiente && !movConfirmada) return setError("Para pagarla ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
+    // una parte por banco y el resto en efectivo en taquilla
+    const pagarParte = enLinea && hayMovimiento && !movResta && movPago.modo === "parte" ? movPago : null;
+    const nParte = pagarParte ? montoParte(pagarParte, movMonto) : null;
+    if (pagarParte && !pagarParte.cajaId) return setError("Elegí de qué cuenta de la empresa se le paga la parte por banco.");
+    if (pagarParte && !nParte) return setError("Lo que va por banco tiene que ser un número menor que el total. Si es todo, elegí \"Otro método de pago\".");
+    if (pagarParte && puedeQuedarPendiente && !movConfirmada) return setError("Para pagarle una parte ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
     if (monedaCobro && (!nTasaCobro || !/[1-9]/.test(nTasaCobro) || nTasaCobro.startsWith("-"))) return setError("Para cobrar en otra moneda escribí la tasa.");
     if (saldo.trim() && !nSaldo) return setError("El saldo inicial no es un número válido.");
     // El movimiento es opcional, pero si se empezó a llenar tiene que estar completo
@@ -432,6 +438,12 @@ export function NuevaCuentaModal({
           if (pagarYa) {
             await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarYa.cajaId!).catch((e) => {
               window.alert(`El cliente y la confirmación quedaron registrados, pero no se pudo pagar por ${pagarYa.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);
+            });
+          }
+          // una parte por banco: sale ya y la taquilla ve solo lo que falta
+          if (pagarParte && nParte) {
+            await pagarParteConfirmacion(creado.movimiento.id, pagarParte.cajaId!, nParte).catch((e) => {
+              window.alert(`El cliente y la confirmación quedaron registrados, pero no se pudo pagar la parte por ${pagarParte.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó entera para pagar en taquilla.`);
             });
           }
         } catch (err) {
@@ -809,7 +821,7 @@ export function NuevaCuentaModal({
                 <input value={movMtcn} onChange={(e) => setMovMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
               </label>
             )}
-            {enLinea && !movResta && <PagoConfirmacion valor={movPago} onCambio={setMovPago} medioNombre={medio?.nombre} />}
+            {enLinea && !movResta && <PagoConfirmacion valor={movPago} onCambio={setMovPago} medioNombre={medio?.nombre} total={movMonto ?? null} />}
             {puedeQuedarPendiente && (
               <label className={`cc-check cc-confirmada ${movConfirmada ? "si" : ""}`}>
                 <input type="checkbox" checked={movConfirmada} onChange={(e) => setMovConfirmada(e.target.checked)} />

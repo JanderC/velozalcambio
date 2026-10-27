@@ -329,6 +329,11 @@ export function editarMovimientoCC(movimientoId: number, cambios: { descripcion?
   return api.put<{ id: number; monto: string; cambio: string }>(`/cuentas-corrientes/movimientos/${movimientoId}`, cambios);
 }
 
+/** Confirmaciones: una parte se le paga ya por una cuenta de la empresa; el resto queda para retirar en efectivo en taquilla. */
+export function pagarParteConfirmacion(movimientoId: number, cajaId: number, monto: string) {
+  return api.post<{ cuenta: string; pagado: string; falta: string; pagoId: number }>(`/cuentas-corrientes/movimientos/${movimientoId}/pagar-parte`, { cajaId, monto });
+}
+
 /** Confirmaciones: le paga al cliente por otro método (no pasa a taquilla), desde una cuenta de la empresa. */
 export function pagarConfirmacionOtroMetodo(movimientoId: number, cajaId: number) {
   return api.post<{ pagado: true; cuenta: string; pagoId: number }>(`/cuentas-corrientes/movimientos/${movimientoId}/pagar-otro-metodo`, { cajaId });

@@ -44,6 +44,9 @@ export interface SolicitudTaquilla {
   pagado_medio: MedioTaquilla | null; // por Bancolombia o por otros métodos no descuenta de la caja
   pagado_caja_id: number | null; // la taquilla que la pagó
   pagado_caja_nombre: string | null;
+  // ya se le pagó una parte por banco: monto es lo que falta (lo que se entrega en efectivo)
+  pagado_parcial?: string;
+  monto_total?: string;
   pagado_por_nombre: string | null;
   registrado_por_nombre: string;
   cuenta_id: number;

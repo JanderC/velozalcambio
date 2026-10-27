@@ -285,3 +285,6 @@
 .tq-otros-modulos small { color: #8a93a3; }
 .tq-otros-modulos li.entra strong { color: #166534; }
 .tq-otros-modulos li.sale strong { color: #b3261e; }
+
+/* Confirmación con una parte ya pagada por banco */
+.tq-ya-banco { display: block; font-size: 0.72rem; color: #166534; font-weight: 600; }
