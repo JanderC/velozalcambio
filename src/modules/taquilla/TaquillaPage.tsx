@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, Image as IconoImagen, Landmark, Lock, LockOpen, Search, Wallet } from "lucide-react";
+import { CheckCircle2, History, Image as IconoImagen, Landmark, Lock, LockOpen, Search, Wallet } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { Header } from "../../components/common/Header";
 import { MiDiaHoy } from "../rendimiento/MiDiaHoy";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
-import { confirmarMovimientoCC, getUrlComprobante } from "../../api/cuentasCorrientes.api";
+import { getUrlComprobante } from "../../api/cuentasCorrientes.api";
 import {
   abrirCajaTaquilla,
   cerrarCajaTaquilla,
   buscarSolicitudesPagadas,
+  confirmarSolicitudTaquilla,
   getTaquilla,
   moverCajaTaquilla,
   moverConCajaFuerte,
@@ -27,6 +28,7 @@ import {
 import { formatearMonto, leerNumero, pctDeComision, sumarDecimales } from "../../utils/montos";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import { OperacionesTaquilla } from "./OperacionesTaquilla";
+import { HistorialTaquilla } from "./HistorialTaquilla";
 import { AvisoClienteModal } from "../../components/whatsapp/AvisoClienteModal";
 import { mensajeParaCliente } from "./mensajeCliente";
 import "./taquilla.css";
@@ -66,6 +68,8 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
   const [abriendo, setAbriendo] = useState(false);
   const [cerrando, setCerrando] = useState(false);
   const [detalle, setDetalle] = useState<SolicitudTaquilla | null>(null);
+  // los cierres anteriores y todo lo que hizo esta taquilla
+  const [verHistorial, setVerHistorial] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -154,7 +158,7 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
     if (!window.confirm(`¿Confirmar la transferencia de ${s.cliente_nombre} por ${dinero(s.monto, s.moneda_codigo)}? Queda lista para pagarse.`)) return;
     setPagando(s.id);
     try {
-      await confirmarMovimientoCC(s.id);
+      await confirmarSolicitudTaquilla(s.id);
       setAviso({
         titulo: "Transacción confirmada",
         resumen: `La transferencia de ${s.cliente_nombre} por ${dinero(s.monto, s.moneda_codigo)} quedó confirmada.`,
@@ -376,6 +380,11 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
               </strong>
             </span>
           )}
+          {taquilla && (
+            <button className="cc-btn-secundario tq-caja-accion" onClick={() => setVerHistorial(true)} title="Cierres anteriores, lo entregado, las transferencias confirmadas y los ingresos y egresos">
+              <History size={14} /> Historial
+            </button>
+          )}
           {taquilla &&
             (abierta ? (
               <button className="cc-btn-secundario tq-caja-accion" onClick={() => setCerrando(true)}>
@@ -480,6 +489,7 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
       {/* Sin buscar, las solicitudes van abajo de todo */}
       {!buscando && listas}
 
+      {verHistorial && <HistorialTaquilla nombre={taquilla?.caja.nombre ?? `Taquilla ${numero}`} onCerrar={() => setVerHistorial(false)} />}
       {detalle && <DetalleSolicitud solicitud={detalle} accion={detalle.pagado_en ? null : botonPagar(detalle)} onCerrar={() => setDetalle(null)} />}
 
       {moviendo && (

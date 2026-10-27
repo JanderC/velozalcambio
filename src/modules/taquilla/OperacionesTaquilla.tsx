@@ -56,7 +56,7 @@ function telefonoWhatsApp(telefono: string | null) {
 }
 
 /** La cuenta del movimiento, como se muestra: Bs. 100.000 × 3,3 = $330.000, o $100.000 ÷ 3,3 = Bs. 30.303. */
-function cuentaDe(o: OperacionTaquilla) {
+export function cuentaDe(o: OperacionTaquilla) {
   const base = dinero(o.cantidad, o.moneda_operacion);
   const tasa = o.tasa ? ` ${o.divide ? "÷" : "×"} ${formatearMonto(o.tasa)}` : "";
   const comision = o.comision_pct && /[1-9]/.test(o.comision_pct) ? ` − ${formatearMonto(o.comision_pct)}%` : "";

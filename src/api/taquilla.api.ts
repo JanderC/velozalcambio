@@ -113,6 +113,33 @@ export interface Taquilla {
 
 export type MontosPorMoneda = Partial<Record<CodigoTaquilla, string>>;
 
+/** El historial de esta taquilla en un rango de días: cierres, entregas, transferencias confirmadas y operaciones. */
+export interface CierreHistorial {
+  abierta_en: string;
+  cerrada_en: string;
+  abrio: string;
+  entregas: number;
+  operaciones: number;
+  monedas: { codigo: CodigoTaquilla; inicial: string; esperado: string | null; contado: string | null; diferencia: string | null }[];
+}
+export interface HistorialTaquilla {
+  desde: string;
+  hasta: string;
+  cierres: CierreHistorial[];
+  entregas: SolicitudTaquilla[];
+  totalesEntregas: { codigo: string; medio: "EFECTIVO" | "TRANSFERENCIA"; total: string; cantidad: number }[];
+  confirmadas: { id: number; fecha: string; descripcion: string | null; monto: string; confirmado_en: string; confirmado_por_nombre: string | null; moneda_codigo: string; cliente_nombre: string; pagado_en: string | null }[];
+  operaciones: OperacionTaquilla[];
+}
+export function getHistorialTaquilla(desde: string, hasta: string) {
+  return api.get<HistorialTaquilla>(`${base}/historial?desde=${desde}&hasta=${hasta}`);
+}
+
+/** Confirmar desde la taquilla una transferencia en proceso (Western, Zelle): queda en el historial de esta taquilla. */
+export function confirmarSolicitudTaquilla(id: number) {
+  return api.post<Taquilla>(`${base}/solicitudes/${id}/confirmar`);
+}
+
 export function getTaquilla() {
   return api.get<Taquilla>(base);
 }

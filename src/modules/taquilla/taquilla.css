@@ -288,3 +288,33 @@
 
 /* Confirmación con una parte ya pagada por banco */
 .tq-ya-banco { display: block; font-size: 0.72rem; color: #166534; font-weight: 600; }
+
+/* Historial de la taquilla: cierres anteriores, entregas, transferencias confirmadas e ingresos/egresos */
+.tqh { display: grid; gap: 12px; }
+.tqh-rango { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.tqh-rango label { display: grid; gap: 2px; font-size: 0.72rem; font-weight: 600; color: #6b7280; }
+.tqh-rango input { height: 34px; padding: 0 8px; border: 1px solid #d7dbe2; border-radius: 8px; font: inherit; }
+.tqh-rapidos { display: flex; gap: 4px; flex-wrap: wrap; }
+.tqh-rapidos button { height: 34px; padding: 0 10px; border: 1px solid #d7dbe2; border-radius: 8px; background: white; color: var(--color-navy); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.tqh-pestanas { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid #e5e7eb; }
+.tqh-pestanas button { padding: 8px 12px; border: none; border-bottom: 3px solid transparent; background: none; color: #4b5563; font: inherit; font-size: 0.86rem; font-weight: 600; cursor: pointer; }
+.tqh-pestanas button.activo { color: var(--color-navy); border-bottom-color: var(--color-gold); }
+.tqh-pestanas span { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 999px; background: #eef0f4; font-size: 0.72rem; text-align: center; }
+.tqh-lista { display: grid; gap: 10px; }
+.tqh-cierre { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fafbfc; }
+.tqh-cierre header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 6px; color: #374151; }
+.tqh-cierre header span { flex-basis: 100%; font-size: 0.78rem; color: #6b7280; }
+.tqh-tabla-scroll { overflow-x: auto; }
+.tqh-tabla { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.tqh-tabla th { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 0.72rem; text-align: left; white-space: nowrap; }
+.tqh-tabla td { padding: 6px 8px; border-bottom: 1px solid #f1f2f4; vertical-align: top; }
+.tqh-tabla .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tqh-tabla .sobra { color: #1a7f37; font-weight: 600; }
+.tqh-tabla .falta { color: #c0392b; font-weight: 600; }
+.tqh-tabla .cuadra { color: #6b7280; }
+.tqh-tabla tr.anulada td { color: #9ca3af; text-decoration: line-through; }
+.tqh-tabla small { color: #6b7280; }
+.tqh-fecha { white-space: nowrap; color: #4b5563; }
+.tqh-totales { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 10px; border-radius: 8px; background: #f2f7ff; font-size: 0.84rem; color: #374151; }
+.tqh-totales span { display: inline-flex; align-items: center; gap: 4px; }
+.tqh-vacio { color: #6b7280; text-align: center; padding: 12px; }
