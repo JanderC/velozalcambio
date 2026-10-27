@@ -3,7 +3,7 @@ import { formatearMonto, leerNumero } from "../../utils/montos";
 import { conPuntos } from "./CuadroBancos";
 
 /*
- * El cierre de la Caja Fuerte y las cuentas de USDT: todo se escribe a mano. Lo que el sistema sabe sale al lado como
+ * El cierre de la Caja Fuerte: todo se escribe a mano (el USDT también, en sus filas). Lo que el sistema sabe sale al lado como
  * sugerencia ("sistema: $…"), y con tocarlo se copia en la casilla; pero lo que cuenta es lo que se escribe.
  */
 
@@ -231,73 +231,6 @@ export function CierreCajaFuerte({
               <td className="num">{tasaDolar ? `US$${conDecimales(c.total / tasaDolar)}` : ""}</td>
               <td />
               <td className="num">{pesos(c.total)}</td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-/** Las cuentas de USDT, escritas a mano: nombre, cuántos USDT y a qué tasa. */
-export function UsdtManual({ filas, onCambio, soloLectura, tasaDolar }: { filas: FilaCierre[]; onCambio: (f: FilaCierre[]) => void; soloLectura: boolean; tasaDolar: number }) {
-  const calc = filas.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
-  const cambiar = (i: number, cambio: Partial<FilaCierre>) => onCambio(filas.map((f, j) => (j === i ? { ...f, ...cambio } : f)));
-  const total = calc.reduce((s, f) => s + f.cantidad, 0);
-  const totalPesos = calc.reduce((s, f) => s + f.pesos, 0);
-  return (
-    <section className="cap-bloque morado cap-bancos">
-      <h2>USDT</h2>
-      <div className="cap-tabla">
-        <table>
-          <thead>
-            <tr>
-              <th>Cuenta</th>
-              <th className="num">USDT</th>
-              <th className="num">Tasa</th>
-              <th className="num">Pesos</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {filas.map((f, i) => (
-              <tr key={i}>
-                <td>
-                  <input value={f.nombre} onChange={(e) => cambiar(i, { nombre: e.target.value })} placeholder="Cuenta (ej. Binance David)" disabled={soloLectura} aria-label="Cuenta" />
-                </td>
-                <td className="num">
-                  <input value={f.cantidad} onChange={(e) => cambiar(i, { cantidad: conPuntos(e.target.value) })} inputMode="decimal" placeholder="0" disabled={soloLectura} aria-label="USDT" />
-                </td>
-                <td className="num">
-                  <input value={f.tasa} onChange={(e) => cambiar(i, { tasa: conPuntos(e.target.value) })} inputMode="decimal" placeholder={tasaDolar ? formatearMonto(String(tasaDolar)) : "tasa"} disabled={soloLectura} aria-label="Tasa" />
-                </td>
-                <td className="num cap-calculado">{calc[i]!.cantidad ? pesos(calc[i]!.pesos) : "—"}</td>
-                <td className="cap-quitar">
-                  {!soloLectura && (
-                    <button type="button" onClick={() => onCambio(filas.length > 1 ? filas.filter((_, j) => j !== i) : [filaCierre()])} aria-label="Quitar esta fila" title="Quitar">
-                      <X size={13} />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {!soloLectura && (
-              <tr className="cap-agregar">
-                <td colSpan={5}>
-                  <button type="button" onClick={() => onCambio([...filas, filaCierre()])}>
-                    <Plus size={13} /> Agregar cuenta
-                  </button>
-                </td>
-              </tr>
-            )}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              <td className="num">{conDecimales(total)}</td>
-              <td />
-              <td className="num">{pesos(totalPesos)}</td>
               <td />
             </tr>
           </tfoot>

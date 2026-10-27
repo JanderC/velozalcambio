@@ -11,7 +11,7 @@ import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
 import { CapitalGrafica } from "./CapitalGrafica";
 import { CapitalTendencia } from "./CapitalTendencia";
 import { CuadroBancos } from "./CuadroBancos";
-import { CIERRE_INICIAL, CierreCajaFuerte, UsdtManual, cuentasDelCierre, filaCierre, type CierreManual, type FilaCierre } from "./CierreCajaFuerte";
+import { CIERRE_INICIAL, CierreCajaFuerte, cuentasDelCierre, filaCierre, type CierreManual, type FilaCierre } from "./CierreCajaFuerte";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import "./capital.css";
 
@@ -46,7 +46,7 @@ interface Manual {
   dolaresFuera: FilaDivisa[]; // dólares que no están en las cajas del sistema
   dolaresPorPagar: FilaDivisa[];
   restarConfirmaciones: boolean;
-  usdt: FilaCierre[]; // las cuentas de USDT, a mano (cuentan como dólares)
+  usdt: FilaCierre[]; // ya no se usa: el USDT se escribe en el cierre de la Caja Fuerte (queda por los cuadres viejos)
   cierre: CierreManual; // el cierre de la Caja Fuerte, a mano
 }
 // un cliente con saldo: lo que me debe (o le debo), en la moneda de su cuenta
@@ -315,7 +315,7 @@ export function CapitalPage() {
           })
       )
     );
-    const divisasFuera = [...m.dolaresFuera, ...m.usdt].map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
+    const divisasFuera = m.dolaresFuera.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
     const porPagarUsd = m.dolaresPorPagar.map((f) => ({ cantidad: num(f.cantidad), tasa: num(f.tasa) || tasaDolar })).map((f) => ({ ...f, pesos: f.cantidad * f.tasa }));
     const conf = (codigo: string) => Number(foto.confirmaciones.find((c) => c.codigo === codigo)?.total ?? 0);
     // los cuadres viejos restaban las confirmaciones aparte, por moneda; los nuevos las traen en la lista de por pagar
@@ -738,7 +738,6 @@ export function CapitalPage() {
               Total bolívares <b>Bs {conDecimales(t.bolivares)}</b> · en pesos <b>{pesos(t.bolivaresCop)}</b>
             </p>
           </CuadroBancos>
-          <UsdtManual filas={manual.usdt} onCambio={(f) => cambiar("usdt", f)} soloLectura={soloLectura} tasaDolar={t.tasaDolar} />
 
           {/* ---------- Guardar el cuadre ---------- */}
           <section className="cap-resumen cap-solo-guardar">
