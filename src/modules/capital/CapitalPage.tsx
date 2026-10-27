@@ -650,46 +650,6 @@ export function CapitalPage() {
             sugerencias={sugerencias}
           />
 
-          {/* ---------- Las cajas, con lo que tienen ahora ---------- */}
-          <section className="cap-bloque oscuro ancho">
-            <h2>Cajas · lo que hay ahora</h2>
-            <div className="cap-tabla">
-            <table>
-              <thead>
-                <tr>
-                  <th>Caja</th>
-                  <th className="num">Pesos</th>
-                  <th className="num">Dólares</th>
-                  <th className="num">Euros</th>
-                  <th className="num">Todo en pesos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {t.cajasAhora.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      {c.nombre} <small>{c.tipo === "FUERTE" ? "Caja Fuerte" : ""}</small>
-                    </td>
-                    <td className="num">{pesos(c.cop)}</td>
-                    <td className="num">${conDecimales(c.usd)}</td>
-                    <td className="num">{c.eur ? `€${conDecimales(c.eur)}` : "—"}</td>
-                    <td className="num cap-calculado">{t.tasaDolar || (!c.usd && !c.eur) ? pesos(c.enPesos) : "falta la tasa"}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>Total en cajas</td>
-                  <td className="num">{pesos(t.cajasAhora.reduce((s, c) => s + c.cop, 0))}</td>
-                  <td className="num">${conDecimales(t.cajasAhora.reduce((s, c) => s + c.usd, 0))}</td>
-                  <td className="num">€{conDecimales(t.cajasAhora.reduce((s, c) => s + c.eur, 0))}</td>
-                  <td className="num">{pesos(t.cajasAhora.reduce((s, c) => s + c.enPesos, 0))}</td>
-                </tr>
-              </tfoot>
-            </table>
-            </div>
-          </section>
-
           {/* ---------- Por cobrar: cada cliente que me debe ---------- */}
           <section className="cap-bloque azul">
             <h2>Por cobrar · me deben</h2>
