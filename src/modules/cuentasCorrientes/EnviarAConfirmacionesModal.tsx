@@ -179,7 +179,7 @@ export function EnviarAConfirmacionesModal({
           <strong>{resultado && /[1-9]/.test(resultado) ? dineroEn(resultado, codigoEntrega) : "—"}</strong>
         </p>
         <p className="cc-modal-nota">
-          {nMonto ? `En ${cuenta.modulo === "POR_PAGAR" ? "Cuentas por Pagar" : cuenta.modulo === "POR_COBRAR" ? "Cuentas por Cobrar" : "Cuentas Corrientes"} se anotan los ${formatearMonto(nMonto)} ${cuenta.moneda_codigo} enviados: ahí deja de debérsele eso. ` : ""}En Confirmaciones queda como una confirmación ya verificada, lista para pagarle en taquilla o por otro método.
+          {nMonto ? `En ${cuenta.modulo === "POR_PAGAR" ? "Cuentas por Pagar" : cuenta.modulo === "POR_COBRAR" ? "Cuentas por Cobrar y Pagar" : "Cuentas Corrientes"} se anotan los ${formatearMonto(nMonto)} ${cuenta.moneda_codigo} enviados: ahí deja de debérsele eso. ` : ""}En Confirmaciones queda como una confirmación ya verificada, lista para pagarle en taquilla o por otro método.
         </p>
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">

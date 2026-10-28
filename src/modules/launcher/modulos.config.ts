@@ -117,7 +117,7 @@ export const MODULOS: ModuloConfig[] = [
   },
   {
     id: "cuentas",
-    titulo: "Cuentas por Cobrar",
+    titulo: "Cuentas por Cobrar y Pagar",
     categoria: "Gestión financiera",
     acento: ACENTO_FINANCIERO,
     icono: FileText,

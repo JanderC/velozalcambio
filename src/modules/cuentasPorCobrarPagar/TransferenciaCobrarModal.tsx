@@ -348,7 +348,7 @@ export function TransferenciaCobrarModal({
           )}
         </label>
         {sugeridos.length > 0 && (
-          <div className="cxc-transf-sugeridos" role="listbox" aria-label="Clientes que ya están en Cuentas por Cobrar">
+          <div className="cxc-transf-sugeridos" role="listbox" aria-label="Clientes que ya están en Cuentas por Cobrar y Pagar">
             <span>¿Es uno de estos? Tocalo para sumarle la transferencia:</span>
             {sugeridos.map((c) => (
               <button type="button" key={c.id} onClick={() => elegir(c)}>

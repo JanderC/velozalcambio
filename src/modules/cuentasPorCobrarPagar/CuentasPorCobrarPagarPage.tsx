@@ -31,7 +31,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
   const puedeEditar = usuario?.rol === "ADMIN" || usuario?.rol === "ASESOR";
   // Cuentas por Pagar: el mismo tablero, con lo que le debo a cada cliente (en positivo) y "Enviar a taquilla" en su hoja
   const pagar = modo === "pagar";
-  const NOMBRE = pagar ? "Cuentas por Pagar" : "Cuentas por Cobrar";
+  const NOMBRE = pagar ? "Cuentas por Pagar" : "Cuentas por Cobrar y Pagar";
   // lo que le debo está en negativo: acá se muestra en positivo
   const ver = (v: string) => (!pagar ? v : v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ? `-${v}` : v);
   const [cuentas, setCuentas] = useState<CuentaCorrienteResumen[] | null>(null);
