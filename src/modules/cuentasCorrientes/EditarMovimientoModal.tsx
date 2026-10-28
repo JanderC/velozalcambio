@@ -16,12 +16,14 @@ export function EditarMovimientoModal({
   movimiento: m,
   monedaCodigo,
   decimales,
+  conPorcentaje = true,
   onGuardado,
   onCerrar,
 }: {
   movimiento: FilaEstadoCuenta;
   monedaCodigo: string;
   decimales: number;
+  conPorcentaje?: boolean; // se puede pasar la tasa a un % (97,5% multiplica por 0,975); en Confirmaciones el % es comisión y no se toca acá
   onGuardado: () => void;
   onCerrar: () => void;
 }) {
@@ -31,9 +33,12 @@ export function EditarMovimientoModal({
   const [cuentaDestino, setCuentaDestino] = useState(m.cuenta_destino ?? "");
   const [resta, setResta] = useState(m.monto.startsWith("-"));
   const [cantidad, setCantidad] = useState(m.cantidad_base ? formatearMonto(sinSigno(m.cantidad_base)) : "");
-  // la tasa solo se edita cuando es una tasa de multiplicar; una comisión se guarda de otra forma y no se toca acá
-  const conTasaSimple = !m.tasa_es_porcentaje;
-  const [tasa, setTasa] = useState(conTasaSimple && m.tasa ? formatearMonto(m.tasa) : "");
+  // la tasa se edita como tasa (× 3.900) o como % (× 97,5%); una comisión descontada se guarda de otra forma y no se toca acá
+  const conTasaSimple = !m.comision_descontada && (conPorcentaje || !m.tasa_es_porcentaje);
+  const [porcentaje, setPorcentaje] = useState(!!m.tasa_es_porcentaje);
+  const [tasa, setTasa] = useState(
+    conTasaSimple && m.tasa ? formatearMonto(m.tasa_es_porcentaje ? multiplicarDecimales(m.tasa, "100", 6) : m.tasa) : ""
+  );
   const [montoDirecto, setMontoDirecto] = useState(formatearMonto(sinSigno(m.monto)));
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +46,11 @@ export function EditarMovimientoModal({
   // La plata ya se movió (una caja, o se pagó en taquilla): el monto no se corrige acá
   const montoFijo = !!m.movimiento_caja_id || !!m.pagado_en;
   const nCantidad = cantidad.trim() ? (leerNumero(cantidad)?.replace(/^-/, "") ?? null) : null;
-  const nTasa = tasa.trim() ? (leerNumero(tasa)?.replace(/^-/, "") ?? null) : null;
-  const calcula = conTasaSimple && !!nCantidad && !!nTasa && /[1-9]/.test(nTasa);
-  const monto = calcula ? multiplicarDecimales(nCantidad!, nTasa!, decimales) : (leerNumero(montoDirecto)?.replace(/^-/, "") ?? null);
+  const nTasa = tasa.trim() ? (leerNumero(tasa.replace(/%/g, ""))?.replace(/^-/, "") ?? null) : null;
+  // lo que multiplica: la tasa, o el % como fracción (97,5% -> 0,975)
+  const factor = nTasa && porcentaje ? multiplicarDecimales(nTasa, "0.01", 8) : nTasa;
+  const calcula = conTasaSimple && !!nCantidad && !!factor && /[1-9]/.test(factor);
+  const monto = calcula ? multiplicarDecimales(nCantidad!, factor!, decimales) : (leerNumero(montoDirecto)?.replace(/^-/, "") ?? null);
   const simbolo = monedaCodigo === "COP" ? "$" : "";
 
   async function guardar(e: FormEvent) {
@@ -51,7 +58,7 @@ export function EditarMovimientoModal({
     setError(null);
     if (!descripcion.trim()) return setError("Escribí la referencia del movimiento.");
     if (cantidad.trim() && !nCantidad) return setError("La cantidad no es un número válido.");
-    if (conTasaSimple && tasa.trim() && (!nTasa || !/[1-9]/.test(nTasa))) return setError("La tasa no es un número válido.");
+    if (conTasaSimple && tasa.trim() && (!nTasa || !/[1-9]/.test(nTasa))) return setError(porcentaje ? "El % no es un número válido." : "La tasa no es un número válido.");
     if (!monto || !/[1-9]/.test(monto)) return setError("El monto no puede quedar en cero. Si el movimiento no va, anulalo.");
     setEnviando(true);
     try {
@@ -64,7 +71,7 @@ export function EditarMovimientoModal({
           ? {}
           : {
               cantidadBase: nCantidad,
-              ...(conTasaSimple ? { tasa: nTasa && /[1-9]/.test(nTasa) ? nTasa : null } : {}),
+              ...(conTasaSimple ? { tasa: factor && /[1-9]/.test(factor) ? factor : null, tasaEsPorcentaje: porcentaje && !!factor && /[1-9]/.test(factor) } : {}),
               monto: `${resta ? "-" : ""}${monto}`,
             }),
       });
@@ -115,8 +122,20 @@ export function EditarMovimientoModal({
               </label>
               {conTasaSimple && (
                 <label>
-                  Tasa
-                  <input value={tasa} onChange={(e) => setTasa(e.target.value)} inputMode="decimal" placeholder="sin tasa" autoComplete="off" />
+                  <span className="cc-editar-modo">
+                    {porcentaje ? "Porcentaje" : "Tasa"}
+                    {conPorcentaje && (
+                      <span role="group" aria-label="Tasa o porcentaje">
+                        <button type="button" className={!porcentaje ? "activo" : ""} aria-pressed={!porcentaje} onClick={() => setPorcentaje(false)} title="Cantidad × tasa">
+                          Tasa
+                        </button>
+                        <button type="button" className={porcentaje ? "activo" : ""} aria-pressed={porcentaje} onClick={() => setPorcentaje(true)} title="Cantidad × %: 97,5% deja el 97,5% de la cantidad">
+                          %
+                        </button>
+                      </span>
+                    )}
+                  </span>
+                  <input value={tasa} onChange={(e) => setTasa(e.target.value)} inputMode="decimal" placeholder={porcentaje ? "ej. 97,5" : "sin tasa"} autoComplete="off" />
                 </label>
               )}
               <label>
@@ -136,12 +155,12 @@ export function EditarMovimientoModal({
               {!conTasaSimple
                 ? "Este movimiento se cargó con comisión: se corrigen la cantidad y el monto a mano (el % no se recalcula)."
                 : calcula
-                  ? `${formatearMonto(nCantidad!)} × ${formatearMonto(nTasa!)} = ${simbolo}${monto ? formatearMonto(monto) : ""}. Para escribir el monto a mano, dejá la tasa vacía.`
+                  ? `${formatearMonto(nCantidad!)} × ${formatearMonto(nTasa!)}${porcentaje ? "%" : ""} = ${simbolo}${monto ? formatearMonto(monto) : ""}. Para escribir el monto a mano, dejá ${porcentaje ? "el %" : "la tasa"} vacío.`
                   : "Con cantidad y tasa, el monto se calcula solo; sin tasa, se escribe el monto."}
             </small>
           </>
         )}
-        <p className="cc-modal-nota">El saldo de la cuenta se corrige con el cambio. El movimiento queda marcado como editado.</p>
+        <p className="cc-modal-nota">El saldo de la cuenta se corrige con el cambio. El movimiento queda marcado como editado y se guarda cómo estaba antes, quién lo cambió y cuándo.</p>
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">
           <button type="button" className="cc-btn-secundario" onClick={onCerrar}>

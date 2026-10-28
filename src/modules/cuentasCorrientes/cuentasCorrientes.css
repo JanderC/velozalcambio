@@ -654,3 +654,9 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 /* Una parte por banco y el resto en efectivo: cuánto va por banco */
 .cc-pago-parte { display: grid; gap: 3px; font-size: 0.8rem; font-weight: 600; color: #374151; }
 .cc-pago-parte input { height: 36px; padding: 0 10px; border: 1px solid #d7dbe2; border-radius: 8px; font: inherit; text-align: right; }
+
+/* Editar movimiento: la tasa o el % */
+.cc-editar-modo { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cc-editar-modo [role="group"] { display: inline-flex; border: 1px solid #d7dbe2; border-radius: 6px; overflow: hidden; }
+.cc-editar-modo button { padding: 1px 9px; border: none; background: white; color: #4b5563; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.cc-editar-modo button.activo { background: var(--color-navy); color: white; }

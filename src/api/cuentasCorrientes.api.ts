@@ -80,6 +80,9 @@ export interface FilaEstadoCuenta {
   // si un administrador lo corrigió: cuándo y quién
   editado_en?: string | null;
   editado_por_nombre?: string | null;
+  ediciones?: number; // cuántas veces se editó
+  // cómo estaba antes de la primera edición (auditoría)
+  editado_original?: { fecha: string; descripcion: string | null; cantidad_base: string | null; tasa: string | null; tasa_es_porcentaje: boolean; monto: string } | null;
 }
 
 export interface TransferenciaFila {
@@ -325,7 +328,7 @@ export function registrarMovimientoCC(data: RegistrarMovimientoInput) {
 }
 
 /** Corregir un movimiento mal cargado (solo administradores). Lo que no se manda queda como está; null lo vacía. */
-export function editarMovimientoCC(movimientoId: number, cambios: { descripcion?: string; fecha?: string; cuentaDestino?: string | null; cantidadBase?: string | null; tasa?: string | null; monto?: string }) {
+export function editarMovimientoCC(movimientoId: number, cambios: { descripcion?: string; fecha?: string; cuentaDestino?: string | null; cantidadBase?: string | null; tasa?: string | null; tasaEsPorcentaje?: boolean; monto?: string }) {
   return api.put<{ id: number; monto: string; cambio: string }>(`/cuentas-corrientes/movimientos/${movimientoId}`, cambios);
 }
 

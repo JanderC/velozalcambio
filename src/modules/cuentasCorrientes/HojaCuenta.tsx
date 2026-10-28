@@ -89,6 +89,17 @@ function telefonoWhatsApp(telefono: string | null) {
 }
 
 /** La tasa de una comisión viene como fracción ("0.03"): se muestra "3%". */
+/** "Editado por david el 28/10 · antes: 608.966 × 1 = $608.966": quién, cuándo y cómo estaba (auditoría). */
+function textoEditado(m: FilaEstadoCuenta) {
+  const quien = `Editado por ${m.editado_por_nombre ?? "un administrador"} el ${fechaCorta(m.editado_en!)}${m.ediciones && m.ediciones > 1 ? ` (${m.ediciones} veces)` : ""}`;
+  const o = m.editado_original;
+  if (!o) return quien;
+  const neg = o.monto.startsWith("-");
+  const tasa = o.tasa ? ` × ${o.tasa_es_porcentaje ? `${formatearMonto(multiplicarDecimales(o.tasa, "100", 6))}%` : formatearMonto(o.tasa)}` : "";
+  const cantidad = o.cantidad_base ? `${formatearMonto(o.cantidad_base.replace(/^-/, ""))}${tasa} = ` : "";
+  return `${quien}\nAntes: ${o.descripcion ?? ""} · ${cantidad}${neg ? "- " : ""}${formatearMonto(o.monto.replace(/^-/, ""))}`;
+}
+
 function tasaTexto(tasa: string, esPorcentaje: boolean, descontada = false, incluida = false) {
   // comisión descontada: se guarda el factor (0.96) y se muestra -4%; si el % ya venía sumado en lo enviado, +6%
   // (0%: familiar o amigo al que no se le cobra comisión)
@@ -905,6 +916,7 @@ export function HojaCuenta({
           movimiento={movimientoEditado}
           monedaCodigo={cuenta.moneda_codigo}
           decimales={Number(cuenta.moneda_decimales ?? 0)}
+          conPorcentaje={cuenta.modulo !== "CAJA"}
           onCerrar={() => setMovimientoEditado(null)}
           onGuardado={() => {
             setMovimientoEditado(null);
@@ -1160,7 +1172,7 @@ export function HojaCuenta({
                   {m.descripcion ?? m.tipo}
                   {m.anulado && !m.reverso_de_id && <em> (anulado)</em>}
                   {m.editado_en && (
-                    <em title={`Editado por ${m.editado_por_nombre ?? "un administrador"} el ${fechaCorta(m.editado_en)}`}> (editado)</em>
+                    <em title={textoEditado(m)}> (editado)</em>
                   )}
                   {m.cuenta_destino && <span className="cc-cuenta-destino-chip">→ {m.cuenta_destino}</span>}
                   {m.tiene_comprobante && (
