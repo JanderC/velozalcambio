@@ -113,7 +113,7 @@ export function TaquillasConfigPage() {
                 </td>
                 <td className="tqc-caja">
                   {t.abierta ? "Abierta" : "Cerrada"}
-                  {t.saldos.length > 0 && <small> · {t.saldos.map((s) => `${formatearMonto(s.monto)} ${s.codigo}`).join(" · ")}</small>}
+                  {t.saldos.length > 0 && <small> · {t.saldos.map((s) => `${formatearMonto(String(s.monto))} ${s.codigo}`).join(" · ")}</small>}
                 </td>
                 <td className="usuarios-tabla-acciones">
                   <button type="button" disabled={ocupado} onClick={() => setEditando({ numero: t.numero, nombre: t.nombre })}>
