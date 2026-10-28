@@ -8,10 +8,10 @@ export function textoMedio(medio: MedioTaquilla | null) {
   return medio === "BANCOLOMBIA" ? "por Bancolombia" : medio === "OTROS" ? "por otros métodos" : "en efectivo";
 }
 
-// Hay varias taquillas que trabajan igual, cada una con su caja: /taquilla (la 1), /taquilla-2 y /taquilla-3.
+// Hay varias taquillas que trabajan igual, cada una con su caja: /taquilla (la 1), /taquilla-2… (se crean en Configuración).
 // La pantalla dice cuál es al montarse y todas las llamadas de este archivo van a esa.
 let base = "/taquilla";
-export type NumeroTaquilla = 1 | 2 | 3;
+export type NumeroTaquilla = number;
 export function usarTaquilla(numero: NumeroTaquilla) {
   base = numero === 1 ? "/taquilla" : `/taquilla-${numero}`;
 }

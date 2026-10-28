@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, History, Landmark, Plus, Save, X } from "lucide-react";
 import { Header } from "../../components/common/Header";
+import { useTaquillas } from "../../hooks/useTaquillas";
+import { rutaDeTaquilla } from "../../api/taquillas.api";
 import { ApiError } from "../../api/client";
 import { capitalApi, type CuadreResumen, type DatosDelSistema } from "../../api/capital.api";
 import { getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
@@ -925,6 +927,7 @@ function ListaSaldos({
 }) {
   const [buscar, setBuscar] = useState("");
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const taquillas = useTaquillas().filter((t) => t.activo);
   const texto = buscar.trim().toLowerCase();
   const lista = clientes ? clientes.filter((c) => !texto || c.nombre.toLowerCase().includes(texto)) : null;
   // los grupos, del que más suma al que menos; adentro, del que más debe al que menos
@@ -994,13 +997,9 @@ function ListaSaldos({
                           {c.modulo === "CAJA" && (
                             <span className="cap-ir-taquilla">
                               Pagar en taquilla:{" "}
-                              {[
-                                ["/taquilla", "1"],
-                                ["/taquilla-2", "2"],
-                                ["/taquilla-3", "3"],
-                              ].map(([ruta, n]) => (
-                                <Link key={n} to={`${ruta}?buscar=${encodeURIComponent(c.nombre)}`} title={`Ir a Taquilla ${n} con ${c.nombre} ya buscado, para pagarle`}>
-                                  {n}
+                              {taquillas.map((t) => (
+                                <Link key={t.numero} to={`${rutaDeTaquilla(t.numero)}?buscar=${encodeURIComponent(c.nombre)}`} title={`Ir a ${t.nombre} con ${c.nombre} ya buscado, para pagarle`}>
+                                  {t.numero}
                                 </Link>
                               ))}
                             </span>

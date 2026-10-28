@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { RequireAuth } from "../auth/RequireAuth";
 import { RequireRole } from "../auth/RequireRole";
 import { LoginPage } from "../auth/LoginPage";
@@ -11,6 +11,7 @@ import { TransaccionesPage } from "../modules/transacciones/TransaccionesPage";
 import { CuentasPorCobrarPagarPage } from "../modules/cuentasPorCobrarPagar/CuentasPorCobrarPagarPage";
 import { CuentasCorrientesPage } from "../modules/cuentasCorrientes/CuentasCorrientesPage";
 import { TaquillaPage } from "../modules/taquilla/TaquillaPage";
+import { TaquillasConfigPage } from "../modules/taquilla/TaquillasConfigPage";
 import { CajaFuertePage } from "../modules/cajaFuerte/CajaFuertePage";
 import { TasasPage } from "../modules/tasas/TasasPage";
 import { ROLES_REGISTRO_TASAS } from "../modules/tasas/tasas.roles";
@@ -28,6 +29,13 @@ import { CapitalPage } from "../modules/capital/CapitalPage";
 
 
 
+function TaquillaPorRuta() {
+  const { pathname } = useLocation();
+  const numero = Number(/^\/taquilla-(\d+)\/?$/.exec(pathname)?.[1]);
+  if (!numero) return <Navigate to="/" replace />;
+  return <TaquillaPage key={`taquilla-${numero}`} numero={numero} />;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -44,8 +52,6 @@ export function AppRoutes() {
         <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
         <Route path="/cajas-confirmaciones" element={<CuentasCorrientesPage key="cajas" modo="cajas" />} />
         <Route path="/taquilla" element={<TaquillaPage key="taquilla-1" numero={1} />} />
-        <Route path="/taquilla-2" element={<TaquillaPage key="taquilla-2" numero={2} />} />
-        <Route path="/taquilla-3" element={<TaquillaPage key="taquilla-3" numero={3} />} />
         <Route path="/caja-fuerte" element={<CajaFuertePage />} />
         <Route path="/reportes" element={<ReportesPage />} />
         <Route path="/rendimiento" element={<RendimientoPage />} />
@@ -67,6 +73,8 @@ export function AppRoutes() {
         </Route>
         <Route element={<RequireRole roles={["ADMIN"]} />}>
         <Route path="/usuarios" element={<UsuariosPage />} />
+        {/* crear taquillas y habilitarlas o deshabilitarlas */}
+        <Route path="/configuracion/taquillas" element={<TaquillasConfigPage />} />
         <Route path="/cuentas-empresa" element={<CuentasEmpresaPage />} />
         {/* Capital de giros: el cuadre de todo el negocio, solo administrador (se entra desde Cuentas por Cobrar) */}
         <Route path="/capital" element={<CapitalPage />} />
@@ -77,6 +85,8 @@ export function AppRoutes() {
         <Route element={<RequireRole roles={["ADMIN", "ASESOR"]} />}>
           <Route path="/whatsapp/*" element={<WhatsAppPage />} />
         </Route>
+        {/* /taquilla-2, /taquilla-3… las que se creen en Configuración; cualquier otra ruta vuelve al panel */}
+        <Route path="*" element={<TaquillaPorRuta />} />
       </Route>
     </Routes>
   );

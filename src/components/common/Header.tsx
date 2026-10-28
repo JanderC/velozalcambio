@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { CircleDollarSign, LogOut, ChevronLeft, Star } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
+import type { ModuloConfig } from "../../types/modulo.types";
 import { useFavoritos } from "../../hooks/useFavoritos";
 import { BotonWhatsappEncabezado } from "../whatsapp/BotonWhatsappEncabezado";
-import { MODULOS } from "../../modules/launcher/modulos.config";
+import { useModulos } from "../../hooks/useTaquillas";
 
 const ROL_LABEL: Record<string, string> = {
   ADMIN: "Administrador",
@@ -16,13 +17,14 @@ export function Header({ mostrarVolver = true }: { mostrarVolver?: boolean }) {
   const { usuario, cerrarSesion } = useAuth();
   const { pathname } = useLocation();
   const { favoritos, alternar, esFavorito } = useFavoritos();
+  const MODULOS = useModulos();
 
   // El módulo en el que se está parado (la ruta más larga que coincide: /tasas/registro antes que /tasas)
   const actual = MODULOS.filter((m) => pathname === m.ruta || pathname.startsWith(`${m.ruta}/`)).sort((a, b) => b.ruta.length - a.ruta.length)[0];
   // Accesos rápidos: los favoritos que este usuario puede abrir, en el orden en que los marcó
   const accesos = favoritos
     .map((id) => MODULOS.find((m) => m.id === id))
-    .filter((m): m is (typeof MODULOS)[number] => !!m && !m.oculto && !!usuario && m.rolesPermitidos.includes(usuario.rol));
+    .filter((m): m is ModuloConfig => !!m && !m.oculto && !!usuario && m.rolesPermitidos.includes(usuario.rol));
 
   return (
     <header className="app-header">

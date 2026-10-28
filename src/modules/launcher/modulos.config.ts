@@ -17,6 +17,7 @@ import {
   Vault,
   TrendingUp,
   Receipt,
+  Store,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
 import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
@@ -106,6 +107,15 @@ export const MODULOS: ModuloConfig[] = [
     rolesPermitidos: ["ADMIN"],
   },
   {
+    id: "taquillas-config",
+    titulo: "Taquillas",
+    categoria: "Configuración",
+    acento: ACENTO_CONFIG,
+    icono: Store,
+    ruta: "/configuracion/taquillas",
+    rolesPermitidos: ["ADMIN"],
+  },
+  {
     id: "cuentas",
     titulo: "Cuentas por Cobrar",
     categoria: "Gestión financiera",
@@ -152,6 +162,7 @@ export const MODULOS: ModuloConfig[] = [
     ruta: "/cajas-confirmaciones",
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
   },
+  // las taquillas: esta es la plantilla; el panel pone una tarjeta por cada taquilla habilitada (Configuración › Taquillas)
   {
     id: "taquilla",
     titulo: "Taquilla 1",
@@ -159,24 +170,6 @@ export const MODULOS: ModuloConfig[] = [
     acento: ACENTO_FINANCIERO,
     icono: CreditCard,
     ruta: "/taquilla",
-    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
-  },
-  {
-    id: "taquilla-2",
-    titulo: "Taquilla 2",
-    categoria: "Gestión financiera",
-    acento: ACENTO_FINANCIERO,
-    icono: CreditCard,
-    ruta: "/taquilla-2",
-    rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
-  },
-  {
-    id: "taquilla-3",
-    titulo: "Taquilla 3",
-    categoria: "Gestión financiera",
-    acento: ACENTO_FINANCIERO,
-    icono: CreditCard,
-    ruta: "/taquilla-3",
     rolesPermitidos: ["ADMIN", "ASESOR", "CAJERO"],
   },
   {

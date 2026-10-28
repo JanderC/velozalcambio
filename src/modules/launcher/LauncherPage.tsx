@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Header } from "../../components/common/Header";
 import { SearchBar } from "../../components/common/SearchBar";
 import { ModuleCard } from "../../components/common/ModuleCard";
-import { MODULOS } from "./modulos.config";
+import { useModulos } from "../../hooks/useTaquillas";
+import type { ModuloConfig } from "../../types/modulo.types";
 import { useAuth } from "../../auth/useAuth";
 import { useFavoritos } from "../../hooks/useFavoritos";
 
@@ -19,6 +20,8 @@ export function LauncherPage() {
   const { usuario } = useAuth();
   const [busqueda, setBusqueda] = useState("");
   const { favoritos } = useFavoritos();
+  // con una tarjeta por cada taquilla habilitada
+  const MODULOS = useModulos();
 
   const grupos = useMemo(() => {
     if (!usuario) return [];
@@ -26,7 +29,7 @@ export function LauncherPage() {
       (m) => !m.oculto && m.rolesPermitidos.includes(usuario.rol) && m.titulo.toLowerCase().includes(busqueda.toLowerCase())
     );
     // Arriba de todo, los favoritos del usuario en el orden en que los marcó
-    const marcados = favoritos.map((id) => visibles.find((m) => m.id === id)).filter((m): m is (typeof MODULOS)[number] => !!m);
+    const marcados = favoritos.map((id) => visibles.find((m) => m.id === id)).filter((m): m is ModuloConfig => !!m);
     return [
       { categoria: "Favoritos", modulos: marcados },
       ...ORDEN_CATEGORIAS.map((categoria) => ({
@@ -34,7 +37,7 @@ export function LauncherPage() {
         modulos: visibles.filter((m) => m.categoria === categoria),
       })),
     ].filter((g) => g.modulos.length > 0);
-  }, [usuario, busqueda, favoritos]);
+  }, [usuario, busqueda, favoritos, MODULOS]);
 
   return (
     <div className="launcher-page">

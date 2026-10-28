@@ -23,3 +23,15 @@
 .usuarios-tabla-acciones { display: flex; gap: 6px; }
 .usuarios-tabla-acciones button { background: transparent; border: 1px solid #d7dbe2; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
 .usuarios-tabla-acciones button:hover { border-color: var(--color-gold-dark); }
+/* Configuración › Taquillas */
+.tqc-nueva { display: flex; gap: 8px; flex-wrap: wrap; }
+.tqc-nueva input { padding: 9px 10px; border: 1px solid #d7dbe2; border-radius: 6px; font-family: "Inter", sans-serif; min-width: 180px; }
+.tqc-renombrar { display: flex; gap: 6px; flex-wrap: wrap; }
+.tqc-renombrar input { padding: 6px 8px; border: 1px solid #d7dbe2; border-radius: 4px; font-family: "Inter", sans-serif; }
+.tqc-renombrar button { background: transparent; border: 1px solid #d7dbe2; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.tqc-caja { font-size: 0.85rem; color: #374151; }
+.tqc-caja small { color: #6b7280; }
+.usuarios-tabla-acciones button:disabled, .tqc-renombrar button:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 640px) {
+  .usuarios-tabla-wrap { overflow-x: auto; padding: 0 16px 24px; }
+}
