@@ -9,6 +9,7 @@ export interface DatosComprobante {
   monto: string | null; // decimal normalizado: "1250000" o "403.5"
   moneda: string | null; // COP, USD, VES, EUR, USDT
   fecha: string | null; // AAAA-MM-DD
+  hora?: string | null; // HH:MM, 24 horas
   banco: string | null;
   remitente: string | null;
   destinatario?: string | null; // a quién se le envió
@@ -164,6 +165,36 @@ function buscarFecha(texto: string): string | null {
   return null;
 }
 
+/** "28 Oct 2026 - 07:07 p m." -> "19:07". La primera hora con minutos que aparezca. */
+export function buscarHora(texto: string): string | null {
+  const m = /\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?\s*m?\b/i.exec(texto);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const pm = m[3]?.toLowerCase() === "p";
+  if (m[3] && h === 12) h = pm ? 12 : 0;
+  else if (pm) h += 12;
+  if (h > 23 || Number(m[2]) > 59) return null;
+  return `${String(h).padStart(2, "0")}:${m[2]}`;
+}
+
+/** Transferencia nacional de Bancolombia: "¡Transferencia exitosa!", "Comprobante No. 0000000712", producto origen/destino. */
+export function esBancolombiaNacional(d: DatosComprobante): boolean {
+  if (d.metodo === "BANCOLOMBIA") return true;
+  const t = d.texto ?? "";
+  return /comprobante\s*n[o°º]/i.test(t) && /producto\s+(?:destino|origen)|transferencia\s+exitosa/i.test(t);
+}
+
+/**
+ * Bancolombia numera los comprobantes por cuenta (0000000712, 0000000713…): el mismo número sale en transferencias de
+ * clientes distintos y el sistema las tomaba por repetidas. La referencia queda armada con los últimos 5 dígitos del
+ * comprobante, la fecha y la hora de la transferencia: 0000000712 del 28/10/2026 a las 7:07 p. m. -> "00712-281026-1907".
+ */
+export function referenciaBancolombia(comprobante: string, fecha: string | null, hora: string | null): string {
+  const numero = comprobante.replace(/\D/g, "").slice(-5).padStart(5, "0");
+  const dia = fecha ? `${fecha.slice(8, 10)}${fecha.slice(5, 7)}${fecha.slice(2, 4)}` : null;
+  return [numero, dia, hora?.replace(":", "")].filter(Boolean).join("-");
+}
+
 const hoyEnBogota = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
 const diasAtras = (fecha: string, hoy: string) => Math.round((Date.parse(hoy + "T12:00:00Z") - Date.parse(fecha + "T12:00:00Z")) / 86_400_000);
 const DIAS_CREIBLES = 10;
@@ -194,7 +225,7 @@ function buscarBanco(texto: string): string | null {
 export function extraerDatos(texto: string): DatosComprobante {
   const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const { monto, moneda } = buscarMonto(lineas, texto);
-  return { referencia: buscarReferencia(lineas), monto, moneda, fecha: buscarFecha(texto), banco: buscarBanco(texto), remitente: null, destinatario: buscarDestinatario(lineas), texto };
+  return { referencia: buscarReferencia(lineas), monto, moneda, fecha: buscarFecha(texto), hora: buscarHora(texto), banco: buscarBanco(texto), remitente: null, destinatario: buscarDestinatario(lineas), texto };
 }
 
 /** Lee la imagen de un comprobante en el navegador (OCR): referencia, monto y fecha de la transacción. */
@@ -287,6 +318,7 @@ async function leerLocal(imagen: File): Promise<DatosComprobante> {
     monto: mejor.monto ?? otro.monto,
     moneda: mejor.moneda ?? otro.moneda,
     fecha: mejor.fecha ?? otro.fecha,
+    hora: mejor.hora ?? otro.hora,
     banco: mejor.banco ?? otro.banco,
     remitente: mejor.remitente ?? otro.remitente,
     destinatario: mejor.destinatario ?? otro.destinatario,
@@ -307,7 +339,11 @@ const ESPERA_IA_MS = 14_000;
  */
 export async function leerComprobante(imagen: File): Promise<DatosComprobante> {
   const d = await leerSinRevisar(imagen);
-  return { ...d, fecha: fechaCreible(d.fecha) };
+  const fecha = fechaCreible(d.fecha);
+  // Bancolombia: el comprobante solo no alcanza para distinguir una transferencia de otra
+  const referencia =
+    d.referencia && /^\d+$/.test(d.referencia) && esBancolombiaNacional(d) ? referenciaBancolombia(d.referencia, d.fecha ?? fecha, d.hora ?? null) : d.referencia;
+  return { ...d, referencia, fecha };
 }
 
 async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
@@ -339,7 +375,7 @@ async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
   if (deLaIA && deLaIA.monto && deLaIA.referencia) {
     if (deLaIA.metodo) return { ...deLaIA, fuente: "ia" };
     const otro = await Promise.race([local, new Promise<null>((r) => setTimeout(() => r(null), 4_000))]);
-    return { ...deLaIA, texto: otro?.d?.texto, fuente: "ia" };
+    return { ...deLaIA, hora: deLaIA.hora ?? otro?.d?.hora, texto: otro?.d?.texto, fuente: "ia" };
   }
   const { d: delNavegador, error } = await local;
   if (!deLaIA) {
@@ -352,6 +388,7 @@ async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
     monto: deLaIA.monto ?? delNavegador.monto,
     moneda: deLaIA.moneda ?? delNavegador.moneda,
     fecha: deLaIA.fecha ?? delNavegador.fecha,
+    hora: deLaIA.hora ?? delNavegador.hora,
     banco: deLaIA.banco ?? delNavegador.banco,
     remitente: deLaIA.remitente ?? delNavegador.remitente,
     destinatario: deLaIA.destinatario ?? delNavegador.destinatario,
