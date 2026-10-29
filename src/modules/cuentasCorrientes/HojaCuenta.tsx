@@ -1532,6 +1532,7 @@ function FilaNueva({
   // la comisión (o la tasa) va una sola vez sobre el total enviado
   const [formulaVarias, setFormulaVarias] = useState<FormulaGeneral>("%");
   const [valorVarias, setValorVarias] = useState("");
+  const [incluidaVarias, setIncluidaVarias] = useState(false); // la comisión ya venía sumada en lo enviado
   const [repetidasVarias, setRepetidasVarias] = useState<Record<string, string>>({});
   const [cargandoVarias, setCargandoVarias] = useState(false);
   // Confirmaciones: pasa a taquilla (como siempre) o se le paga ya por otro método, desde una cuenta de la empresa
@@ -1896,7 +1897,7 @@ function FilaNueva({
 
   async function cargarVarias() {
     setError(null);
-    const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto);
+    const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto, incluidaVarias);
     if (r.error || !r.resultado) return setError(r.error ?? "Revisá los montos.");
     if (Object.keys(repetidasVarias).length) return setError("Hay una referencia que ya está registrada: corregila antes de cargar.");
     if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
@@ -1939,7 +1940,7 @@ function FilaNueva({
         !conValor || formulaVarias === "÷"
           ? { monto: `${signo}${total}` }
           : formulaVarias === "%"
-            ? { cantidadBase: `${signo}${r.totalEnviado}`, tasa: factorDeComision(r.valor!, false), tasaEsPorcentaje: true, comisionDescontada: true, comisionIncluida: false }
+            ? { cantidadBase: `${signo}${r.totalEnviado}`, tasa: factorDeComision(r.valor!, incluidaVarias), tasaEsPorcentaje: true, comisionDescontada: true, comisionIncluida: incluidaVarias }
             : { cantidadBase: `${signo}${r.totalEnviado}`, tasa: r.valor! };
       const creado = await registrarMovimientoCC({
         cuentaId: destino.id,
@@ -2003,6 +2004,7 @@ function FilaNueva({
         `${resumen}\n\nTotal enviado: ${dineroEn(r.totalEnviado, codigoLlega)}${lineaFormula ? `\n${lineaFormula}` : ""}\n${resta ? "Monto" : "Recibe"}: ${dineroEn(total, codigoMonto)}` +
         (pagadaPor ? `\nPagado por: ${pagadaPor}` : lineaParcial ? lineaParcial : enProceso ? "\nEn breves minutos estará disponible" : resta ? "" : "\nDisponible para recoger");
       setTransferencias([transferenciaVacia()]);
+      setIncluidaVarias(false);
       setVarias(false);
       setPago(PAGO_POR_TAQUILLA);
       setReferencia(referenciaPuesta);
@@ -2557,6 +2559,8 @@ function FilaNueva({
           onFormula={setFormulaVarias}
           valor={valorVarias}
           onValor={setValorVarias}
+          incluida={incluidaVarias}
+          onIncluida={setIncluidaVarias}
           repetidas={repetidasVarias}
           cargando={cargandoVarias}
           textoBoton={!resta && pago.modo === "otro" && pago.nombre ? `Enviar y pagar por ${pago.nombre}` : !resta ? "Enviar a caja" : "Enviar"}

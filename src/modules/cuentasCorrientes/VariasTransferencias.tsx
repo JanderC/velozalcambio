@@ -19,8 +19,11 @@ export interface Transferencia {
 }
 export const transferenciaVacia = (): Transferencia => ({ referencia: "", remitente: "", cantidad: "", captura: null });
 
-/** El total enviado y lo que queda después de la comisión (o la tasa), en la moneda en que se le paga. */
-export function calcularResumen(filas: Transferencia[], formula: FormulaGeneral, valorEscrito: string, llega: string, queda: string) {
+/**
+ * El total enviado y lo que queda después de la comisión (o la tasa), en la moneda en que se le paga.
+ * Comisión incluida: lo enviado ya trae el % sumado (2.650 = 2.500 + 6%), se le paga 2.650 ÷ 1,06 = 2.500.
+ */
+export function calcularResumen(filas: Transferencia[], formula: FormulaGeneral, valorEscrito: string, llega: string, queda: string, incluida = false) {
   const cantidades = filas.map((f) => (f.cantidad.trim() ? (leerNumero(f.cantidad)?.replace(/^-/, "") ?? null) : null));
   const totalEnviado = cantidades.reduce<string>((s, c) => (c ? sumarDecimales(s, c) : s), "0");
   const valor = valorEscrito.trim() ? (leerNumero(valorEscrito.replace(/%/g, ""))?.replace(/^-/, "") ?? null) : null;
@@ -36,7 +39,7 @@ export function calcularResumen(filas: Transferencia[], formula: FormulaGeneral,
   }
   if (formula === "%") {
     if (Number(valor) >= 100) return { ...base, error: "La comisión tiene que ser menor al 100%." };
-    const resultado = multiplicarDecimales(totalEnviado, factorDeComision(valor, false), decimales);
+    const resultado = multiplicarDecimales(totalEnviado, factorDeComision(valor, incluida), decimales);
     return { ...base, resultado, descuento: sumarDecimales(totalEnviado, `-${resultado}`), error: null };
   }
   const resultado = formula === "÷" ? dividirDecimales(totalEnviado, valor, decimales) : multiplicarDecimales(totalEnviado, valor, decimales);
@@ -52,6 +55,8 @@ export function VariasTransferencias({
   onFormula,
   valor,
   onValor,
+  incluida,
+  onIncluida,
   repetidas,
   cargando,
   textoBoton,
@@ -65,6 +70,8 @@ export function VariasTransferencias({
   onFormula: (f: FormulaGeneral) => void;
   valor: string;
   onValor: (v: string) => void;
+  incluida: boolean; // la comisión ya viene sumada en lo enviado
+  onIncluida: (v: boolean) => void;
   repetidas: Record<string, string>; // referencia -> aviso de que ya está registrada
   cargando: boolean;
   textoBoton: string;
@@ -134,7 +141,7 @@ export function VariasTransferencias({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const r = calcularResumen(filas, formula, valor, llega, queda);
+  const r = calcularResumen(filas, formula, valor, llega, queda, incluida);
   const hayRepetidas = filas.some((f) => f.referencia.trim() && repetidas[f.referencia.trim().toLowerCase()]);
   const leyendo = filas.some((f) => f.leyendo);
 
@@ -225,6 +232,12 @@ export function VariasTransferencias({
             {formula === "%" ? (r.descuento ? `− ${dineroEn(r.descuento, llega)}` : "—") : r.resultado && r.valor ? `${formula} ${formatearMonto(r.valor)}` : "—"}
           </b>
         </div>
+        {formula === "%" && r.valor && /[1-9]/.test(r.valor) && (
+          <label className="cc-check cc-varias-incluida">
+            <input type="checkbox" checked={incluida} onChange={(e) => onIncluida(e.target.checked)} />
+            Lo enviado ya trae el {formatearMonto(r.valor)}% sumado
+          </label>
+        )}
         <div className="cc-varias-linea pagar">
           <span>Se le paga</span>
           <b>{r.resultado ? dineroEn(r.resultado, queda) : "—"}</b>
