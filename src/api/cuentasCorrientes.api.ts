@@ -108,6 +108,8 @@ export interface EstadoCuenta {
   enviado: string;
   enviadoTotal: string;
   enviadoPorPagar: string;
+  // en Confirmaciones: lo que el cliente tiene por retirar en taquilla, de cualquier día
+  porPagar?: { id: number; fecha: string; descripcion: string | null; monto: string; estado_confirmacion: string | null }[];
   saldoAnterior: string;
   movimientos: FilaEstadoCuenta[];
   sumas: string;

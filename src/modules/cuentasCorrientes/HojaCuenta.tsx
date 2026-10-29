@@ -248,7 +248,7 @@ export function HojaCuenta({
   // En el computador el reporte se muestra en pantalla, para copiarlo o descargarlo
   const [reporte, setReporte] = useState<{ blob: Blob; url: string; nombre: string } | null>(null);
   // Abono recién cargado (o elegido en la tabla): se le puede confirmar al cliente por WhatsApp
-  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string; texto?: string } | null>(null);
+  const [abonoParaAvisar, setAbonoParaAvisar] = useState<{ monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string; texto?: string; id?: number; ids?: number[]; porRetirar?: string } | null>(null);
   const [estadoAviso, setEstadoAviso] = useState<"" | "enviando" | "enviado">("");
   const [copiado, setCopiado] = useState(false);
 
@@ -531,7 +531,29 @@ export function HojaCuenta({
     const anotado = (descripcion.split(SEPARADOR_PERSONA)[1] ?? "").replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, "");
     return `Ref: ${mtcn ? `MTCN ${mtcn}` : (codigosDeReferencia(anotado).join(" / ") || "—")}`;
   }
+  // Lo que el cliente ya tenía por retirar en taquilla (de otros días): va en el mismo mensaje, con el total.
+  //   Pendiente por retirar de antes:
+  //   Ref: WFCT22RX95BR / WFCT22RX8G9H · 2.000,01 USD (20/10)
+  //   Total para retirar: 4.474,04 USD
+  function conPendientes(texto: string, a: Aviso, excluir: number[]) {
+    if (!esConfirmaciones || (a.sentido !== "retiro" && a.sentido !== "confirmada" && a.sentido !== "proceso")) return texto;
+    const listos = (estado?.porPagar ?? []).filter((p) => p.estado_confirmacion !== "EN_PROCESO" && /[1-9]/.test(p.monto));
+    const antes = listos.filter((p) => !excluir.includes(p.id));
+    if (!antes.length) return texto;
+    const plata = (v: string) => `${simbolo}${formatearMonto(v)}${sufijo}`;
+    const lineas = antes.map((p) => `${refDeDescripcion(p.descripcion ?? "")} · ${plata(p.monto)} (${fechaCorta(p.fecha)})`);
+    const sumaAntes = antes.reduce((s, p) => sumarDecimales(s, p.monto), "0");
+    if (a.sentido === "proceso") return `${texto}\n\nAdemás tiene disponible para retirar:\n${lineas.join("\n")}${antes.length > 1 ? `\nTotal: ${plata(sumaAntes)}` : ""}`;
+    // lo de esta operación que queda para retirar: si la hoja ya se recargó, lo que dice la lista; si no, lo del aviso
+    const estas = listos.filter((p) => excluir.includes(p.id));
+    const yaPagada = excluir.length > 0 && excluir.every((id) => estado?.movimientos.find((m) => m.id === id)?.pagado_en);
+    const ahora = estas.length ? estas.reduce((s, p) => sumarDecimales(s, p.monto), "0") : yaPagada ? "0" : (a.porRetirar ?? a.monto);
+    return `${texto}\n\nPendiente por retirar de antes:\n${lineas.join("\n")}\n\nTotal para retirar: ${plata(sumarDecimales(sumaAntes, ahora))}`;
+  }
   function construirAviso(a: Aviso) {
+    return conPendientes(armarAviso(a), a, a.ids ?? (a.id != null ? [a.id] : []));
+  }
+  function armarAviso(a: Aviso) {
     if (a.texto) return a.texto; // el mensaje ya armado (varias operaciones juntas)
     const monto = `${simbolo}${formatearMonto(a.monto)}${sufijo}`;
     const lineaRef = refDeDescripcion(a.descripcion);
@@ -550,6 +572,7 @@ export function HojaCuenta({
   }
   // Qué se le dice al cliente de un movimiento: según su estado de confirmación y, en Confirmaciones, si fue compra o venta
   const avisoDeMovimiento = (m: FilaEstadoCuenta): Aviso => ({
+    id: m.id,
     monto: m.monto.replace(/^-/, ""),
     descripcion: m.descripcion ?? m.tipo,
     // operación con comisión descontada: el total enviado y el % (la tasa guardada es lo que queda: 0.9435 -> 5,65%)
@@ -592,8 +615,13 @@ export function HojaCuenta({
       : `Estimado(a), le informamos que las operaciones han sido confirmadas.\n\n${cuerpo}\nRecibe en total: ${total}\nDisponible para recoger`;
   }
   const variasOperaciones = operacionesJuntas.length > 1;
+  // el aviso de varias operaciones juntas (con lo pendiente de antes, sin repetir las que ya van en la lista)
+  const avisoDeVarias = (): Aviso | null =>
+    variasOperaciones && ultimaOperacion
+      ? { ...avisoDeMovimiento(ultimaOperacion), texto: construirAvisoDeVarias(operacionesJuntas), ids: operacionesJuntas.map((m) => m.id) }
+      : null;
   const mensajeSaldo = variasOperaciones
-    ? construirAvisoDeVarias(operacionesJuntas)
+    ? construirAviso(avisoDeVarias()!)
     : ultimaOperacion
     ? construirAviso(avisoDeMovimiento(ultimaOperacion))
     : `Estimado(a), le informamos su saldo al ${fechaCorta(new Date().toISOString())}.\n\n${saldoParaCliente}`;
@@ -850,7 +878,7 @@ export function HojaCuenta({
             className="cc-whatsapp cc-whatsapp-vinculado"
             onClick={() => {
               setEstadoAviso("");
-              setAbonoParaAvisar({ ...avisoDeMovimiento(ultimaOperacion), ...(variasOperaciones ? { texto: mensajeSaldo } : {}) });
+              setAbonoParaAvisar(avisoDeVarias() ?? avisoDeMovimiento(ultimaOperacion));
             }}
             title="Enviar la última operación desde un WhatsApp vinculado al sistema (Bolívares, Pesos o Dólares): se elige la línea y sale sola"
           >
@@ -1382,7 +1410,7 @@ function FilaNueva({
   saldo: string;
   referencias: string[];
   // si lo guardado fue un abono, lo devuelve para poder confirmárselo al cliente
-  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string; texto?: string }) => void;
+  onGuardado: (abono?: { monto: string; descripcion: string; sentido?: "recibe" | "retiro" | "proceso" | "confirmada"; enviado?: string; comision?: string; texto?: string; id?: number; ids?: number[]; porRetirar?: string }) => void;
   medios?: { id: number; nombre: string }[];
   onElegirMedio?: (id: number | "") => void;
   onOtraCuenta?: (cuentaId: number) => void;
@@ -1959,10 +1987,12 @@ function FilaNueva({
         }
       }
       let lineaParcial = "";
+      let porRetirar = pagadaPor ? "0" : undefined; // lo que de esta operación queda para retirar en taquilla
       if (pagarParte && nParte) {
         try {
           const rp = await pagarParteConfirmacion(creado.movimiento.id, pagarParte.cajaId!, nParte);
           lineaParcial = `\nPagado por ${pagarParte.nombre}: ${dineroEn(nParte, codigoMonto)}\nPara retirar en efectivo: ${dineroEn(rp.falta, codigoMonto)}`;
+          porRetirar = rp.falta;
         } catch (e) {
           setError(`La confirmación quedó registrada, pero no se pudo pagar la parte por ${pagarParte.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó entera para pagar en taquilla.`);
         }
@@ -1985,7 +2015,7 @@ function FilaNueva({
         onOtraCuenta?.(destino.id);
         return;
       }
-      onGuardado({ monto: total, descripcion: `${referenciaFinal}${SEPARADOR_PERSONA}${refs.join(" / ")}`, sentido: enProceso ? "proceso" : resta ? "recibe" : "retiro", texto });
+      onGuardado({ monto: total, descripcion: `${referenciaFinal}${SEPARADOR_PERSONA}${refs.join(" / ")}`, sentido: enProceso ? "proceso" : resta ? "recibe" : "retiro", texto, id: creado.movimiento.id, porRetirar });
     } catch (err) {
       setError(`No se cargó: ${err instanceof ApiError ? err.message : "error de conexión"}`);
     } finally {
@@ -2016,6 +2046,8 @@ function FilaNueva({
     }
     setEnviando(true);
     const hechas: string[] = [];
+    const idsAca: number[] = []; // las partes que quedaron en esta cuenta
+    let enEstaCuenta = "0";
     const signo = resta ? "-" : "";
     const enProceso = llevaConfirmacion && !confirmada;
     try {
@@ -2058,6 +2090,10 @@ function FilaNueva({
         });
         if (imagen) await subirComprobanteMovimiento(creado.movimiento.id, imagen).catch(() => {});
         hechas.push(dineroEn(c.total!, p.moneda));
+        if (destino.id === cuenta.id) {
+          idsAca.push(creado.movimiento.id);
+          enEstaCuenta = sumarDecimales(enEstaCuenta, c.total!);
+        }
       }
       // el aviso para el cliente lleva todo junto: lo que envió y lo que recibe en cada moneda
       const ref = nMtcn ? `MTCN ${nMtcn}` : codigosDeReferencia(persona).join(" / ") || "—";
@@ -2076,7 +2112,7 @@ function FilaNueva({
       setMtcn("");
       setConfirmada(false);
       setCantidad("");
-      onGuardado({ monto: cuentas[0]!.total!, descripcion: descripcionAviso, sentido: enProceso ? "proceso" : resta ? "recibe" : "retiro", texto: texto.trim() });
+      onGuardado({ monto: cuentas[0]!.total!, descripcion: descripcionAviso, sentido: enProceso ? "proceso" : resta ? "recibe" : "retiro", texto: texto.trim(), ids: idsAca, porRetirar: enEstaCuenta });
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : (err as Error).message || "error de conexión";
       setError(
@@ -2347,12 +2383,14 @@ function FilaNueva({
       }
       onGuardado(
         datos.estadoConfirmacion === "EN_PROCESO"
-          ? { monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso", ...envio }
+          ? { id: creado.movimiento.id, monto: montoConSigno.replace(/^-/, ""), descripcion: datos.descripcion, sentido: "proceso", ...envio }
           : enConfirmaciones
           ? {
+              id: creado.movimiento.id,
               monto: montoConSigno.replace(/^-/, ""),
               descripcion: datos.descripcion,
               sentido: datos.tipo === "ABONO" ? "recibe" : "retiro",
+              ...(pagadaPor ? { porRetirar: "0" } : parcial ? { porRetirar: parcial.falta } : {}),
               ...envio,
               // pagada en el momento: el aviso dice por dónde se le pagó
               ...(pagadaPor
