@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Plus, X } from "lucide-react";
 import { factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, dividirDecimales, sumarDecimales } from "../../utils/montos";
 import { leerComprobante } from "./ocrComprobante";
+import { lecturaDudosa } from "./comprobantesVarios";
 import { dineroEn } from "./RepartoMonedas";
 
 // Confirmaciones armadas con varias transferencias del cliente: cada una con su referencia, quién la envió, su monto y
@@ -18,6 +19,7 @@ export interface Transferencia {
   captura: File | null;
   leyendo?: boolean;
   aviso?: string | null;
+  dudosa?: boolean; // la IA no la leyó bien: se pide verificar antes de procesar
 }
 export const transferenciaVacia = (): Transferencia => ({ referencia: "", remitente: "", cantidad: "", captura: null });
 
@@ -152,7 +154,7 @@ export function VariasTransferencias({
 
   // Una captura por fila: se lee y llena la referencia, el monto y quién envió
   async function ponerCaptura(imagen: File, i: number) {
-    cambiar(i, { captura: imagen, leyendo: true, aviso: null });
+    cambiar(i, { captura: imagen, leyendo: true, aviso: null, dudosa: false });
     try {
       const d = await leerComprobante(imagen);
       const f = filasRef.current[i];
@@ -163,9 +165,10 @@ export function VariasTransferencias({
         cantidad: f.cantidad || (d.monto ? formatearMonto(d.monto) : ""),
         remitente: f.remitente || d.remitente || "",
         aviso: d.referencia || d.monto ? null : "No pude leer la captura: escribí los datos.",
+        dudosa: lecturaDudosa(d),
       });
     } catch {
-      cambiar(i, { leyendo: false, aviso: "No pude leer la captura: escribí los datos." });
+      cambiar(i, { leyendo: false, aviso: "No pude leer la captura: escribí los datos.", dudosa: true });
     }
   }
 

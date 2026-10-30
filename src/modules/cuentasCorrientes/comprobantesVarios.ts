@@ -12,12 +12,15 @@ export interface LecturaCapturas {
   moneda: string | null;
   conIA: boolean; // todas las capturas aceptadas las leyó la IA del servidor
   repetidas: number; // capturas que ya estaban cargadas (misma referencia): no se suman dos veces
+  dudosas: number; // capturas que la IA no leyó, o les faltó el monto o la referencia
 }
+
+export const lecturaDudosa = (d: DatosComprobante) => d.fuente !== "ia" || !d.monto || !d.referencia;
 
 /** Lee las capturas una por una. yaEscrito: las referencias que ya están cargadas en el formulario. */
 export async function leerCapturas(archivos: File[], yaEscrito: string): Promise<LecturaCapturas> {
   const vistas = new Set(codigosDeReferencia(yaEscrito).map((c) => c.toLowerCase()));
-  const r: LecturaCapturas = { aceptadas: [], primera: null, referencias: [], total: null, moneda: null, conIA: true, repetidas: 0 };
+  const r: LecturaCapturas = { aceptadas: [], primera: null, referencias: [], total: null, moneda: null, conIA: true, repetidas: 0, dudosas: 0 };
   for (const archivo of archivos) {
     const d = await leerComprobante(archivo);
     const clave = d.referencia?.toLowerCase();
@@ -28,6 +31,7 @@ export async function leerCapturas(archivos: File[], yaEscrito: string): Promise
     if (clave) vistas.add(clave);
     r.aceptadas.push(archivo);
     if (d.fuente !== "ia") r.conIA = false;
+    if (lecturaDudosa(d)) r.dudosas++;
     r.primera ??= d;
     if (d.referencia) r.referencias.push(d.referencia);
     if (d.monto) r.total = r.total ? sumarDecimales(r.total, d.monto) : d.monto;

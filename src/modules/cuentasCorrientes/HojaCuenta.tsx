@@ -52,6 +52,7 @@ import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, pctDeComision, sumarDecimales } from "../../utils/montos";
 import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
+import { motivoDeLectura, motivosDeMonto, VerificarMontosModal, type MontoAVerificar, type Verificacion } from "./verificarMontos";
 import { LINEAS_WA, whatsappApi, type ConexionWa, type LineaWa } from "../../api/whatsapp.api";
 import { abrirChatEnBurbuja } from "../../components/whatsapp/BurbujaWhatsapp";
 import { EnviarReportePorVinculado } from "../../components/whatsapp/EnviarReportePorVinculado";
@@ -1543,6 +1544,8 @@ function FilaNueva({
   // La imagen se guarda con el movimiento al agregarlo, para verla después (en la hoja y en Taquilla)
   // El cliente puede mandar el monto en varias transferencias: se cargan varias capturas, se suman y se guardan juntas
   const [imagenesAdjuntas, setImagenesAdjuntas] = useState<File[]>([]);
+  const [capturasDudosas, setCapturasDudosas] = useState(0);
+  const [verificacion, setVerificacion] = useState<Verificacion | null>(null);
   // Confirmaciones, pago repartido: lo enviado se le entrega en varias monedas (800 USD: 400 en pesos, 400 en bolívares).
   // Es una casilla chica; sin marcarla el formulario es el de siempre.
   const [repartido, setRepartido] = useState(false);
@@ -1622,6 +1625,7 @@ function FilaNueva({
         return;
       }
       setImagenesAdjuntas((lista) => [...lista, ...l.aceptadas]);
+      setCapturasDudosas((n) => n + l.dudosas);
       const partes: string[] = [];
       if (l.referencias.length) partes.push(`referencia ${l.referencias.join(" / ")}`);
       if (l.total) partes.push(`monto ${formatearMonto(l.total)}${l.moneda ? ` ${l.moneda}` : ""}${l.aceptadas.length > 1 ? ` (suma de ${l.aceptadas.length} capturas)` : ""}`);
@@ -1671,10 +1675,26 @@ function FilaNueva({
       );
       setAbierta(true);
     } catch (err) {
+      setCapturasDudosas((n) => n + archivos.length);
       setError(err instanceof Error ? err.message : "No se pudo leer la imagen.");
     } finally {
       setLeyendo(false);
     }
+  }
+  /**
+   * Confirmaciones: si una captura no se leyó bien o un monto se sale de lo común, se frena con un modal y se procesa
+   * solo si quien carga lo confirma. Sin motivos sigue derecho. Sin conexión para ver el historial, se usan los topes.
+   */
+  async function confirmarVerificacion(montos: MontoAVerificar[], filas: Verificacion["filas"], dudosas: number, imagenes: File[]) {
+    if (!enConfirmaciones) return true;
+    const historial = await getMovimientosCuentaCorriente(cuenta.id)
+      .then((lista) => (lista as MovimientoIgual[]).filter((m) => !m.anulado && !m.reverso_de_id).map((m) => m.monto))
+      .catch(() => [] as string[]);
+    const motivos = [...(dudosas ? [motivoDeLectura(dudosas)] : []), ...motivosDeMonto(montos, historial, cuenta.moneda_codigo)];
+    if (!motivos.length) return true;
+    const seguir = await new Promise<boolean>((resolver) => setVerificacion({ motivos, filas, imagenes, resolver }));
+    setVerificacion(null);
+    return seguir;
   }
   const cargarRecientes = useCallback(() => {
     getTasasRecientes(cuenta.id)
@@ -1947,6 +1967,9 @@ function FilaNueva({
     };
   }, [varias, enConfirmaciones, resta, cuenta.tercero_id, codigoLlega, cargandoVarias]);
 
+  const filasDeTransferencias = (cantidades: (string | null)[]) =>
+    transferencias.map((t, i) => ({ etiqueta: `Transferencia ${i + 1}${t.referencia.trim() ? ` · ${t.referencia.trim()}` : ""}`, valor: dineroEn(cantidades[i] ?? "0", codigoLlega) }));
+
   /** Las transferencias van a Cuentas por Pagar: lo enviado se le junta ahí (sin comisión) hasta que complete. */
   async function cargarVariasAPagar() {
     const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto, incluidaVarias);
@@ -1958,6 +1981,16 @@ function FilaNueva({
     const refs = transferencias.map((t) => t.referencia.trim()).filter(Boolean);
     const remitentes = [...new Set(transferencias.map((t) => t.remitente.trim()).filter(Boolean))];
     const resumen = transferencias.map((t, i) => `Transferencia ${i + 1}${t.referencia.trim() ? ` · Ref ${t.referencia.trim()}` : ""} · ${dineroEn(r.cantidades[i]!, codigoLlega)}`).join("\n");
+    const verificado = await confirmarVerificacion(
+      [{ monto: r.totalEnviado, codigo: codigoLlega }],
+      [
+        ...filasDeTransferencias(r.cantidades),
+        { etiqueta: "Total enviado", valor: dineroEn(r.totalEnviado, codigoLlega) },
+      ],
+      transferencias.filter((t) => t.dudosa).length,
+      transferencias.flatMap((t) => (t.captura ? [t.captura] : []))
+    );
+    if (!verificado) return setError("No se procesó: revisá los montos.");
     const p = progresoMeta(r, metaVarias, previoPagar, formulaVarias, incluidaVarias, codigoLlega, codigoMonto);
     const progreso = p ? textoProgreso(p, codigoMonto) : "";
     const seguir = window.confirm(
@@ -2048,6 +2081,18 @@ function FilaNueva({
         : `Tasa: ${formulaVarias === "÷" ? "÷" : "×"} ${formatearMonto(r.valor)}`;
     // el resumen completo antes de enviar: cada transferencia, lo enviado, la comisión y lo que se le paga
     const resumen = transferencias.map((t, i) => `Transferencia ${i + 1}${t.referencia.trim() ? ` · Ref ${t.referencia.trim()}` : ""} · ${dineroEn(r.cantidades[i]!, codigoLlega)}`).join("\n");
+    const verificado = await confirmarVerificacion(
+      [{ monto: total, codigo: codigoMonto }],
+      [
+        ...filasDeTransferencias(r.cantidades),
+        { etiqueta: "Total enviado", valor: dineroEn(r.totalEnviado, codigoLlega) },
+        ...(lineaFormula ? [{ etiqueta: formulaVarias === "%" ? "Comisión" : "Tasa", valor: lineaFormula.replace(/^[^:]*: /, "") }] : []),
+        { etiqueta: resta ? "Monto" : "Se le entrega", valor: dineroEn(total, codigoMonto) },
+      ],
+      transferencias.filter((t) => t.dudosa).length,
+      transferencias.flatMap((t) => (t.captura ? [t.captura] : []))
+    );
+    if (!verificado) return setError("No se procesó: revisá los montos.");
     const seguir = window.confirm(
       `${resta ? "Venta" : "Compra"} con ${transferencias.length} transferencias\n\n${resumen}\n\nTotal enviado: ${dineroEn(r.totalEnviado, codigoLlega)}${lineaFormula ? `\n${lineaFormula}` : ""}\nSe le paga: ${dineroEn(total, codigoMonto)}` +
         `${pagarCon ? `\nSe paga ya por ${pagarCon.nombre}.` : !resta ? "\nPasa a taquilla." : ""}\n\n¿Enviar?`
@@ -2175,6 +2220,16 @@ function FilaNueva({
         return setError(aviso);
       }
     }
+    const verificado = await confirmarVerificacion(
+      cuentas.map((c, i) => ({ monto: c.total!, codigo: partes[i]!.moneda })),
+      [
+        { etiqueta: "Total enviado", valor: dineroEn(repartidoTotal, codigoLlega) },
+        ...cuentas.map((c, i) => ({ etiqueta: `Parte ${i + 1}`, valor: dineroEn(c.total!, partes[i]!.moneda) })),
+      ],
+      capturasDudosas,
+      imagenesAdjuntas
+    );
+    if (!verificado) return setError("No se procesó: revisá los montos.");
     setEnviando(true);
     const hechas: string[] = [];
     const idsAca: number[] = []; // las partes que quedaron en esta cuenta
@@ -2234,6 +2289,7 @@ function FilaNueva({
         (enProceso ? "En breves minutos estará disponible" : resta ? "" : "Disponible para recoger");
       const descripcionAviso = `${referenciaFinal}${personaCompleta ? `${SEPARADOR_PERSONA}${personaCompleta}` : ""}`;
       setImagenesAdjuntas([]);
+      setCapturasDudosas(0);
       setAvisoLectura(null);
       setRepartido(false);
       setPartes(partesIniciales("COP", "VES"));
@@ -2279,7 +2335,7 @@ function FilaNueva({
     // $770.096.850). Se frena y se pregunta antes de anotarlo.
     const montoNumero = Number(sinSigno(montoConSigno));
     const tope = codigoMonto === "COP" ? 100_000_000 : codigoMonto === "VES" ? 50_000_000 : 50_000;
-    if (montoNumero > tope) {
+    if (!enConfirmaciones && montoNumero > tope) {
       const seguir = window.confirm(
         `Revisá el monto\n\nEl movimiento va a quedar por ${formatearMonto(sinSigno(montoConSigno))} ${codigoMonto}${nCantidad ? ` (cantidad ${formatearMonto(sinSigno(nCantidad))})` : ""}.\n` +
           `Es un monto muy grande: ¿no se pegó una referencia donde va la cantidad?\n\n¿Registrarlo igual?`
@@ -2352,6 +2408,19 @@ function FilaNueva({
       }
     }
 
+    const verificado = await confirmarVerificacion(
+      [{ monto: sinSigno(montoConSigno), codigo: codigoMonto }],
+      [
+        ...(conTasa && nCantidad ? [{ etiqueta: "Cantidad", valor: `${formatearMonto(sinSigno(nCantidad))} ${enCobro ? codigoDivision : codigoLlega}` }] : []),
+        ...(conTasa && nEscrita ? [{ etiqueta: esPorcentaje ? "Comisión" : "Tasa", valor: `${enCobro ? "÷ " : ""}${formatearMonto(nEscrita)}${esPorcentaje ? "%" : ""}` }] : []),
+        { etiqueta: resta ? "Monto" : "Se le entrega", valor: dineroEn(sinSigno(montoConSigno), codigoMonto) },
+        ...(persona.trim() ? [{ etiqueta: "Referencia", valor: persona.trim() }] : []),
+      ],
+      capturasDudosas,
+      imagenesAdjuntas
+    );
+    if (!verificado) return setError("No se procesó: revisá los montos.");
+
     // La fila se limpia ya, para poder seguir cargando la siguiente sin esperar al servidor.
     // Si el guardado falla, se devuelve lo escrito (salvo que ya se esté escribiendo otra).
     if (conTasa && enCobro && !cuenta.tasa_cobro) {
@@ -2372,6 +2441,7 @@ function FilaNueva({
     const tasaCobroNueva = !otraMoneda && enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
     const adjuntas = imagenesAdjuntas;
     setImagenesAdjuntas([]);
+    setCapturasDudosas(0);
     setAvisoLectura(null);
     const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro, entregaEn };
     setEnCobro(iniciaEnCobro);
@@ -2582,6 +2652,7 @@ function FilaNueva({
       <Plus size={18} /> Nuevo movimiento
     </button>
     {abierta && <div className="cc-velo" onClick={() => setAbierta(false)} />}
+    {verificacion && <VerificarMontosModal verificacion={verificacion} />}
     <form className={`cc-nueva ${abierta ? "abierta" : ""}`} onSubmit={guardar}>
       <div className="cc-nueva-titulo">
         Nuevo movimiento
@@ -2907,7 +2978,13 @@ function FilaNueva({
           {imagenesAdjuntas.length === 1
             ? "Imagen del comprobante lista: se guarda con el movimiento. Si mandó el monto en varias transferencias, cargá o pegá las otras capturas y se suman."
             : `${imagenesAdjuntas.length} capturas cargadas: los montos están sumados y se guardan juntas con el movimiento.`}
-          <button type="button" onClick={() => setImagenesAdjuntas([])}>
+          <button
+            type="button"
+            onClick={() => {
+              setImagenesAdjuntas([]);
+              setCapturasDudosas(0);
+            }}
+          >
             Quitar
           </button>
         </p>
