@@ -81,20 +81,22 @@ const negar = (v: string) => (v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ?
  * Sin nombre del cliente ni nada del sistema, y sin los movimientos anulados.
  * titulo: una línea arriba de la tabla con el día del reporte (ej. "Cierre del día 05/10/2026"), para que
  * un cierre hecho después siga saliendo con la fecha de su día.
+ * pie: para mostrar solo algunos movimientos (los marcados en la calculadora). El TOTAL va sumando desde cero y abajo
+ * van estas líneas en vez del saldo: el saldo de la cuenta no sale de una selección.
  */
-export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titulo?: string, abonado = "Abonado en el día"): Promise<Blob> {
+export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titulo?: string, abonado = "Abonado en el día", pie?: { etiqueta: string; valor: string }[]): Promise<Blob> {
   const altoTitulo = titulo ? ALTO_FILA : 0;
   const vigentes = estado.movimientos.filter((m) => !m.anulado);
-  const cuadro = lineasDelCuadro(estado);
+  const cuadro = pie ? { titulo: "", lineas: [] as LineaCuadro[] } : lineasDelCuadro(estado);
   const filas = vigentes.slice(-MAX_FILAS);
   // El saldo de arranque sale de restarle al saldo final lo que se muestra: así el total corrido siempre cierra
-  let corrido = filas.reduce((saldo, m) => sumarDecimales(saldo, negar(m.monto)), estado.saldoFinal);
+  let corrido = pie ? "0" : filas.reduce((saldo, m) => sumarDecimales(saldo, negar(m.monto)), estado.saldoFinal);
   const conSaldoAnterior = /[1-9]/.test(corrido);
 
   const lienzo = document.createElement("canvas");
   lienzo.width = ANCHO;
   const altoCuadro = cuadro.lineas.length ? SEPARACION_CUADRO + (cuadro.lineas.length + 1) * ALTO_FILA : 0;
-  lienzo.height = altoTitulo + ALTO_CABEZA + (filas.length + (conSaldoAnterior ? 1 : 0) + 2) * ALTO_FILA + altoCuadro + 12;
+  lienzo.height = altoTitulo + ALTO_CABEZA + (filas.length + (conSaldoAnterior ? 1 : 0) + (pie ? pie.length : 2)) * ALTO_FILA + altoCuadro + 12;
   const c = lienzo.getContext("2d")!;
   c.fillStyle = "#ffffff";
   c.fillRect(0, 0, lienzo.width, lienzo.height);
@@ -160,13 +162,23 @@ export function generarImagenReporte(estado: EstadoCuenta, simbolo: string, titu
     texto(dinero(corrido), "total", medio, colorMonto(corrido), true);
     y += ALTO_FILA;
   });
-  // Lo que abonó el cliente en el día, en la moneda de la cuenta
-  c.fillStyle = "#eef7f0";
-  c.fillRect(0, y, ANCHO, ALTO_FILA);
-  texto(abonado, "fecha", y + ALTO_FILA / 2, "#1a7f37", true);
-  texto(dinero(abonadoEnElDia(estado)), "total", y + ALTO_FILA / 2, "#1a7f37", true);
-  y += ALTO_FILA;
-  franja("Saldo pendiente", estado.saldoFinal);
+  if (pie) {
+    for (const l of pie) {
+      c.fillStyle = "#e6f7fb";
+      c.fillRect(0, y, ANCHO, ALTO_FILA);
+      texto(l.etiqueta, "fecha", y + ALTO_FILA / 2, "#12305a", true);
+      texto(l.valor, "total", y + ALTO_FILA / 2, "#12305a", true);
+      y += ALTO_FILA;
+    }
+  } else {
+    // Lo que abonó el cliente en el día, en la moneda de la cuenta
+    c.fillStyle = "#eef7f0";
+    c.fillRect(0, y, ANCHO, ALTO_FILA);
+    texto(abonado, "fecha", y + ALTO_FILA / 2, "#1a7f37", true);
+    texto(dinero(abonadoEnElDia(estado)), "total", y + ALTO_FILA / 2, "#1a7f37", true);
+    y += ALTO_FILA;
+    franja("Saldo pendiente", estado.saldoFinal);
+  }
 
   // Cuadrito debajo de la tabla: por moneda, cada tasa en su línea y el total
   if (cuadro.lineas.length) {

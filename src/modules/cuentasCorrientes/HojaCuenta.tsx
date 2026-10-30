@@ -445,6 +445,28 @@ export function HojaCuenta({
   const llevo = (comparaEn === "cantidad" ? sumaCantidad : sumaMonto).replace(/^-/, "");
   const nMeta = meta.trim() ? (leerNumero(meta)?.replace(/^-/, "") ?? null) : null;
   const falta = nMeta ? sumarDecimales(nMeta, `-${llevo}`) : null;
+  // Lo marcado como imagen para el cliente: solo esas operaciones y sus sumas, sin el saldo de la cuenta
+  async function mostrarSeleccion() {
+    if (!estado) return;
+    const dinero = (v: string) => `${v.startsWith("-") ? "- " : ""}${simbolo}${formatearMonto(v.replace(/^-/, ""))}`;
+    const conMeta = nMeta && falta !== null;
+    const pie = [
+      ...(hayCantidades ? [{ etiqueta: "Suma de cantidades", valor: formatearMonto(sumaCantidad) }] : []),
+      { etiqueta: "Suma de montos", valor: dinero(sumaMonto) },
+      ...(conMeta
+        ? [
+            { etiqueta: "Lleva", valor: `${comparaEn === "monto" ? dinero(llevo) : formatearMonto(llevo)} de ${comparaEn === "monto" ? dinero(nMeta) : formatearMonto(nMeta)}` },
+            ...(/[1-9]/.test(falta) && !falta.startsWith("-") ? [{ etiqueta: "Falta", valor: comparaEn === "monto" ? dinero(falta) : formatearMonto(falta) }] : []),
+          ]
+        : []),
+    ];
+    const titulo = `Operaciones seleccionadas · ${enRango ? `${fechaDelDia(desde)} al ${fechaDelDia(dia)}` : fechaDelDia(dia)}`;
+    try {
+      await entregarReporte(await generarImagenReporte({ ...estado, movimientos: delaSeleccion }, simbolo, titulo, undefined, pie), `seleccion-${dia}.png`);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   function marcar(id: number) {
     setMarcados((actual) => {
       const nuevo = new Set(actual);
@@ -1061,6 +1083,9 @@ export function HojaCuenta({
               setMeta("");
             }} title="Borra las marcas y la meta guardadas de este día">
               Quitar marcas
+            </button>
+            <button type="button" className="cc-calculadora-enviar" onClick={() => void mostrarSeleccion()} title="Imagen solo con las operaciones marcadas y sus sumas, para mandársela al cliente">
+              <Share2 size={13} /> Mostrar al cliente
             </button>
             {(cuenta.modulo === "CORRIENTE" || cuenta.modulo === "POR_PAGAR" || cuenta.modulo === "POR_COBRAR") && puedeAnular && (
               <button type="button" className="cc-calculadora-enviar" onClick={() => setEnviandoAConf(sumaMonto.replace(/^-/, ""))} title="Pasar el total de lo marcado a Confirmaciones, con comisión o tasa">
