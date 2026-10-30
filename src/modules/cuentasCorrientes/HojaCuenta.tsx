@@ -42,7 +42,7 @@ import { METODOS, comisionPara, detectarMetodo, nombreMetodo, referenciaDelMetod
 import { escrita } from "../tasas/tablero";
 import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, avisoDePagoParcial, montoParte, type PagoElegido } from "./PagoConfirmacion";
-import { VariasTransferencias, calcularResumen, transferenciaVacia, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
+import { VariasTransferencias, calcularResumen, progresoMeta, textoProgreso, transferenciaVacia, type DestinoVarias, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
@@ -1533,6 +1533,9 @@ function FilaNueva({
   const [formulaVarias, setFormulaVarias] = useState<FormulaGeneral>("%");
   const [valorVarias, setValorVarias] = useState("");
   const [incluidaVarias, setIncluidaVarias] = useState(false); // la comisión ya venía sumada en lo enviado
+  const [metaVarias, setMetaVarias] = useState(""); // cuánto va a recibir en total
+  const [destinoVarias, setDestinoVarias] = useState<DestinoVarias>("caja");
+  const [previoPagar, setPrevioPagar] = useState<string | null>(null); // lo que ya tiene enviado en Cuentas por Pagar
   const [repetidasVarias, setRepetidasVarias] = useState<Record<string, string>>({});
   const [cargandoVarias, setCargandoVarias] = useState(false);
   // Confirmaciones: pasa a taquilla (como siempre) o se le paga ya por otro método, desde una cuenta de la empresa
@@ -1895,8 +1898,96 @@ function FilaNueva({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [referenciasVarias, canalDelBloqueo]);
 
+  // Lo que el cliente ya tiene juntado en Cuentas por Pagar, en la moneda en que llegan las transferencias
+  useEffect(() => {
+    if (!varias || !enConfirmaciones || resta) return setPrevioPagar(null);
+    let vigente = true;
+    getCuentasCorrientes({ terceroId: cuenta.tercero_id })
+      .then((l) => {
+        const suya = l.find((c) => c.modulo === "POR_PAGAR" && c.moneda_codigo === codigoLlega && c.saldo_actual.startsWith("-"));
+        if (vigente) setPrevioPagar(suya ? suya.saldo_actual.replace(/^-/, "") : null);
+      })
+      .catch(() => vigente && setPrevioPagar(null));
+    return () => {
+      vigente = false;
+    };
+  }, [varias, enConfirmaciones, resta, cuenta.tercero_id, codigoLlega, cargandoVarias]);
+
+  /** Las transferencias van a Cuentas por Pagar: lo enviado se le junta ahí (sin comisión) hasta que complete. */
+  async function cargarVariasAPagar() {
+    const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto, incluidaVarias);
+    if (r.cantidades.some((c) => !c || !/[1-9]/.test(c))) return setError("Falta el monto de una transferencia.");
+    if (Object.keys(repetidasVarias).length) return setError("Hay una referencia que ya está registrada: corregila antes de cargar.");
+    if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
+    const monedaLlega = monedas.find((m) => m.codigo === codigoLlega);
+    if (!monedaLlega) return setError(`No encuentro la moneda ${codigoLlega}.`);
+    const refs = transferencias.map((t) => t.referencia.trim()).filter(Boolean);
+    const remitentes = [...new Set(transferencias.map((t) => t.remitente.trim()).filter(Boolean))];
+    const resumen = transferencias.map((t, i) => `Transferencia ${i + 1}${t.referencia.trim() ? ` · Ref ${t.referencia.trim()}` : ""} · ${dineroEn(r.cantidades[i]!, codigoLlega)}`).join("\n");
+    const p = progresoMeta(r, metaVarias, previoPagar, formulaVarias, incluidaVarias, codigoLlega, codigoMonto);
+    const progreso = p ? textoProgreso(p, codigoMonto) : "";
+    const seguir = window.confirm(
+      `A Cuentas por Pagar: ${transferencias.length} transferencias\n\n${resumen}\n\nTotal enviado: ${dineroEn(r.totalEnviado, codigoLlega)}` +
+        (previoPagar && /[1-9]/.test(previoPagar) ? `\nYa tenía: ${dineroEn(previoPagar, codigoLlega)}` : "") +
+        (progreso ? `\n${progreso}` : "") +
+        `\n\nQueda guardado sin descontar la comisión; no pasa a taquilla todavía.\n\n¿Enviar?`
+    );
+    if (!seguir) return;
+    setCargandoVarias(true);
+    try {
+      const cuentaPagar = await crearCuentaCorriente({ terceroId: cuenta.tercero_id, canalId: cuenta.canal_id, modulo: "POR_PAGAR", monedaId: monedaLlega.id, usarExistente: true });
+      const quien = [refs.join(" / "), remitentes.join(", "), nMtcn ? `MTCN ${nMtcn}` : ""].filter(Boolean).join(" ");
+      const creado = await registrarMovimientoCC({
+        cuentaId: cuentaPagar.id,
+        terceroId: cuenta.tercero_id,
+        canalId: cuentaPagar.canal_id,
+        monedaId: cuentaPagar.moneda_id,
+        canalMovimientoId: medioMov.id,
+        tipo: "ABONO",
+        descripcion: `${referenciaFinal}${quien ? `${SEPARADOR_PERSONA}${quien}` : ""}`,
+        fecha: fecha === hoyBogota() ? undefined : `${fecha}T12:00:00-05:00`,
+        monto: `-${r.totalEnviado}`,
+        totalEnviado: r.totalEnviado,
+        cuentaDestino: cuentaDestino.trim() || undefined,
+        transferencias: transferencias.map((t, i) => ({
+          referencia: t.referencia.trim() || undefined,
+          remitente: t.remitente.trim() || undefined,
+          cantidad: r.cantidades[i]!,
+          formula: "DIRECTO" as const,
+          resultado: r.cantidades[i]!,
+        })),
+      });
+      const ids = creado.transferencias ?? [];
+      await Promise.all(
+        transferencias.map((t, i) => {
+          const tr = ids.find((x) => x.orden === i + 1);
+          return t.captura && tr ? subirComprobanteTransferencia(tr.id, t.captura).catch(() => {}) : Promise.resolve();
+        })
+      );
+      const texto =
+        `Estimado(a), le informamos que recibimos sus transferencias.\n\n${resumen}\n\nTotal enviado: ${dineroEn(r.totalEnviado, codigoLlega)}` +
+        (previoPagar && /[1-9]/.test(previoPagar) ? `\nTotal enviado hasta hoy: ${dineroEn(sumarDecimales(previoPagar, r.totalEnviado), codigoLlega)}` : "") +
+        (progreso ? `\n${progreso}` : "");
+      setTransferencias([transferenciaVacia()]);
+      setIncluidaVarias(false);
+      setMetaVarias("");
+      setDestinoVarias("caja");
+      setVarias(false);
+      setReferencia(referenciaPuesta);
+      setPersona("");
+      setCuentaDestino("");
+      setMtcn("");
+      onGuardado({ monto: r.totalEnviado, descripcion: `${referenciaFinal}${SEPARADOR_PERSONA}${refs.join(" / ")}`, texto });
+    } catch (err) {
+      setError(`No se cargó: ${err instanceof ApiError ? err.message : "error de conexión"}`);
+    } finally {
+      setCargandoVarias(false);
+    }
+  }
+
   async function cargarVarias() {
     setError(null);
+    if (destinoVarias === "pagar") return cargarVariasAPagar();
     const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto, incluidaVarias);
     if (r.error || !r.resultado) return setError(r.error ?? "Revisá los montos.");
     if (Object.keys(repetidasVarias).length) return setError("Hay una referencia que ya está registrada: corregila antes de cargar.");
@@ -1913,6 +2004,8 @@ function FilaNueva({
     if (pagarParte && llevaConfirmacion && !confirmada) return setError("Para pagarle una parte ya tiene que entrar confirmada: marcá que la transferencia ya está confirmada.");
     const refs = transferencias.map((t) => t.referencia.trim()).filter(Boolean);
     const remitentes = [...new Set(transferencias.map((t) => t.remitente.trim()).filter(Boolean))];
+    const pMeta = progresoMeta(r, metaVarias, previoPagar, formulaVarias, incluidaVarias, codigoLlega, codigoMonto);
+    const progresoCaja = pMeta ? textoProgreso(pMeta, codigoMonto) : "";
     // la línea de la comisión o la tasa, igual en el resumen y en el aviso
     const lineaFormula = !r.valor
       ? ""
@@ -2002,9 +2095,11 @@ function FilaNueva({
       const texto =
         `Estimado(a), le informamos que ${enProceso ? "la operación está en proceso de confirmación" : pagadaPor ? "la operación ha sido confirmada y pagada" : resta ? "su compra ha sido registrada" : "la operación ha sido confirmada"}.\n\n` +
         `${resumen}\n\nTotal enviado: ${dineroEn(r.totalEnviado, codigoLlega)}${lineaFormula ? `\n${lineaFormula}` : ""}\n${resta ? "Monto" : "Recibe"}: ${dineroEn(total, codigoMonto)}` +
-        (pagadaPor ? `\nPagado por: ${pagadaPor}` : lineaParcial ? lineaParcial : enProceso ? "\nEn breves minutos estará disponible" : resta ? "" : "\nDisponible para recoger");
+        (pagadaPor ? `\nPagado por: ${pagadaPor}` : lineaParcial ? lineaParcial : enProceso ? "\nEn breves minutos estará disponible" : resta ? "" : "\nDisponible para recoger") +
+        (progresoCaja ? `\n\n${progresoCaja}` : "");
       setTransferencias([transferenciaVacia()]);
       setIncluidaVarias(false);
+      setMetaVarias("");
       setVarias(false);
       setPago(PAGO_POR_TAQUILLA);
       setReferencia(referenciaPuesta);
@@ -2561,6 +2656,11 @@ function FilaNueva({
           onValor={setValorVarias}
           incluida={incluidaVarias}
           onIncluida={setIncluidaVarias}
+          meta={metaVarias}
+          onMeta={setMetaVarias}
+          previo={previoPagar}
+          destino={resta ? "caja" : destinoVarias}
+          onDestino={resta ? undefined : setDestinoVarias}
           repetidas={repetidasVarias}
           cargando={cargandoVarias}
           textoBoton={!resta && pago.modo === "otro" && pago.nombre ? `Enviar y pagar por ${pago.nombre}` : !resta ? "Enviar a caja" : "Enviar"}

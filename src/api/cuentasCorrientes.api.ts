@@ -423,7 +423,7 @@ export function buscarClientesExistentes(nombre: string, telefono: string) {
 /** Pasar a Confirmaciones lo que se le debe en Cuentas Corrientes, con comisión o tasa. */
 export function enviarAConfirmaciones(
   cuentaId: number,
-  d: { monto: string; formula: "DIRECTO" | "COMISION" | "TASA" | "DIVIDIR"; valor?: string; monedaEntregaId: number; canalId: number; descripcion?: string }
+  d: { monto: string; formula: "DIRECTO" | "COMISION" | "TASA" | "DIVIDIR"; valor?: string; incluida?: boolean; monedaEntregaId: number; canalId: number; descripcion?: string }
 ) {
   return api.post<{ confirmacionId: number; corrienteId: number; cuentaConfirmacionesId: number; resultado: string; moneda: string }>(`/cuentas-corrientes/${cuentaId}/enviar-a-confirmaciones`, d);
 }

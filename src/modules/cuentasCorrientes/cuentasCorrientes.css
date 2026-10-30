@@ -663,3 +663,8 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 
 /* Varias transferencias: la comisión ya venía sumada en lo enviado */
 .cc-varias-incluida { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin: 2px 0 4px; }
+
+/* Varias transferencias: cuánto va a recibir y a dónde va */
+.cc-varias-linea.meta input { max-width: 170px; margin-left: auto; }
+.cc-varias-progreso { display: block; font-size: 0.8rem; color: #4b5563; margin: 2px 0 6px; line-height: 1.4; }
+.cc-varias-destino { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 0.85rem; flex-wrap: wrap; }

@@ -9,6 +9,8 @@ import { dineroEn } from "./RepartoMonedas";
 // se le paga. Se ve el resumen completo y con "Enviar a caja" queda una sola confirmación, con cada transferencia
 // guardada aparte.
 export type FormulaGeneral = "%" | "x" | "÷";
+// a dónde va: a caja (confirmación para pagar en taquilla) o a Cuentas por Pagar (se le junta hasta completar lo que va a recibir)
+export type DestinoVarias = "caja" | "pagar";
 export interface Transferencia {
   referencia: string;
   remitente: string;
@@ -39,11 +41,59 @@ export function calcularResumen(filas: Transferencia[], formula: FormulaGeneral,
   }
   if (formula === "%") {
     if (Number(valor) >= 100) return { ...base, error: "La comisión tiene que ser menor al 100%." };
-    const resultado = multiplicarDecimales(totalEnviado, factorDeComision(valor, incluida), decimales);
+    // con comisión se le paga en la misma moneda en que envió: 2.784 USD − 6% no son 2.627 pesos
+    if (llega !== queda) return { ...base, error: `Con comisión se le paga en ${llega}. Para pagarle en ${queda} usá × Tasa o ÷ Dividir.` };
+    const resultado = aplicarFormula(totalEnviado, formula, valor, decimales, incluida)!;
     return { ...base, resultado, descuento: sumarDecimales(totalEnviado, `-${resultado}`), error: null };
   }
-  const resultado = formula === "÷" ? dividirDecimales(totalEnviado, valor, decimales) : multiplicarDecimales(totalEnviado, valor, decimales);
+  const resultado = aplicarFormula(totalEnviado, formula, valor, decimales, incluida);
   return { ...base, resultado, error: resultado && /[1-9]/.test(resultado) ? null : "El total da cero: revisá los montos y la tasa." };
+}
+
+/** Lo enviado con la comisión o la tasa aplicada (en la moneda en que se le paga). */
+export function aplicarFormula(total: string, formula: FormulaGeneral, valor: string, decimales: number, incluida = false): string | null {
+  if (formula === "%") return multiplicarDecimales(total, factorDeComision(valor, incluida), decimales);
+  return formula === "÷" ? dividirDecimales(total, valor, decimales) : multiplicarDecimales(total, valor, decimales);
+}
+
+/**
+ * Cuánto lleva y cuánto le falta para lo que va a recibir (ej. 3.000 USD). Lo que ya tenía guardado en Cuentas por Pagar
+ * (lo enviado antes, sin descontar) se suma a lo de ahora y se le aplica la misma comisión o tasa. null sin meta.
+ */
+export function progresoMeta(
+  r: { totalEnviado: string; valor: string | null },
+  metaEscrita: string,
+  previo: string | null,
+  formula: FormulaGeneral,
+  incluida: boolean,
+  llega: string,
+  queda: string
+) {
+  const meta = metaEscrita.trim() ? (leerNumero(metaEscrita)?.replace(/^-/, "") ?? null) : null;
+  if (!meta || !/[1-9]/.test(meta)) return null;
+  const bruto = sumarDecimales(previo ?? "0", r.totalEnviado);
+  const conValor = !!r.valor && /[1-9]/.test(r.valor) && !(formula === "%" && llega !== queda);
+  const lleva = conValor ? aplicarFormula(bruto, formula, r.valor!, queda === "COP" ? 0 : 2, incluida) : llega === queda ? bruto : null;
+  const falta = lleva ? sumarDecimales(meta, `-${lleva}`) : null;
+  // lo que falta, en lo que tiene que enviar (antes de la comisión o la tasa)
+  const faltaEnviar =
+    falta && Number(falta) > 0
+      ? conValor
+        ? formula === "%"
+          ? dividirDecimales(falta, factorDeComision(r.valor!, incluida), 2)
+          : formula === "÷"
+            ? multiplicarDecimales(falta, r.valor!, 2)
+            : dividirDecimales(falta, r.valor!, 2)
+        : falta
+      : null;
+  return { meta, lleva, falta, faltaEnviar };
+}
+
+/** "Lleva 2.627 USD de 3.000 USD · falta 373 USD" (para el aviso al cliente). */
+export function textoProgreso(p: NonNullable<ReturnType<typeof progresoMeta>>, queda: string) {
+  if (!p.lleva || !p.falta) return "";
+  const n = Number(p.falta);
+  return `Lleva: ${dineroEn(p.lleva, queda)} de ${dineroEn(p.meta, queda)}\n${n > 0 ? `Falta: ${dineroEn(p.falta, queda)}` : n === 0 ? "Completo" : `Se pasa por: ${dineroEn(p.falta.replace(/^-/, ""), queda)}`}`;
 }
 
 export function VariasTransferencias({
@@ -57,6 +107,11 @@ export function VariasTransferencias({
   onValor,
   incluida,
   onIncluida,
+  meta,
+  onMeta,
+  previo,
+  destino,
+  onDestino,
   repetidas,
   cargando,
   textoBoton,
@@ -72,6 +127,11 @@ export function VariasTransferencias({
   onValor: (v: string) => void;
   incluida: boolean; // la comisión ya viene sumada en lo enviado
   onIncluida: (v: boolean) => void;
+  meta: string; // cuánto va a recibir en total (opcional): se ve cuánto lleva y cuánto falta
+  onMeta: (v: string) => void;
+  previo: string | null; // lo que ya tiene en Cuentas por Pagar (enviado antes, en la moneda en que llega)
+  destino: DestinoVarias;
+  onDestino?: (d: DestinoVarias) => void; // sin esto no se ofrece mandarlo a Cuentas por Pagar
   repetidas: Record<string, string>; // referencia -> aviso de que ya está registrada
   cargando: boolean;
   textoBoton: string;
@@ -144,6 +204,11 @@ export function VariasTransferencias({
   const r = calcularResumen(filas, formula, valor, llega, queda, incluida);
   const hayRepetidas = filas.some((f) => f.referencia.trim() && repetidas[f.referencia.trim().toLowerCase()]);
   const leyendo = filas.some((f) => f.leyendo);
+  const aPagar = destino === "pagar";
+  // a Cuentas por Pagar va lo enviado tal cual: alcanza con que estén los montos
+  const montosListos = filas.length > 0 && r.cantidades.every((c) => !!c && /[1-9]/.test(c));
+  const p = progresoMeta(r, meta, previo, formula, incluida, llega, queda);
+  const conPrevio = !!previo && /[1-9]/.test(previo);
 
   return (
     <div className="cc-varias" role="group" aria-label="Varias transferencias">
@@ -242,9 +307,60 @@ export function VariasTransferencias({
           <span>Se le paga</span>
           <b>{r.resultado ? dineroEn(r.resultado, queda) : "—"}</b>
         </div>
-        {r.error && filas.some((f) => f.cantidad.trim()) && <small className="cc-varias-aviso">{r.error}</small>}
-        <button type="button" className="cc-guardar cc-varias-enviar" onClick={onCargar} disabled={!!r.error || hayRepetidas || leyendo || cargando} title={hayRepetidas ? "Hay una referencia ya registrada" : undefined}>
-          {cargando ? "Enviando…" : textoBoton}
+        <div className="cc-varias-linea meta">
+          <span>Va a recibir</span>
+          <input className="num" value={meta} onChange={(e) => onMeta(e.target.value)} inputMode="decimal" placeholder={`ej. 3.000 ${queda} (opcional)`} autoComplete="off" aria-label="Cuánto va a recibir en total" />
+        </div>
+        {p && (
+          <small className="cc-varias-progreso">
+            {p.lleva && p.falta ? (
+              <>
+                Lleva <b>{dineroEn(p.lleva, queda)}</b> de {dineroEn(p.meta, queda)}
+                {conPrevio ? ` (con ${dineroEn(previo!, llega)} que ya tenía en Cuentas por Pagar)` : ""} ·{" "}
+                {Number(p.falta) > 0 ? (
+                  <>
+                    falta <b>{dineroEn(p.falta, queda)}</b>
+                    {p.faltaEnviar && p.faltaEnviar !== p.falta ? ` (≈ ${dineroEn(p.faltaEnviar, llega)} por enviar)` : ""}
+                  </>
+                ) : Number(p.falta) === 0 ? (
+                  <b>completo</b>
+                ) : (
+                  `se pasa por ${dineroEn(p.falta.replace(/^-/, ""), queda)}`
+                )}
+              </>
+            ) : (
+              "Escribí la comisión o la tasa para ver cuánto lleva."
+            )}
+          </small>
+        )}
+        {!p && conPrevio && <small className="cc-varias-progreso">Ya tiene {dineroEn(previo!, llega)} enviados en Cuentas por Pagar.</small>}
+        {onDestino && (
+          <div className="cc-varias-destino">
+            <span>Va a</span>
+            <div className="cc-chips" role="radiogroup" aria-label="A dónde va">
+              <button type="button" role="radio" aria-checked={!aPagar} className={!aPagar ? "activo" : ""} onClick={() => onDestino("caja")}>
+                Caja (taquilla)
+              </button>
+              <button type="button" role="radio" aria-checked={aPagar} className={aPagar ? "activo" : ""} onClick={() => onDestino("pagar")}>
+                Cuentas por Pagar
+              </button>
+            </div>
+          </div>
+        )}
+        {aPagar && (
+          <small className="cc-varias-progreso">
+            Queda guardado en Cuentas por Pagar lo enviado ({dineroEn(r.totalEnviado, llega)}), sin descontar la comisión. Cuando complete, desde allá se envía a taquilla con la comisión.
+          </small>
+        )}
+        {r.error && !aPagar && filas.some((f) => f.cantidad.trim()) && <small className="cc-varias-aviso">{r.error}</small>}
+        <button
+          type="button"
+          className="cc-guardar cc-varias-enviar"
+          onClick={onCargar}
+          disabled={(aPagar ? !montosListos : !!r.error) || hayRepetidas || leyendo || cargando}
+          title={hayRepetidas ? "Hay una referencia ya registrada" : undefined}
+        >
+          {cargando ? "Enviando…" : aPagar ? "Enviar a Cuentas por Pagar" : textoBoton}
         </button>
       </div>
       <small>Pegá cada captura (Ctrl+V) y se llena su fila. Al enviar queda una sola confirmación por lo que se le paga, con cada transferencia guardada aparte.</small>

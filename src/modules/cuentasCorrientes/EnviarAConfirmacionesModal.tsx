@@ -35,6 +35,7 @@ export function EnviarAConfirmacionesModal({
   const [monto, setMonto] = useState(montoInicial ? conPuntos(montoInicial.replace(/^-/, "").replace(".", ",")) : "");
   const [formula, setFormula] = useState<Formula>("COMISION");
   const [valor, setValor] = useState("");
+  const [incluida, setIncluida] = useState(false); // lo enviado ya trae el % sumado (2.650 al 6% = 2.500)
   const [entrega, setEntrega] = useState(cuenta.moneda_codigo);
   const [canalId, setCanalId] = useState<number | null>(null);
   const [descripcion, setDescripcion] = useState("");
@@ -67,7 +68,7 @@ export function EnviarAConfirmacionesModal({
         : !nValor || !/[1-9]/.test(nValor)
           ? null
           : formula === "COMISION"
-            ? multiplicarDecimales(nMonto, factorDeComision(nValor, false), decimales)
+            ? multiplicarDecimales(nMonto, factorDeComision(nValor, incluida), decimales)
             : formula === "TASA"
               ? multiplicarDecimales(nMonto, nValor, decimales)
               : dividirDecimales(nMonto, nValor, decimales);
@@ -88,6 +89,7 @@ export function EnviarAConfirmacionesModal({
         monto: nMonto,
         formula,
         ...(formula !== "DIRECTO" ? { valor: nValor! } : {}),
+        ...(formula === "COMISION" && incluida ? { incluida: true } : {}),
         monedaEntregaId: moneda.id,
         canalId,
         descripcion: descripcion.trim() || undefined,
@@ -160,6 +162,12 @@ export function EnviarAConfirmacionesModal({
             </select>
           </label>
         </div>
+        {formula === "COMISION" && nValor && /[1-9]/.test(nValor) && (
+          <label className="cc-check">
+            <input type="checkbox" checked={incluida} onChange={(e) => setIncluida(e.target.checked)} />
+            Lo enviado ya trae el {formatearMonto(nValor)}% sumado
+          </label>
+        )}
         <div className="cxc-transf-metodo">
           <span>Medio de la confirmación</span>
           <div className="cc-chips" role="radiogroup" aria-label="Medio">
