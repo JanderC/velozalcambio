@@ -677,5 +677,9 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 
 /* Varias transferencias: cuánto va a recibir y a dónde va */
 .cc-varias-linea.meta input { max-width: 170px; margin-left: auto; }
+.cc-varias-cuenta { display: grid; gap: 4px; padding: 8px 10px; border-radius: 8px; background: #f4f7fb; font-size: 0.92rem; }
+.cc-varias-cuenta > div { display: flex; justify-content: space-between; gap: 12px; }
+.cc-varias-cuenta .total { font-weight: 700; color: var(--color-navy-dark); }
+.cc-varias-cuenta .falta { padding-top: 4px; border-top: 1px solid #dfe5ee; font-size: 1.02rem; font-weight: 700; color: var(--color-navy-dark); }
 .cc-varias-progreso { display: block; font-size: 0.8rem; color: #4b5563; margin: 2px 0 6px; line-height: 1.4; }
 .cc-varias-destino { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 0.85rem; flex-wrap: wrap; }

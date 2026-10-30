@@ -59,8 +59,10 @@ export function aplicarFormula(total: string, formula: FormulaGeneral, valor: st
 }
 
 /**
- * Cuánto lleva y cuánto le falta para lo que va a recibir (ej. 3.000 USD). Lo que ya tenía guardado en Cuentas por Pagar
- * (lo enviado antes, sin descontar) se suma a lo de ahora y se le aplica la misma comisión o tasa. null sin meta.
+ * Cuánto lleva y cuánto le falta para lo que va a retirar (ej. 3.000 USD). Lo que ya tenía guardado en Cuentas por Pagar
+ * (lo enviado antes, sin descontar) se suma a lo de ahora. null sin meta.
+ * Con comisión la cuenta sale de lo que retira: 6.100 + 6% (366) = 6.466 a recibir, y a eso se le van restando las
+ * transferencias. Con tasa se le aplica la tasa a lo enviado.
  */
 export function progresoMeta(
   r: { totalEnviado: string; valor: string | null },
@@ -75,6 +77,11 @@ export function progresoMeta(
   if (!meta || !/[1-9]/.test(meta)) return null;
   const bruto = sumarDecimales(previo ?? "0", r.totalEnviado);
   const conValor = !!r.valor && /[1-9]/.test(r.valor) && !(formula === "%" && llega !== queda);
+  if (conValor && formula === "%") {
+    const comision = multiplicarDecimales(meta, dividirDecimales(r.valor!, "100", 8)!, queda === "COP" ? 0 : 2);
+    const total = sumarDecimales(meta, comision);
+    return { meta, lleva: bruto as string | null, falta: sumarDecimales(total, `-${bruto}`) as string | null, faltaEnviar: null as string | null, cuenta: { pct: r.valor!, comision, total } };
+  }
   const lleva = conValor ? aplicarFormula(bruto, formula, r.valor!, queda === "COP" ? 0 : 2, incluida) : llega === queda ? bruto : null;
   const falta = lleva ? sumarDecimales(meta, `-${lleva}`) : null;
   // lo que falta, en lo que tiene que enviar (antes de la comisión o la tasa)
@@ -88,14 +95,18 @@ export function progresoMeta(
             : dividirDecimales(falta, r.valor!, 2)
         : falta
       : null;
-  return { meta, lleva, falta, faltaEnviar };
+  return { meta, lleva, falta, faltaEnviar, cuenta: null };
 }
 
-/** "Lleva 2.627 USD de 3.000 USD · falta 373 USD" (para el aviso al cliente). */
+/** "Lleva 2.627 USD de 3.000 USD · falta 373 USD" (para el aviso al cliente). Con comisión, la cuenta completa. */
 export function textoProgreso(p: NonNullable<ReturnType<typeof progresoMeta>>, queda: string) {
   if (!p.lleva || !p.falta) return "";
   const n = Number(p.falta);
-  return `Lleva: ${dineroEn(p.lleva, queda)} de ${dineroEn(p.meta, queda)}\n${n > 0 ? `Falta: ${dineroEn(p.falta, queda)}` : n === 0 ? "Completo" : `Se pasa por: ${dineroEn(p.falta.replace(/^-/, ""), queda)}`}`;
+  const cierre = n > 0 ? `Falta: ${dineroEn(p.falta, queda)}` : n === 0 ? "Completo" : `Se pasa por: ${dineroEn(p.falta.replace(/^-/, ""), queda)}`;
+  if (p.cuenta) {
+    return `Retira: ${dineroEn(p.meta, queda)}\nComisión ${formatearMonto(p.cuenta.pct)}%: ${dineroEn(p.cuenta.comision, queda)}\nTotal a recibir: ${dineroEn(p.cuenta.total, queda)}\nRecibido: ${dineroEn(p.lleva, queda)}\n${cierre}`;
+  }
+  return `Lleva: ${dineroEn(p.lleva, queda)} de ${dineroEn(p.meta, queda)}\n${cierre}`;
 }
 
 export function VariasTransferencias({
@@ -212,6 +223,11 @@ export function VariasTransferencias({
   const montosListos = filas.length > 0 && r.cantidades.every((c) => !!c && /[1-9]/.test(c));
   const p = progresoMeta(r, meta, previo, formula, incluida, llega, queda);
   const conPrevio = !!previo && /[1-9]/.test(previo);
+  const faltaRecibir = !!p?.cuenta && Number(p.falta) > 0;
+  // con lo que retira escrito, el % va encima: lo que se le paga sale de dividir, no de restar
+  useEffect(() => {
+    if (p?.cuenta && !incluida) onIncluida(true);
+  }, [!!p?.cuenta, incluida]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="cc-varias" role="group" aria-label="Varias transferencias">
@@ -296,25 +312,49 @@ export function VariasTransferencias({
             ))}
           </div>
           <input className="num" value={valor} onChange={(e) => onValor(e.target.value)} inputMode="decimal" placeholder={formula === "%" ? "ej. 6" : "tasa"} autoComplete="off" aria-label="Comisión o tasa sobre el total" />
-          <b className={formula === "%" ? "neg" : ""}>
-            {formula === "%" ? (r.descuento ? `− ${dineroEn(r.descuento, llega)}` : "—") : r.resultado && r.valor ? `${formula} ${formatearMonto(r.valor)}` : "—"}
-          </b>
+          {!p?.cuenta && (
+            <b className={formula === "%" ? "neg" : ""}>
+              {formula === "%" ? (r.descuento ? `− ${dineroEn(r.descuento, llega)}` : "—") : r.resultado && r.valor ? `${formula} ${formatearMonto(r.valor)}` : "—"}
+            </b>
+          )}
         </div>
-        {formula === "%" && r.valor && /[1-9]/.test(r.valor) && (
+        {formula === "%" && r.valor && /[1-9]/.test(r.valor) && !p?.cuenta && (
           <label className="cc-check cc-varias-incluida">
             <input type="checkbox" checked={incluida} onChange={(e) => onIncluida(e.target.checked)} />
             Lo enviado ya trae el {formatearMonto(r.valor)}% sumado
           </label>
         )}
-        <div className="cc-varias-linea pagar">
-          <span>Se le paga</span>
-          <b>{r.resultado ? dineroEn(r.resultado, queda) : "—"}</b>
-        </div>
         <div className="cc-varias-linea meta">
-          <span>Va a recibir</span>
-          <input className="num" value={meta} onChange={(e) => onMeta(e.target.value)} inputMode="decimal" placeholder={`ej. 3.000 ${queda} (opcional)`} autoComplete="off" aria-label="Cuánto va a recibir en total" />
+          <span>Va a retirar</span>
+          <input className="num" value={meta} onChange={(e) => onMeta(e.target.value)} inputMode="decimal" placeholder={`ej. 3.000 ${queda} (opcional)`} autoComplete="off" aria-label="Cuánto va a retirar en total" />
         </div>
-        {p && (
+        {p?.cuenta && (
+          <div className="cc-varias-cuenta">
+            <div>
+              <span>Comisión {formatearMonto(p.cuenta.pct)}%</span>
+              <b>+ {dineroEn(p.cuenta.comision, queda)}</b>
+            </div>
+            <div className="total">
+              <span>Total a recibir</span>
+              <b>{dineroEn(p.cuenta.total, queda)}</b>
+            </div>
+            {conPrevio && (
+              <div>
+                <span>Ya tenía en Cuentas por Pagar</span>
+                <b>{dineroEn(previo!, llega)}</b>
+              </div>
+            )}
+            <div>
+              <span>Recibido</span>
+              <b>{dineroEn(p.lleva!, queda)}</b>
+            </div>
+            <div className="falta">
+              <span>{Number(p.falta) > 0 ? "Falta por recibir" : Number(p.falta) === 0 ? "Completo" : "Se pasa por"}</span>
+              <b>{dineroEn(p.falta!.replace(/^-/, ""), queda)}</b>
+            </div>
+          </div>
+        )}
+        {p && !p.cuenta && (
           <small className="cc-varias-progreso">
             {p.lleva && p.falta ? (
               <>
@@ -337,6 +377,11 @@ export function VariasTransferencias({
           </small>
         )}
         {!p && conPrevio && <small className="cc-varias-progreso">Ya tiene {dineroEn(previo!, llega)} enviados en Cuentas por Pagar.</small>}
+        <div className="cc-varias-linea pagar">
+          <span>{faltaRecibir ? "Si se envía ahora, se le paga" : "Se le paga"}</span>
+          <b>{r.resultado ? dineroEn(r.resultado, queda) : "—"}</b>
+        </div>
+        {faltaRecibir && onDestino && !aPagar && <small className="cc-varias-progreso">Para esperar a que complete, elegí Cuentas por Pagar.</small>}
         {onDestino && (
           <div className="cc-varias-destino">
             <span>Va a</span>
