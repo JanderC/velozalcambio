@@ -79,6 +79,13 @@ export function NuevoClienteCobrarModal({
     if (!existente && nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
     if (!grupoFinal) return setError("Escribí el nombre del grupo nuevo.");
     if (!moneda) return setError("No se pudo cargar la moneda. Cerrá y volvé a abrir.");
+    // el cliente ya existe y no hay movimiento que anotar: se abre su hoja en la moneda elegida
+    if (existente && !conMovimiento && onClienteExistente) {
+      setEnviando(true);
+      const abierta = await onClienteExistente(existente.id, grupoFinal, moneda.id);
+      setEnviando(false);
+      if (abierta) return;
+    }
     if (conMovimiento) {
       if (!total) return setError("Escribí el monto del movimiento (o quitá el movimiento para registrar solo el cliente).");
       if (tasa.trim() && !conTasa) return setError("La tasa no es un número válido.");
@@ -151,13 +158,7 @@ export function NuevoClienteCobrarModal({
               Teléfono (para enviarle el saldo por WhatsApp)
               <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="ej. 314 349 8481" inputMode="tel" autoComplete="off" />
             </label>
-            <AvisoClienteExistente
-              lista={existentes.lista}
-              modulo={modulo}
-              onUsar={async (c) => {
-                if (!(await onClienteExistente?.(c.id, grupo === NUEVO ? grupoNuevo.trim() : grupo, moneda?.id))) setExistente(c);
-              }}
-            />
+            <AvisoClienteExistente lista={existentes.lista} modulo={modulo} onUsar={setExistente} />
           </>
         )}
         <label>
@@ -228,7 +229,7 @@ export function NuevoClienteCobrarModal({
             Cancelar
           </button>
           <button type="submit" className="cc-guardar" disabled={enviando}>
-            {enviando ? "Guardando…" : conMovimiento ? "Registrar cliente y movimiento" : "Registrar cliente"}
+            {enviando ? "Guardando…" : conMovimiento ? (existente ? "Registrar movimiento" : "Registrar cliente y movimiento") : existente ? "Abrir su cuenta" : "Registrar cliente"}
           </button>
         </div>
       </form>

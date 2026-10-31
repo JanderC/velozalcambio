@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { formatearMonto } from "../../utils/montos";
 
 const NOMBRE_MODULO: Record<string, string> = { CORRIENTE: "Cuentas Corrientes", POR_COBRAR: "Cuentas por Cobrar y Pagar", POR_PAGAR: "Cuentas por Pagar", CAJA: "Confirmaciones" };
@@ -41,33 +42,55 @@ export function useEnOtrosModulos(buscar: string, modulo: string, activo = true)
   return { lista, limpiar: () => setLista([]) };
 }
 
+/** Un cliente de otro módulo: se elige la moneda de su contabilidad y se lleva aquí. Viene puesta la de su cuenta. */
+function FilaEnOtroModulo({ c, monedas, etiqueta, puedeTraer, onTraer }: { c: CuentaCorrienteResumen; monedas: Moneda[]; etiqueta: string; puedeTraer: boolean; onTraer: (c: CuentaCorrienteResumen, monedaId: number) => void }) {
+  const [monedaId, setMonedaId] = useState(c.moneda_id);
+  return (
+    <li>
+      <span>
+        <b>{c.tercero_nombre}</b>
+        <small>
+          {NOMBRE_MODULO[c.modulo] ?? c.modulo}
+          {c.activo ? "" : " (cuenta eliminada)"}
+          {c.grupo_cobro ? ` · ${c.grupo_cobro}` : ""} · {c.moneda_codigo} · saldo {formatearMonto(c.saldo_actual)}
+          {c.tercero_telefono ? ` · ${c.tercero_telefono}` : ""}
+        </small>
+      </span>
+      <span className="cc-otros-modulos-acciones">
+        {puedeTraer && monedas.length > 0 && (
+          <select value={monedaId} onChange={(e) => setMonedaId(Number(e.target.value))} aria-label="Moneda de su contabilidad" title="Moneda en la que se le lleva la contabilidad aquí">
+            {monedas.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.codigo}
+              </option>
+            ))}
+          </select>
+        )}
+        {puedeTraer && (
+          <button type="button" onClick={() => onTraer(c, monedaId)} title="Se usa el mismo cliente, no se crea de nuevo; lo de allá no se toca">
+            {etiqueta}
+          </button>
+        )}
+        {c.activo && RUTA_MODULO[c.modulo] && <Link to={RUTA_MODULO[c.modulo]!}>Ver allá</Link>}
+      </span>
+    </li>
+  );
+}
+
 /** Los clientes de otro módulo, con el botón para llevarlos aquí sin crearlos de nuevo (lo de allá no se toca). */
-export function ListaEnOtrosModulos({ lista, etiqueta, puedeTraer, onTraer }: { lista: CuentaCorrienteResumen[]; etiqueta: string; puedeTraer: boolean; onTraer: (c: CuentaCorrienteResumen) => void }) {
-  if (lista.length === 0) return null;
+export function ListaEnOtrosModulos({ lista, etiqueta, puedeTraer, onTraer }: { lista: CuentaCorrienteResumen[]; etiqueta: string; puedeTraer: boolean; onTraer: (c: CuentaCorrienteResumen, monedaId: number) => void }) {
+  const [monedas, setMonedas] = useState<Moneda[]>([]);
+  const hay = lista.length > 0;
+  useEffect(() => {
+    if (hay && !monedas.length) getMonedas().then(setMonedas).catch(() => {});
+  }, [hay, monedas.length]);
+  if (!hay) return null;
   return (
     <div className="cc-otros-modulos">
       <p>Está registrado en otro módulo:</p>
       <ul>
         {lista.map((c) => (
-          <li key={c.tercero_id}>
-            <span>
-              <b>{c.tercero_nombre}</b>
-              <small>
-                {NOMBRE_MODULO[c.modulo] ?? c.modulo}
-                {c.activo ? "" : " (cuenta eliminada)"}
-                {c.grupo_cobro ? ` · ${c.grupo_cobro}` : ""} · {c.moneda_codigo} · saldo {formatearMonto(c.saldo_actual)}
-                {c.tercero_telefono ? ` · ${c.tercero_telefono}` : ""}
-              </small>
-            </span>
-            <span className="cc-otros-modulos-acciones">
-              {puedeTraer && (
-                <button type="button" onClick={() => onTraer(c)} title="Se usa el mismo cliente, no se crea de nuevo; lo de allá no se toca">
-                  {etiqueta}
-                </button>
-              )}
-              {c.activo && RUTA_MODULO[c.modulo] && <Link to={RUTA_MODULO[c.modulo]!}>Ver allá</Link>}
-            </span>
-          </li>
+          <FilaEnOtroModulo key={c.tercero_id} c={c} monedas={monedas} etiqueta={etiqueta} puedeTraer={puedeTraer} onTraer={onTraer} />
         ))}
       </ul>
     </div>

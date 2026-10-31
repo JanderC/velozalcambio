@@ -283,7 +283,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
 
       {error && <p className="cxc-error">{error}</p>}
       {!cuentas && !error && <p className="cxc-aviso">Cargando…</p>}
-      <ListaEnOtrosModulos lista={enOtros.lista} etiqueta="Llevar aquí" puedeTraer={puedeEditar} onTraer={(c) => void llevarCliente(c.tercero_id)} />
+      <ListaEnOtrosModulos lista={enOtros.lista} etiqueta="Llevar aquí" puedeTraer={puedeEditar} onTraer={(c, monedaId) => void llevarCliente(c.tercero_id, undefined, monedaId)} />
 
       {verLesDebo && lesDebo.length > 0 && (
         <section className="cxc-les-debo" aria-label="Clientes a los que les debo">

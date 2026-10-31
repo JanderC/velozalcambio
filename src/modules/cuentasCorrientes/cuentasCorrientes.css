@@ -606,6 +606,7 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-otros-modulos-acciones { display: inline-flex; align-items: center; gap: 8px; }
 .cc-otros-modulos-acciones button { padding: 5px 10px; border: none; border-radius: 6px; background: var(--color-navy); color: white; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
 .cc-otros-modulos-acciones a { font-size: 0.78rem; color: var(--color-navy); }
+.cc-otros-modulos-acciones select { padding: 4px 6px; border: 1px solid #d7dbe2; border-radius: 6px; background: white; font: inherit; font-size: 0.78rem; }
 
 /* Mover un movimiento a otro cliente */
 .cc-mover-lista { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 10px; }

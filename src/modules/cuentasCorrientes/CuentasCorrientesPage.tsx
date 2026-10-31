@@ -141,12 +141,12 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   const moduloAqui = modo === "cajas" ? "CAJA" : "CORRIENTE";
   const enOtros = useEnOtrosModulos(buscar, moduloAqui, modo !== "cobrar");
   const enOtrosModulos = enOtros.lista;
-  async function abrirCuentaAqui(c: CuentaCorrienteResumen) {
+  async function abrirCuentaAqui(c: CuentaCorrienteResumen, monedaId = c.moneda_id) {
     try {
       const nueva = await crearCuentaCorriente(
         modo === "cajas"
-          ? { terceroId: c.tercero_id, modulo: "CAJA", monedaId: c.moneda_id, canalId: canalId || c.canal_id, usarExistente: true }
-          : { terceroId: c.tercero_id, modulo: "CORRIENTE", monedaId: c.moneda_id }
+          ? { terceroId: c.tercero_id, modulo: "CAJA", monedaId, canalId: canalId || c.canal_id, usarExistente: true }
+          : { terceroId: c.tercero_id, modulo: "CORRIENTE", monedaId }
       );
       enOtros.limpiar();
       await cargar();
@@ -344,7 +344,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                     : "Todavía no hay cuentas. Creá la primera con «Nueva cuenta»."}
             </p>
           )}
-          <ListaEnOtrosModulos lista={enOtrosModulos} etiqueta={modo === "cajas" ? "Llevar a Confirmaciones" : "Llevar aquí"} puedeTraer={puedeCrear || modo === "cajas"} onTraer={(c) => void abrirCuentaAqui(c)} />
+          <ListaEnOtrosModulos lista={enOtrosModulos} etiqueta={modo === "cajas" ? "Llevar a Confirmaciones" : "Llevar aquí"} puedeTraer={puedeCrear || modo === "cajas"} onTraer={(c, monedaId) => void abrirCuentaAqui(c, monedaId)} />
           <ul className="cc-cuentas">
             {filas.map(({ c, todas }) => (
               <li key={c.id}>
