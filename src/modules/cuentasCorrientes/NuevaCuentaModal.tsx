@@ -224,6 +224,11 @@ export function NuevaCuentaModal({
     const canal = canales.find((c) => c.nombre === m.medio);
     if (canal) onElegirMedio?.(canal.id);
     if (m.medio === "WESTERN_UNION" && referenciaLeida && /^\d{8,12}$/.test(referenciaLeida.replace(/\D/g, ""))) setMovMtcn(referenciaLeida.replace(/\D/g, ""));
+    // ya estaba elegida la moneda que quiere el cliente: la captura no se la cambia
+    if (sigueLaRegla(metodo) && !movResta && m.medio === medio?.nombre && formulaDeOperacion(codigoMedio, destinoElegido) === "dividir") {
+      elegirEntrega(destinoElegido);
+      return nombreMetodo(metodo);
+    }
     const claveTasa = tasaDelMetodo(metodo);
     if (claveTasa) {
       const v = tablero?.actual?.valores[claveTasa];

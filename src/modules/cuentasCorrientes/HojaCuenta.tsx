@@ -1765,7 +1765,8 @@ function FilaNueva({
   // lo que llega es la moneda del medio; si es la misma de la cuenta, bolívares (o pesos si la cuenta no es en pesos).
   const delMedio = MONEDA_DEL_MEDIO[medioMov.nombre];
   const codigoDivision =
-    (otraMoneda ? null : cobroCodigo) ??
+    // (la moneda de cobro no aplica si por este medio llega otra: un cliente que cobra en pesos y manda bolívares)
+    (otraMoneda || (enConfirmaciones && delMedio && delMedio !== codigoMonto && delMedio !== cobroCodigo) ? null : cobroCodigo) ??
     (enConfirmaciones
       ? delMedio && delMedio !== codigoMonto
         ? delMedio
@@ -1903,7 +1904,7 @@ function FilaNueva({
     conTasa && !esPorcentaje && !enCobro && nCantidad && nTasa && codigoMonto === "COP" ? monedaDeLaTasa(nTasa, referencia) : null;
   const movimientoCaja = !monto
     ? null
-    : enCobro && cobroCodigo && nCantidad
+    : enCobro && cobroCodigo && cobroCodigo === codigoDivision && nCantidad
       ? { codigo: cobroCodigo, cantidad: sinSigno(nCantidad) }
       : convierte && conTasa && nCantidad
         ? { codigo: monedaMov, cantidad: sinSigno(nCantidad) }
@@ -1957,7 +1958,7 @@ function FilaNueva({
   // qué dice la regla, solo si es lo que está puesto (a mano se puede haber elegido otra cuenta)
   const notaRegla =
     formulaRegla === "dividir" && enCobro
-      ? `Llega en ${delMedio} y quiere ${entregaEn}: se divide por la tasa.`
+      ? `Llega en ${delMedio} y quiere ${entregaEn}: se divide por la tasa.${tasa.trim() ? "" : " Falta escribir la tasa."}`
       : formulaRegla === "multiplicar" && !enCobro && !esPorcentaje
         ? `Llega en ${delMedio} y quiere ${entregaEn}: se multiplica por la tasa.`
         : formulaRegla === "comision" && esPorcentaje

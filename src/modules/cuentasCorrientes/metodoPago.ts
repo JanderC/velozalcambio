@@ -64,18 +64,22 @@ export function esFacturaBancolombia(d: DatosComprobante | null) {
 // ---------- Qué cuenta se hace: sale de lo que llega y de la moneda que quiere el cliente ----------
 export type FormulaOperacion = "dividir" | "multiplicar" | "comision";
 /**
- * Pesos a bolívares, dólares o USDT se divide; pesos a pesos (retiro en efectivo) lleva comisión; bolívares a pesos se
- * multiplica. Lo demás no tiene regla: null, y queda como esté.
+ * Pesos a bolívares, dólares o USDT se divide; pesos a pesos (retiro en efectivo) lleva comisión; bolívares a pesos
+ * (efectivo o transferencia) se multiplica; bolívares a dólares o USDT se divide. Lo demás no tiene regla: null, y queda como esté.
  */
 export function formulaDeOperacion(llega: string | null | undefined, entrega: string): FormulaOperacion | null {
   if (llega === "COP") return entrega === "COP" ? "comision" : "dividir";
-  if (llega === "VES" && entrega === "COP") return "multiplicar";
+  if (llega === "VES") return entrega === "COP" ? "multiplicar" : entrega === "USD" || entrega === "USDT" ? "dividir" : null;
   return null;
 }
 /** Remitly, Western y Bancolombia internacional llegan por esos medios, pero tienen su propia comisión. */
 export const sigueLaRegla = (m: Metodo) => m === "NEQUI" || m === "BANCOLOMBIA" || m === "BOLIVARES";
-/** La tasa del día de esa operación. Con pesos que llegan, se le vende al cliente la moneda que pide. */
+/**
+ * La tasa del día de esa operación. Con pesos que llegan, se le vende al cliente la moneda que pide.
+ * De bolívares a dólares o USDT el tablero no tiene tasa (la de Bs es contra pesos): null, y se escribe a mano.
+ */
 export function tasaDeOperacion(llega: string | null | undefined, entrega: string, v: ValoresTablero | undefined) {
+  if (llega === "VES" && entrega !== "COP") return null;
   const claves: Record<string, string[]> = { VES: ["bs"], USD: ["dolar.venta.bancolombia", "dolar.venta.100-50"], USDT: ["usdt.venta"], EUR: ["euro.venta"] };
   const clave = claves[(llega === "COP" ? entrega : llega) ?? ""]?.find((k) => v?.[k]);
   return clave ? v![clave] : null;
