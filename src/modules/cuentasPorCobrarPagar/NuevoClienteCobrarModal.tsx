@@ -89,7 +89,7 @@ export function NuevoClienteCobrarModal({
       const cuenta = await crearCuentaCorriente(datos).catch((err) => {
         // ya hay un cliente con ese nombre (en otro módulo): ¿es el mismo?
         if (!(err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
-        if (!window.confirm(`Ya hay un cliente llamado "${nombre.trim()}" en el sistema.\n\n¿Es la misma persona? Aceptar: se usa ese cliente y se le abre su cuenta aquí.\nCancelar: no se registra nada (si es otra persona, escribí el nombre distinto).`)) throw err;
+        if (!window.confirm(`${err.message}.\n\n¿Es la misma persona? Aceptar: se usa ese cliente y se le abre su cuenta aquí.\nCancelar: no se registra nada (si es otra persona, corregí el nombre o el teléfono).`)) throw err;
         return crearCuentaCorriente({ ...datos, usarExistente: true });
       });
       if (conMovimiento && total) {
@@ -138,7 +138,7 @@ export function NuevoClienteCobrarModal({
               Teléfono (para enviarle el saldo por WhatsApp)
               <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="ej. 314 349 8481" inputMode="tel" autoComplete="off" />
             </label>
-            <AvisoClienteExistente lista={existentes.lista} modulo={modulo} onDescartar={existentes.descartar} onUsar={setExistente} />
+            <AvisoClienteExistente lista={existentes.lista} modulo={modulo} onUsar={setExistente} />
           </>
         )}
         <label>

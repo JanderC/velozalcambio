@@ -335,7 +335,7 @@ export function NuevaCuentaModal({
       const cuenta = await crearCuentaCorriente(datos).catch((err) => {
         // ya hay un cliente con ese nombre: ¿es el mismo?
         if (!(err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
-        if (!window.confirm(`Ya hay un cliente llamado "${nombre.trim()}" en el sistema.\n\n¿Es la misma persona? Aceptar: se usa ese cliente.\nCancelar: no se registra nada.`)) throw err;
+        if (!window.confirm(`${err.message}.\n\n¿Es la misma persona? Aceptar: se usa ese cliente.\nCancelar: no se registra nada.`)) throw err;
         return crearCuentaCorriente({ ...datos, usarExistente: true });
       });
       tocado.current = { nombre: false, telefono: false, cedula: false };
@@ -415,9 +415,9 @@ export function NuevaCuentaModal({
         // Se pregunta si es el mismo y, si lo es, el movimiento se le registra a él con este medio.
         if (!(err instanceof ApiError && err.status === 409 && /^Ya existe/.test(err.message))) throw err;
         const esElMismo = window.confirm(
-          `Ya hay un cliente llamado "${nombre.trim()}" en el sistema.\n\n` +
+          `${err.message}.\n\n` +
             `¿Es la misma persona? Aceptar: el movimiento se le registra a ese cliente${etiquetaMedio ? ` por ${etiquetaMedio}` : ""}.\n` +
-            `Cancelar: no se registra nada (si es otra persona, escribí el nombre distinto, por ejemplo con el segundo apellido).`
+            `Cancelar: no se registra nada (si es otra persona, corregí el nombre o el teléfono).`
         );
         if (!esElMismo) throw err;
         return crearCuentaCorriente({ ...datosCuenta, usarExistente: true });
@@ -582,7 +582,6 @@ export function NuevaCuentaModal({
             <AvisoClienteExistente
               lista={existentes.lista}
               modulo={modulo}
-              onDescartar={existentes.descartar}
               onUsar={(c) => {
                 setTercero({ id: c.id, nombre: c.nombre, telefono: c.telefono, identificacion: c.identificacion, tipo: c.tipo as Tercero["tipo"], created_at: "" });
                 setModo("existente");

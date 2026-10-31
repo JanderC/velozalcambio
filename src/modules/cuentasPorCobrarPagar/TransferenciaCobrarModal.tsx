@@ -365,7 +365,6 @@ export function TransferenciaCobrarModal({
           <AvisoClienteExistente
             lista={deOtrosModulos}
             modulo="POR_COBRAR"
-            onDescartar={buscados.descartar}
             onUsar={(c) => {
               setExistente(c);
               setNombre(c.nombre);
