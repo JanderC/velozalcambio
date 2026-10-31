@@ -169,3 +169,6 @@
 .cxc-enviar { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: none; border-radius: 8px; background: #b91c1c; color: white; font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
 .cxc-enviar:hover { background: #991b1b; }
 @media (max-width: 720px) { .cxc-hero-debo { justify-items: start; text-align: left; } .cxc-les-debo { margin: 12px 10px 0; } }
+/* lo buscado que está en otro módulo: alineado con el buscador */
+.cxc-page .cc-otros-modulos { margin: 12px 40px 0; }
+@media (max-width: 900px) { .cxc-page .cc-otros-modulos { margin: 12px 14px 0; } }
