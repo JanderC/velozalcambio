@@ -53,6 +53,34 @@ export function detectarMetodo(d: DatosComprobante | null): Metodo | null {
   return null;
 }
 
+/** Recibo de una factura pagada por Bancolombia: no lleva comisión. */
+export function esFacturaBancolombia(d: DatosComprobante | null) {
+  if (!d) return false;
+  const t = `${d.texto ?? ""} ${d.banco ?? ""}`.toLowerCase();
+  const porBancolombia = d.metodo === "BANCOLOMBIA" || /bancolombia/.test(t);
+  return porBancolombia && (d.metodo === "PAGO_FACTURA" || /factura|pago de servicios|convenio/.test(t));
+}
+
+// ---------- Qué cuenta se hace: sale de lo que llega y de la moneda que quiere el cliente ----------
+export type FormulaOperacion = "dividir" | "multiplicar" | "comision";
+/**
+ * Pesos a bolívares, dólares o USDT se divide; pesos a pesos (retiro en efectivo) lleva comisión; bolívares a pesos se
+ * multiplica. Lo demás no tiene regla: null, y queda como esté.
+ */
+export function formulaDeOperacion(llega: string | null | undefined, entrega: string): FormulaOperacion | null {
+  if (llega === "COP") return entrega === "COP" ? "comision" : "dividir";
+  if (llega === "VES" && entrega === "COP") return "multiplicar";
+  return null;
+}
+/** Remitly, Western y Bancolombia internacional llegan por esos medios, pero tienen su propia comisión. */
+export const sigueLaRegla = (m: Metodo) => m === "NEQUI" || m === "BANCOLOMBIA" || m === "BOLIVARES";
+/** La tasa del día de esa operación. Con pesos que llegan, se le vende al cliente la moneda que pide. */
+export function tasaDeOperacion(llega: string | null | undefined, entrega: string, v: ValoresTablero | undefined) {
+  const claves: Record<string, string[]> = { VES: ["bs"], USD: ["dolar.venta.bancolombia", "dolar.venta.100-50"], USDT: ["usdt.venta"], EUR: ["euro.venta"] };
+  const clave = claves[(llega === "COP" ? entrega : llega) ?? ""]?.find((k) => v?.[k]);
+  return clave ? v![clave] : null;
+}
+
 // ---------- Las comisiones de cada método (configurables en Tasas) ----------
 export interface CampoComision {
   clave: string;

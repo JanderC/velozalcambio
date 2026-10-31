@@ -10,7 +10,7 @@ import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, montoParte, type PagoElegido } from "./PagoConfirmacion";
-import { METODOS, comisionPara, detectarMetodo, nombreMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
+import { METODOS, comisionPara, detectarMetodo, esFacturaBancolombia, formulaDeOperacion, nombreMetodo, sigueLaRegla, tasaDeOperacion, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita, useTablero } from "../tasas/tablero";
 
 // Confirmaciones: el medio se elige arriba (Bolívares, Zelle...) y define en qué moneda se mueve
@@ -134,7 +134,10 @@ export function NuevaCuentaModal({
   // Al pasar a comisión viene puesta la última usada; al salir de comisión, el % no sirve como tasa y se limpia
   function cambiarFormula(formula: "tasa" | "dividir" | "comision") {
     if (formula === movFormula) return;
+    // al dividir viene puesta la tasa del día de la moneda que quiere el cliente
+    const delDia = modulo === "CAJA" && formula === "dividir" ? tasaDeOperacion(codigoMedio, movDestino, tablero?.actual?.valores) : null;
     if (formula === "comision") setMovValor(ultimaComision());
+    else if (delDia) setMovValor(escrita(delDia));
     else if (movFormula === "comision") setMovValor("");
     setMovFormula(formula);
   }
@@ -195,8 +198,26 @@ export function NuevaCuentaModal({
   // ---------- Confirmaciones: la captura dice el método, y con él el medio y la comisión ----------
   const tablero = useTablero();
   const [preguntaMetodo, setPreguntaMetodo] = useState<{ total: string | null; referencia: string | null } | null>(null);
+  const metodoAplicado = useRef<Metodo | null>(null);
+  // Confirmaciones, Compra: al elegir la moneda que quiere el cliente, la cuenta se pone sola
+  function elegirEntrega(codigo: string) {
+    const propio = metodoAplicado.current && !sigueLaRegla(metodoAplicado.current);
+    const regla = modulo === "CAJA" && !movResta && !propio ? formulaDeOperacion(codigoMedio, codigo) : null;
+    if (!regla) return (movFormula === "dividir" ? setMovDestino : movFormula === "comision" ? setMovDestinoComision : setMovDestinoTasa)(codigo);
+    const valores = tablero?.actual?.valores;
+    const delDia = tasaDeOperacion(codigoMedio, codigo, valores);
+    if (regla === "comision") {
+      setMovDestinoComision(codigo);
+      setMovValor(comisionPara("BANCOLOMBIA", nMovCantidad, valores)?.pct ?? ultimaComision());
+    } else {
+      (regla === "dividir" ? setMovDestino : setMovDestinoTasa)(codigo);
+      setMovValor(delDia ? escrita(delDia) : "");
+    }
+    setMovFormula(regla === "multiplicar" ? "tasa" : regla);
+  }
   function aplicarMetodo(metodo: Metodo, total: string | null, referenciaLeida: string | null) {
     setPreguntaMetodo(null);
+    metodoAplicado.current = metodo;
     const m = METODOS.find((x) => x.clave === metodo)!;
     const canal = canales.find((c) => c.nombre === m.medio);
     if (canal) onElegirMedio?.(canal.id);
@@ -242,9 +263,12 @@ export function NuevaCuentaModal({
       // Confirmaciones: qué método es (y su comisión); si no se reconoce, se pregunta
       let detectado = false;
       if (modulo === "CAJA" && !sumando) {
-        const metodo = detectarMetodo(l.primera);
+        const factura = esFacturaBancolombia(l.primera);
+        const metodo: Metodo | null = factura ? "BANCOLOMBIA" : detectarMetodo(l.primera);
+        if (factura) setMovSinComision(true);
         if (metodo) {
-          partes.unshift(aplicarMetodo(metodo, l.total, l.referencias[0] ?? null));
+          const texto = aplicarMetodo(metodo, l.total, l.referencias[0] ?? null);
+          partes.unshift(factura ? "Pago de factura por Bancolombia: sin comisión" : texto);
           detectado = true;
         } else setPreguntaMetodo({ total: l.total, referencia: l.referencias[0] ?? null });
       }
@@ -746,12 +770,13 @@ export function NuevaCuentaModal({
               {(
                 <label className="cc-primer-mov-destino">
                   ¿Qué moneda quiere el cliente? Se entrega en
-                  <select value={destinoElegido} onChange={(e) => (movFormula === "dividir" ? setMovDestino : movFormula === "comision" ? setMovDestinoComision : setMovDestinoTasa)(e.target.value)}>
+                  <select value={destinoElegido} onChange={(e) => elegirEntrega(e.target.value)}>
                     {/* todas las monedas, menos la que ya trae el medio (no habría nada que convertir) */}
                     {monedas
                       // al dividir no se lista la moneda del medio (no habría nada que dividir); al multiplicar sí,
                       // porque por Nequi o Bancolombia se anota la cantidad vendida × tasa = pesos
-                      .filter((m) => movFormula !== "dividir" || m.codigo !== codigoMedio || m.codigo === destinoElegido)
+                      // (en Confirmaciones sí: pesos a pesos es un retiro, con comisión)
+                      .filter((m) => modulo === "CAJA" || movFormula !== "dividir" || m.codigo !== codigoMedio || m.codigo === destinoElegido)
                       .map((m) => (
                         <option key={m.id} value={m.codigo}>
                           {m.nombre} ({m.codigo})
@@ -791,7 +816,7 @@ export function NuevaCuentaModal({
             {movFormula === "comision" && (
               <label className="cc-sin-comision">
                 <input type="checkbox" checked={movSinComision} onChange={(e) => setMovSinComision(e.target.checked)} />
-                Familiar o amigo: sin comisión
+                Familiar o amigo o pago de factura: sin comisión
               </label>
             )}
             <small className="cc-primer-mov-nota">

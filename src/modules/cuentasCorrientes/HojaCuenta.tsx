@@ -38,7 +38,7 @@ import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
 import { EnviarAConfirmacionesModal } from "./EnviarAConfirmacionesModal";
 import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
-import { METODOS, comisionPara, detectarMetodo, nombreMetodo, referenciaDelMetodo, tasaDelMetodo, type Metodo } from "./metodoPago";
+import { METODOS, comisionPara, detectarMetodo, esFacturaBancolombia, formulaDeOperacion, nombreMetodo, referenciaDelMetodo, sigueLaRegla, tasaDeOperacion, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita } from "../tasas/tablero";
 import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, avisoDePagoParcial, montoParte, type PagoElegido } from "./PagoConfirmacion";
@@ -140,11 +140,13 @@ function Monto({ valor, simbolo = "$" }: { valor: string; simbolo?: string }) {
 }
 
 // Confirmaciones: las operaciones que se hacen, iguales para todos los clientes (no lo último que se le escribió a cada uno)
+const REFERENCIA_FACTURA = "Pago de factura";
 export const OPERACIONES_CONFIRMACIONES = ["Compra", "Venta"].flatMap((sentido) => ["pesos", "bolívares", "dólares", "USDT", "euros"].map((moneda) => `${sentido} de ${moneda}`));
-// Confirmaciones: al elegir otro medio, la moneda en que se entrega solo cambia sola cuando ese medio se paga en pesos
-// (Bancolombia, Nequi, Western Union). Por USDT, Zelle o Bolívares queda la de la cuenta del cliente: con una tasa de
-// miles el total son pesos, y si se pusiera sola la moneda del medio quedaría anotado como 310.000 USDT. Se elige a mano.
-const ENTREGA_DEL_MEDIO: Record<string, string> = { BANCOLOMBIA: "COP", NEQUI: "COP", WESTERN_UNION: "COP" };
+// Confirmaciones: al elegir otro medio, la moneda en que se entrega solo cambia sola por Western Union (se paga en pesos).
+// Por los demás queda la de la cuenta del cliente: el que trabaja en bolívares y manda por Bancolombia quiere bolívares,
+// y por USDT o Zelle, con una tasa de miles el total son pesos (quedaría anotado como 310.000 USDT). Se elige a mano.
+const ENTREGA_DEL_MEDIO: Record<string, string> = { WESTERN_UNION: "COP" };
+const MONEDA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "USD", ZELLE: "USD" };
 /** "WESTERN_UNION" -> "Western Union". */
 const nombreDeMedio = (nombre: string) =>
   nombre === "SIN_BANCO"
@@ -1476,7 +1478,7 @@ function FilaNueva({
   // Confirmaciones, "Se entrega en": llega en una moneda y se le entrega en otra (USDT × tasa = bolívares), igual que
   // al crear el cliente. Si no es la moneda de esta cuenta, el movimiento queda en la cuenta del mismo cliente en esa
   // moneda (se le abre sola si no la tiene). El cliente se registra una vez con una moneda, pero puede hacer la
-  // operación que quiera: al elegir otro medio viene puesta la moneda de ese medio (Bancolombia y Nequi, pesos).
+  // operación que quiera: viene puesta la de su cuenta y se cambia acá.
   const puedeElegirEntrega = enConfirmaciones;
   const entregaPorDefecto = enConfirmaciones && medioCambiado ? (ENTREGA_DEL_MEDIO[medioMov.nombre] ?? cuenta.moneda_codigo) : cuenta.moneda_codigo;
   const [entregaEn, setEntregaEn] = useState(entregaPorDefecto);
@@ -1538,6 +1540,8 @@ function FilaNueva({
   const [comisionIncluida, setComisionIncluida] = useState(false);
   // Familiar o amigo: en este movimiento no se cobra comisión (lo que entra es lo que sale)
   const [sinComision, setSinComision] = useState(false);
+  // Pago de factura por Bancolombia: no lleva comisión
+  const [esFactura, setEsFactura] = useState(false);
   // Leer la imagen del comprobante: llena el número de referencia, el monto y la fecha
   const [leyendo, setLeyendo] = useState(false);
   const [avisoLectura, setAvisoLectura] = useState<string | null>(null);
@@ -1575,8 +1579,12 @@ function FilaNueva({
   const [preguntaMetodo, setPreguntaMetodo] = useState<{ total: string | null; referencia: string | null } | null>(null);
   // lo que dice la captura: "Aquí fue un pago por Bancolombia" (en todos los módulos)
   const [metodoDetectado, setMetodoDetectado] = useState<string | null>(null);
+  // el método de la captura, y cada cuánto hay que volver a poner la cuenta (ver el efecto de la regla, más abajo)
+  const metodoAplicado = useRef<Metodo | null>(null);
+  const [pedidoRegla, setPedidoRegla] = useState(0);
   function aplicarMetodo(metodo: Metodo, total: string | null, referenciaLeida: string | null) {
     setPreguntaMetodo(null);
+    metodoAplicado.current = metodo;
     const m = METODOS.find((x) => x.clave === metodo)!;
     // el medio de arriba se elige solo
     const medio = medios.find((x) => x.nombre === m.medio);
@@ -1584,6 +1592,15 @@ function FilaNueva({
     if (medio) onElegirMedio?.(medio.id);
     // Western: la referencia es el MTCN
     if (m.medio === "WESTERN_UNION" && referenciaLeida && /^\d{8,12}$/.test(referenciaLeida.replace(/\D/g, ""))) setMtcn(referenciaLeida.replace(/\D/g, ""));
+    // Compra por Bancolombia, Nequi o bolívares: la cuenta depende de la moneda que quiere el cliente
+    if (sigueLaRegla(metodo) && !resta && formulaDeOperacion(MONEDA_DEL_MEDIO[m.medio], entregaEn)) {
+      if (total) {
+        setCantidad(formatearMonto(total));
+        setMontoDirecto("");
+      }
+      setPedidoRegla((n) => n + 1);
+      return nombreMetodo(metodo);
+    }
     // bolívares y USDT: lo que llega va en la cantidad, con la tasa del día
     const claveTasa = tasaDelMetodo(metodo);
     if (claveTasa) {
@@ -1659,9 +1676,12 @@ function FilaNueva({
       }
       // Qué es la captura (Bancolombia, Nequi, Zelle…): se avisa y la referencia queda "Pago de Bancolombia"
       if (!sumando) {
-        const metodo = detectarMetodo(l.primera);
+        const factura = enConfirmaciones && esFacturaBancolombia(l.primera);
+        const metodo: Metodo | null = factura ? "BANCOLOMBIA" : detectarMetodo(l.primera);
         setMetodoDetectado(metodo ? nombreMetodo(metodo) : null);
-        if (metodo) alCambiarReferencia(referenciaDelMetodo(metodo));
+        if (metodo) alCambiarReferencia(factura ? REFERENCIA_FACTURA : referenciaDelMetodo(metodo));
+        setEsFactura(factura);
+        if (factura) setEntregaEn("COP");
         // Confirmaciones: además el medio de arriba y su comisión; si no se reconoce, se pregunta
         if (enConfirmaciones) {
           if (metodo) partes.unshift(aplicarMetodo(metodo, l.total, l.referencias[0] ?? null));
@@ -1743,7 +1763,6 @@ function FilaNueva({
   // Dividir: lo que llega en otra moneda se divide por la tasa y queda en la moneda de la cuenta (82.500 COP ÷ 3.280 = 25,15 USD).
   // Con moneda de cobro configurada es esa. En Confirmaciones se puede dividir siempre, como al crear el cliente:
   // lo que llega es la moneda del medio; si es la misma de la cuenta, bolívares (o pesos si la cuenta no es en pesos).
-  const MONEDA_DEL_MEDIO: Record<string, string> = { BOLIVARES: "VES", BANCOLOMBIA: "COP", NEQUI: "COP", USDT: "USDT", WESTERN_UNION: "USD", ZELLE: "USD" };
   const delMedio = MONEDA_DEL_MEDIO[medioMov.nombre];
   const codigoDivision =
     (otraMoneda ? null : cobroCodigo) ??
@@ -1814,7 +1833,7 @@ function FilaNueva({
   const nCantidad = cantidad.trim() ? leerNumero(cantidad) : null;
   // Lo escrito en la casilla (ej. "3" si es comisión) y el multiplicador que se guarda (3% -> "0.03")
   // (sin comisión: es como si en la casilla dijera 0, sin tocar el % habitual del cliente)
-  const exonerado = sinComision && esPorcentaje && comisionDescuenta;
+  const exonerado = (sinComision || esFactura) && esPorcentaje && comisionDescuenta;
   const nEscrita = exonerado ? "0" : tasa.trim() ? leerNumero(tasa.replace(/%/g, "")) : null;
   const fraccion = nEscrita && esPorcentaje ? multiplicarDecimales(nEscrita, "0.01", 8) : null;
   // con comisión descontada el multiplicador es lo que queda: 4% -> 0.96
@@ -1897,6 +1916,55 @@ function FilaNueva({
   const monedaEntrega = monedas.find((m) => m.codigo === (enConfirmaciones ? entregaEn : recibeEn));
   const monedaCantidad = monedas.find((m) => m.codigo === monedaMov);
   const simbolo = codigoMonto === "COP" ? "$" : "";
+
+  // Confirmaciones, Compra: al pegar la captura, o al cambiar el medio o la moneda que quiere el cliente, la cuenta se pone
+  // sola (las muchachas se equivocaban eligiéndola). Después se puede cambiar a mano: se repone solo si cambia uno de esos.
+  const formulaRegla = enConfirmaciones && !resta ? formulaDeOperacion(delMedio, entregaEn) : null;
+  const parRegla = useRef(`${delMedio}|${entregaEn}`);
+  const pedidoVisto = useRef(0);
+  useEffect(() => {
+    const par = `${delMedio}|${entregaEn}`;
+    const toca = par !== parRegla.current || pedidoRegla !== pedidoVisto.current;
+    parRegla.current = par;
+    pedidoVisto.current = pedidoRegla;
+    if (!toca || !formulaRegla || (metodoAplicado.current && !sigueLaRegla(metodoAplicado.current))) return;
+    const valores = tablero?.actual?.valores;
+    const delDia = tasaDeOperacion(delMedio, entregaEn, valores);
+    // el cliente que tiene su propia tasa de cobro la conserva
+    const tasaPropia = !otraMoneda && cobroCodigo === delMedio ? formatearMonto(cuenta.tasa_cobro!) : "";
+    const puesta =
+      formulaRegla === "comision"
+        ? (comisionPara("BANCOLOMBIA", nCantidad, valores)?.pct ?? pctCuenta)
+        : formulaRegla === "dividir"
+          ? tasaPropia || (delDia ? escrita(delDia) : "")
+          : delDia
+            ? escrita(delDia)
+            : tasaPuesta;
+    if (delDia) tasaDelTablero.current = escrita(delDia);
+    setEnCobro(formulaRegla === "dividir");
+    setEsPorcentaje(formulaRegla === "comision");
+    setTasa(puesta);
+    setFormulaVarias(formulaRegla === "dividir" ? "÷" : formulaRegla === "comision" ? "%" : "x");
+    setValorVarias(puesta);
+    // lo que estaba en monto directo (la captura en la moneda de la cuenta) pasa a ser la cantidad de la cuenta
+    if (!cantidad.trim() && montoDirecto.trim()) {
+      setCantidad(montoDirecto);
+      setMontoDirecto("");
+    }
+    if (formulaRegla !== "comision") setEsFactura(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [delMedio, entregaEn, pedidoRegla]);
+  // qué dice la regla, solo si es lo que está puesto (a mano se puede haber elegido otra cuenta)
+  const notaRegla =
+    formulaRegla === "dividir" && enCobro
+      ? `Llega en ${delMedio} y quiere ${entregaEn}: se divide por la tasa.`
+      : formulaRegla === "multiplicar" && !enCobro && !esPorcentaje
+        ? `Llega en ${delMedio} y quiere ${entregaEn}: se multiplica por la tasa.`
+        : formulaRegla === "comision" && esPorcentaje
+          ? esFactura
+            ? "Pago de factura: sin comisión."
+            : "Retiro en pesos: se le quita la comisión."
+          : null;
 
   function alCambiarReferencia(valor: string) {
     setReferencia(valor);
@@ -2443,9 +2511,13 @@ function FilaNueva({
     setImagenesAdjuntas([]);
     setCapturasDudosas(0);
     setAvisoLectura(null);
-    const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro, entregaEn };
+    const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro, entregaEn, esFactura };
     setEnCobro(iniciaEnCobro);
     setEntregaEn(entregaPorDefecto);
+    setEsFactura(false);
+    metodoAplicado.current = null;
+    // el formulario vuelve a arrancar: eso no es elegir otra moneda
+    parRegla.current = `${delMedio}|${entregaPorDefecto}`;
     const escritoMoneda = { monedaMov, recibeEn };
     setMonedaMov(cuenta.moneda_codigo);
     setRecibeEn(cuenta.moneda_codigo);
@@ -2637,6 +2709,8 @@ function FilaNueva({
         setEsPorcentaje(escrito.esPorcentaje);
         setEnCobro(escrito.enCobro);
         setEntregaEn(escrito.entregaEn);
+        setEsFactura(escrito.esFactura);
+        parRegla.current = `${delMedio}|${escrito.entregaEn}`;
         setMonedaMov(escritoMoneda.monedaMov);
         setRecibeEn(escritoMoneda.recibeEn);
       }
@@ -2680,13 +2754,32 @@ function FilaNueva({
           <span>Medio de este movimiento</span>
           <div className="cc-chips" role="radiogroup" aria-label="Medio de este movimiento">
             {/* el medio con que se registró el cliente va primero; los demás, para registrarle una operación por otro medio */}
-            <button type="button" role="radio" aria-checked={!medioCambiado} className={!medioCambiado ? "activo" : ""} onClick={() => onElegirMedio("")}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={!medioCambiado}
+              className={!medioCambiado ? "activo" : ""}
+              onClick={() => {
+                metodoAplicado.current = null;
+                onElegirMedio("");
+              }}
+            >
               {nombreDeMedio(cuenta.canal_nombre) || "Medio del cliente"}
             </button>
             {medios
               .filter((m) => m.id !== cuenta.canal_id)
               .map((m) => (
-                <button type="button" key={m.id} role="radio" aria-checked={medioMov.id === m.id} className={medioMov.id === m.id ? "activo" : ""} onClick={() => onElegirMedio(m.id)}>
+                <button
+                  type="button"
+                  key={m.id}
+                  role="radio"
+                  aria-checked={medioMov.id === m.id}
+                  className={medioMov.id === m.id ? "activo" : ""}
+                  onClick={() => {
+                    metodoAplicado.current = null;
+                    onElegirMedio(m.id);
+                  }}
+                >
                   {nombreDeMedio(m.nombre)}
                 </button>
               ))}
@@ -2811,6 +2904,22 @@ function FilaNueva({
               ? `El total queda en ${entregaEn}, en la cuenta en ${entregaEn} de ${cuenta.tercero_nombre} (se le abre sola si no la tiene). Al agregar se abre esa hoja.`
               : `Está registrado en ${cuenta.moneda_codigo}, pero puede pedir otra: elegila acá y la cuenta (× tasa o ÷ dividir) queda en esa moneda.`}
           </small>
+          {notaRegla && <b className="cc-entrega-regla">{notaRegla}</b>}
+        </label>
+      )}
+      {enConfirmaciones && !repartido && formulaRegla === "comision" && (
+        <label className="cc-reparto-check" title="Por Bancolombia, el pago de una factura no lleva comisión">
+          <input
+            type="checkbox"
+            checked={esFactura}
+            onChange={(e) => {
+              setEsFactura(e.target.checked);
+              if (e.target.checked) alCambiarReferencia(REFERENCIA_FACTURA);
+              else if (referencia === REFERENCIA_FACTURA) alCambiarReferencia("");
+              setPedidoRegla((n) => n + 1);
+            }}
+          />
+          Pago de factura (sin comisión)
         </label>
       )}
       <div className="cc-nueva-campos">
@@ -2990,7 +3099,7 @@ function FilaNueva({
         </p>
       )}
       {/* Discreto: familiar o amigo al que no se le cobra comisión en este movimiento */}
-      {comisionDescuenta && esPorcentaje && (
+      {comisionDescuenta && esPorcentaje && !esFactura && (
         <label className="cc-sin-comision">
           <input type="checkbox" checked={sinComision} onChange={(e) => setSinComision(e.target.checked)} />
           Familiar o amigo: sin comisión{sinComision ? " (recibe lo mismo que envió)" : ""}
@@ -3116,7 +3225,7 @@ function FilaNueva({
             ) : comisionDescuenta ? (
               <>
                 {simbolo}
-                {formatearMonto(sinSigno(nCantidad))} {exonerado ? "sin comisión (familiar o amigo)" : `− ${formatearMonto(nEscrita)}% de comisión`} ={" "}
+                {formatearMonto(sinSigno(nCantidad))} {exonerado ? `sin comisión (${esFactura ? "pago de factura" : "familiar o amigo"})` : `− ${formatearMonto(nEscrita)}% de comisión`} ={" "}
               </>
             ) : (
               <>
