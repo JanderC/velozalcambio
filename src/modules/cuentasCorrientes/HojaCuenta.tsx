@@ -5,6 +5,8 @@ import {
   confirmarMovimientoCC,
   avisarClienteCuenta,
   buscarMovimientoPorNumero,
+  buscarOperacionIgual,
+  confirmarOperacionIgual,
   codigosDeReferencia,
   eliminarCuentaCorriente,
   type MovimientoConNumero,
@@ -2446,6 +2448,13 @@ function FilaNueva({
         window.alert(`Referencia repetida\n\n${aviso}`);
         return setError(aviso);
       }
+    }
+
+    // Zelle no trae número: el mismo capture se puede registrar dos veces, incluso a otro cliente
+    if (enConfirmaciones && !resta && esZelle && canalDelBloqueo) {
+      const montos = [conTasa && nCantidad ? sinSigno(nCantidad) : null, monto].filter((v): v is string => !!v);
+      const igual = await buscarOperacionIgual(canalDelBloqueo, montos, cuenta.id).catch(() => null);
+      if (igual && !confirmarOperacionIgual(igual)) return setError("No se registró: es la misma operación.");
     }
 
     // Misma persona que envía y mismo monto que un movimiento ya cargado en esta cuenta: puede ser la misma

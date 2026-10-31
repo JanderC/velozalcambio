@@ -245,6 +245,20 @@ export async function buscarMovimientoPorNumero(numero: string, canalId?: number
   return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${encodeURIComponent(numero)}${filtro}`)).movimiento;
 }
 
+/** Zelle no trae número: una operación de las últimas 24 horas por ese medio y con ese monto, en cualquier cliente. */
+export async function buscarOperacionIgual(canalId: number, montos: string[], cuentaId?: number) {
+  const filtro = cuentaId ? `&cuentaId=${cuentaId}` : "";
+  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/operacion-igual?canalId=${canalId}&montos=${montos.join(",")}${filtro}`)).movimiento;
+}
+
+/** Pregunta antes de registrar otra operación igual. true: seguir. */
+export function confirmarOperacionIgual(ya: MovimientoConNumero) {
+  return window.confirm(
+    `Posible capture repetido\n\nHace poco se registró una operación igual por ${ya.canal_nombre}:\n${ya.tercero_nombre} · ${ya.descripcion} · ${Number(ya.monto).toLocaleString("es-CO")}\n\n` +
+      `Aceptar: es otra transferencia, se registra.\nCancelar: es la misma, no se registra nada.`
+  );
+}
+
 /** Manda un mensaje al cliente por el WhatsApp conectado al sistema. */
 export function avisarClienteCuenta(id: number, texto: string, linea: 1 | 2 | 3 = 1) {
   // linea: por cuál de los WhatsApp vinculados sale (1 Bolívares, 2 Pesos, 3 Dólares)

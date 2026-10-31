@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, codigosDeReferencia, crearCuentaCorriente, pagarConfirmacionOtroMetodo, pagarParteConfirmacion, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarMovimientoPorNumero, buscarOperacionIgual, codigosDeReferencia, confirmarOperacionIgual, crearCuentaCorriente, pagarConfirmacionOtroMetodo, pagarParteConfirmacion, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
@@ -398,6 +398,12 @@ export function NuevaCuentaModal({
           window.alert(`Referencia repetida\n\n${aviso}`);
           return setError(aviso);
         }
+      }
+      // Zelle no trae número: el mismo capture se puede registrar dos veces, incluso a otro cliente
+      if (conMovimiento && !movResta && medio?.nombre === "ZELLE") {
+        const montos = [nMovCantidad, movMonto].filter((v): v is string => !!v).map((v) => v.replace(/^-/, ""));
+        const igual = await buscarOperacionIgual(medio.id, montos).catch(() => null);
+        if (igual && !confirmarOperacionIgual(igual)) return setError("No se registró: es la misma operación.");
       }
       const datosCuenta = {
         ...(modo === "existente" ? { terceroId: tercero!.id, usarExistente: true } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
