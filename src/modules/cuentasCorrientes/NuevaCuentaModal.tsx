@@ -30,8 +30,11 @@ export function NuevaCuentaModal({
   onPersonalizar,
   onCreada,
   onCerrar,
+  onClienteExistente,
 }: {
   canales: Canal[];
+  // Confirmaciones: el cliente ya existe, se abre su hoja. false: no se pudo abrir y se sigue en el formulario.
+  onClienteExistente?: (terceroId: number, capturas: File[]) => Promise<boolean>;
   modulo?: "CORRIENTE" | "POR_COBRAR" | "CAJA";
   // enLinea: el formulario va en la página (sin ventana ni pestañas), siempre para alguien nuevo
   enLinea?: boolean;
@@ -588,7 +591,8 @@ export function NuevaCuentaModal({
             <AvisoClienteExistente
               lista={existentes.lista}
               modulo={modulo}
-              onUsar={(c) => {
+              onUsar={async (c) => {
+                if (await onClienteExistente?.(c.id, imagenesAdjuntas)) return;
                 setTercero({ id: c.id, nombre: c.nombre, telefono: c.telefono, identificacion: c.identificacion, tipo: c.tipo as Tercero["tipo"], created_at: "" });
                 setModo("existente");
               }}

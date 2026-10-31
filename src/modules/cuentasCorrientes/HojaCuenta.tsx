@@ -173,8 +173,11 @@ export function HojaCuenta({
   irA = null,
   abrirCon = null,
   resumenCliente = null,
+  capturas = null,
 }: {
   cuenta: CuentaCorrienteResumen;
+  // Confirmaciones: capturas pegadas en el formulario de cliente nuevo antes de reconocer que el cliente ya existía
+  capturas?: File[] | null;
   // Confirmaciones: los movimientos del cliente en todas sus cuentas, debajo de la cabeza de la hoja
   resumenCliente?: ReactNode;
   // desde el buscador: ir al día de este movimiento y resaltarlo (clave cambia en cada búsqueda para volver a ir)
@@ -1409,6 +1412,7 @@ export function HojaCuenta({
           onElegirMedio={onElegirMedio}
           onOtraCuenta={onAbrirCuenta}
           abrirCon={abrirCon}
+          capturas={capturas}
           onGuardado={(abono) => {
             void cargar();
             onActualizar();
@@ -1438,8 +1442,10 @@ function FilaNueva({
   onGuardado,
   onOtraCuenta,
   abrirCon = null,
+  capturas = null,
 }: {
   cuenta: CuentaCorrienteResumen;
+  capturas?: File[] | null;
   medioElegido?: { id: number; nombre: string } | null;
   saldo: string;
   referencias: string[];
@@ -1990,6 +1996,14 @@ function FilaNueva({
     if (varias) return;
     if (!leyendo) void cargarComprobantes(imagenes);
   };
+  // lo que ya se había pegado antes de reconocer al cliente: sigue aquí, no hay que volver a pegarlo
+  const capturasLeidas = useRef<File[] | null>(null);
+  useEffect(() => {
+    if (!capturas?.length || capturasLeidas.current === capturas) return;
+    capturasLeidas.current = capturas; // cada captura se lee una sola vez
+    setAbierta(true);
+    pegarImagen.current(capturas);
+  }, [capturas]);
   useEffect(() => {
 
     const alPegar = (e: globalThis.ClipboardEvent) => {

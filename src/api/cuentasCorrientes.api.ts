@@ -18,6 +18,7 @@ export interface CuentaCorrienteResumen {
   tercero_nombre: string;
   tercero_telefono: string | null;
   tercero_identificacion: string | null; // cédula
+  activo: boolean; // false: la cuenta se eliminó de las listas (solo llega al buscar con soloCliente)
   // Dónde se lleva: en Cuentas Corrientes, o pasada a Cuentas por Cobrar (poco movimiento)
   modulo: ModuloCuenta;
   referencia: string | null; // dato libre del cliente (Confirmaciones)

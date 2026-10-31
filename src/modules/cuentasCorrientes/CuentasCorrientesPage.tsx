@@ -52,6 +52,12 @@ function sumaPorMoneda(cuentas: CuentaCorrienteResumen[], campo: "saldo_actual" 
   return [...suma.entries()].filter(([, v]) => /[1-9]/.test(v));
 }
 
+/** De las cuentas de un cliente, la que se trae a este módulo: la que ya fue de aquí y la de movimiento más reciente. */
+function cuentaParaTraer(cuentas: CuentaCorrienteResumen[], modulo: string) {
+  const fecha = (c: CuentaCorrienteResumen) => (c.ultimo_movimiento ? new Date(c.ultimo_movimiento).getTime() : 0);
+  return [...cuentas].sort((a, b) => Number(b.modulo === modulo) - Number(a.modulo === modulo) || fecha(b) - fecha(a))[0]!;
+}
+
 const sinTildes = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /** La cuenta que representa al cliente en la lista: donde apareció lo buscado, la que tiene saldo o la de su último movimiento. */
@@ -149,9 +155,10 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
       getCuentasCorrientes({ buscar, soloCliente: true })
         .then((todas) => {
           if (!vigente) return;
-          const yaAqui = new Set(todas.filter((c) => c.modulo === moduloAqui).map((c) => c.tercero_id));
-          const unaPorCliente = new Map(todas.filter((c) => !yaAqui.has(c.tercero_id)).map((c) => [c.tercero_id, c]));
-          setEnOtrosModulos([...unaPorCliente.values()]);
+          const yaAqui = new Set(todas.filter((c) => c.modulo === moduloAqui && c.activo).map((c) => c.tercero_id));
+          const porCliente = new Map<number, CuentaCorrienteResumen[]>();
+          for (const c of todas) if (!yaAqui.has(c.tercero_id)) porCliente.set(c.tercero_id, [...(porCliente.get(c.tercero_id) ?? []), c]);
+          setEnOtrosModulos([...porCliente.values()].map((l) => cuentaParaTraer(l, moduloAqui)));
         })
         .catch(() => vigente && setEnOtrosModulos([]));
     }, 300);
@@ -170,9 +177,28 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
       setEnOtrosModulos([]);
       await cargar();
       setSeleccionadaId(nueva.id);
+      return nueva.id;
     } catch (e) {
       setError((e as Error).message);
+      return null;
     }
+  }
+  // Confirmaciones: el formulario reconoció a un cliente que ya existe. No se crea de nuevo: se abre su hoja y lo que
+  // ya se había pegado sigue ahí. Si no tenía cuenta aquí (o se le eliminó), se le abre.
+  const [capturasPara, setCapturasPara] = useState<{ cuentaId: number; archivos: File[] } | null>(null);
+  async function abrirClienteExistente(terceroId: number, capturas: File[]) {
+    const todas = await getCuentasCorrientes({ terceroId, soloCliente: true }).catch(() => []);
+    if (!todas.length) return false;
+    const aqui = todas.filter((c) => c.modulo === "CAJA" && c.activo);
+    const elegida = aqui.length ? cuentaPrincipal(aqui) : cuentaParaTraer(todas, "CAJA");
+    const cuentaId = aqui.length ? elegida.id : await abrirCuentaAqui(elegida);
+    if (!cuentaId) return false;
+    if (capturas.length) setCapturasPara({ cuentaId, archivos: capturas });
+    setCuentasCliente(aqui);
+    setIrA(null);
+    setSeleccionadaId(cuentaId);
+    setBuscar(elegida.tercero_nombre);
+    return true;
   }
   const NOMBRE_MODULO: Record<string, string> = { CORRIENTE: "Cuentas Corrientes", POR_COBRAR: "Cuentas por Cobrar y Pagar", POR_PAGAR: "Cuentas por Pagar", CAJA: "Confirmaciones" };
   const RUTA_MODULO: Record<string, string> = { CORRIENTE: "/cuentas-corrientes", POR_COBRAR: "/cuentas-por-cobrar-pagar", POR_PAGAR: "/cuentas-por-pagar", CAJA: "/cajas-confirmaciones" };
@@ -356,6 +382,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                       <b>{c.tercero_nombre}</b>
                       <small>
                         {NOMBRE_MODULO[c.modulo] ?? c.modulo}
+                        {c.activo ? "" : " (cuenta eliminada)"}
                         {c.grupo_cobro ? ` · ${c.grupo_cobro}` : ""} · {c.moneda_codigo} · saldo {formatearMonto(c.saldo_actual)}
                       </small>
                     </span>
@@ -365,7 +392,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                           {modo === "cajas" ? "Traer a Confirmaciones" : "Abrirle cuenta aquí"}
                         </button>
                       )}
-                      {RUTA_MODULO[c.modulo] && <Link to={RUTA_MODULO[c.modulo]!}>Ver allá</Link>}
+                      {c.activo && RUTA_MODULO[c.modulo] && <Link to={RUTA_MODULO[c.modulo]!}>Ver allá</Link>}
                     </span>
                   </li>
                 ))}
@@ -475,6 +502,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
             cuenta={seleccionada}
             irA={irA && irA.cuentaId === seleccionada.id ? irA : null}
             abrirCon={abrirCon && abrirCon.cuentaId === seleccionada.id ? abrirCon.modo : null}
+            capturas={capturasPara?.cuentaId === seleccionada.id ? capturasPara.archivos : null}
             onActualizar={() => {
               setVersionCliente((v) => v + 1);
               void cargar();
@@ -520,6 +548,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
               onElegirMedio={setCanalId}
               onPersonalizar={() => setPersonalizando(true)}
               onCerrar={() => {}}
+              onClienteExistente={abrirClienteExistente}
               onCreada={async (c, seguirCon) => {
                 await cargar();
                 setAbrirCon(seguirCon ? { cuentaId: c.id, modo: seguirCon } : null);
