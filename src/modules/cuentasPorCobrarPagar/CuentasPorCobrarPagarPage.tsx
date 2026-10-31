@@ -25,7 +25,7 @@ const sinTildes = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, 
 
 /**
  * Cuentas por Cobrar: clientes propios del módulo, agrupados como en el Excel (Cerveloza, Zelle, Préstamos…).
- * Cada grupo es una tabla "Nombre Cliente / Monto COP" con su total; al tocar un cliente se abre su hoja, que se
+ * Cada grupo es una tabla "Nombre Cliente / Monto" con su total; al tocar un cliente se abre su hoja, que se
  * lleva igual que una cuenta corriente (cargos, abonos, WhatsApp, reporte).
  */
 export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar" | "pagar" }) {
@@ -68,7 +68,11 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
       .catch(() => {});
   }, [cargar]);
 
-  const todas = useMemo(() => cuentas ?? [], [cuentas]);
+  // Un cliente que se lleva en dólares no se repite con su cuenta en pesos vacía
+  const todas = useMemo(() => {
+    const lista = cuentas ?? [];
+    return lista.filter((c) => c.ultimo_movimiento || /[1-9]/.test(c.saldo_actual) || !lista.some((o) => o.tercero_id === c.tercero_id && o.ultimo_movimiento));
+  }, [cuentas]);
   const grupos = useMemo(() => gruposDe(todas), [todas]);
   // lo buscado: por nombre o por teléfono (comparando solo los dígitos)
   const visibles = useMemo(() => {
@@ -91,20 +95,20 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
   const [enviandoId, setEnviandoId] = useState<number | null>(null);
   const enviando = enviandoId !== null ? (todas.find((c) => c.id === enviandoId) ?? null) : null;
   const otrasMonedas = useMemo(() => totalesPorMoneda(todas), [todas]);
-  const abierta = abiertaId !== null ? (todas.find((c) => c.id === abiertaId) ?? null) : null;
+  const abierta = abiertaId !== null ? ((cuentas ?? []).find((c) => c.id === abiertaId) ?? null) : null;
   const buscando = buscar.trim() !== "";
   const moduloAqui = pagar ? "POR_PAGAR" : "POR_COBRAR";
   // Una sola lista de clientes: el que está en otro módulo se lleva aquí sin crearlo de nuevo
   const enOtros = useEnOtrosModulos(buscar, moduloAqui);
-  async function llevarCliente(terceroId: number, grupo?: string) {
+  async function llevarCliente(terceroId: number, grupo?: string, monedaId?: number) {
     try {
       const suyas = await getCuentasCorrientes({ terceroId, soloCliente: true });
       if (!suyas.length) return false;
-      const yaAqui = suyas.find((c) => c.modulo === moduloAqui && c.activo);
-      const cop = monedas.find((m) => m.codigo === "COP");
-      if (!yaAqui && !cop) return false;
+      const yaAqui = suyas.find((c) => c.modulo === moduloAqui && c.activo && (!monedaId || c.moneda_id === monedaId));
+      const moneda = monedaId ?? monedas.find((m) => m.codigo === "COP")?.id;
+      if (!yaAqui && !moneda) return false;
       const grupoCobro = grupo && grupo !== SIN_GRUPO ? grupo : undefined;
-      const cuenta = yaAqui ?? (await crearCuentaCorriente({ terceroId, modulo: moduloAqui, monedaId: cop!.id, grupoCobro, usarExistente: true }));
+      const cuenta = yaAqui ?? (await crearCuentaCorriente({ terceroId, modulo: moduloAqui, monedaId: moneda!, grupoCobro, usarExistente: true }));
       enOtros.limpiar();
       await cargar();
       setCreandoEn(null);
@@ -330,7 +334,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
                   <thead>
                     <tr>
                       <th>Nombre cliente</th>
-                      <th className="num">Monto COP</th>
+                      <th className="num">Monto</th>
                       <th aria-label="WhatsApp" />
                     </tr>
                   </thead>
@@ -346,7 +350,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
                             <span className="cxc-nombre">{c.tercero_nombre}</span>
                             {detalle && <small>{detalle}</small>}
                           </td>
-                          <td className={`num ${pesos !== null && ver(pesos).startsWith("-") ? "favor" : ""}`}>{pesos === null ? <span className="cxc-sin-tasa">sin tasa</span> : dinero(ver(pesos), "COP")}</td>
+                          <td className={`num ${pesos !== null && ver(pesos).startsWith("-") ? "favor" : ""}`}>{pesos === null ? dinero(ver(c.saldo_actual), c.moneda_codigo) : dinero(ver(pesos), "COP")}</td>
                           <td className="cxc-wa">
                             {puedeEditar && !pagar && c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual) && (
                               <button

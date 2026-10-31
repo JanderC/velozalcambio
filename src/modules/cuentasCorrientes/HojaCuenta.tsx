@@ -1810,12 +1810,18 @@ function FilaNueva({
     } catch {
       // sin almacenamiento: se escribe
     }
-    setTasa(cuenta.tasa_cobro ? formatearMonto(cuenta.tasa_cobro) : recordada);
+    const delDia = enConfirmaciones ? null : tasaDeOperacion("COP", codigoMonto, tablero?.actual?.valores);
+    setTasa(cuenta.tasa_cobro ? formatearMonto(cuenta.tasa_cobro) : recordada || (delDia ? formatearMonto(delDia) : ""));
   }
+  // Cuentas Corrientes y por Cobrar: se entregan pesos y su contabilidad queda en dólares: se divide por la tasa, sola
+  useEffect(() => {
+    if (!enConfirmaciones && convierte && monedaMov === "COP" && codigoDivision === "COP") activarCobro();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convierte, monedaMov, codigoMonto]);
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
   const pendientes = useRef(0);
-  const decimales = otraMoneda ? (entregaEn === "COP" ? 0 : 2) : Number(cuenta.moneda_decimales ?? 0);
+  const decimales = otraMoneda ? (codigoMonto === "COP" ? 0 : 2) : Number(cuenta.moneda_decimales ?? 0);
 
   // Confirmaciones: las monedas hacen falta para elegir en cuál se le entrega (antes solo se cargaban al marcar la caja)
   useEffect(() => {
@@ -2643,6 +2649,8 @@ function FilaNueva({
             modulo: cuenta.modulo,
             monedaId: monedaEntrega!.id,
             ...(cuenta.grupo_cobro ? { grupoCobro: cuenta.grupo_cobro } : {}),
+            // se dividió: la cuenta nueva queda con esa tasa, como un cliente que se trabaja dividiendo
+            ...(escrito.enCobro && monedaCantidad && nTasa ? { monedaCobroId: monedaCantidad.id, tasaCobro: nTasa } : {}),
           })));
       otraCuentaId = destino.id;
       return registrarMovimientoCC({ ...datos, cuentaId: destino.id, canalId: destino.canal_id, monedaId: destino.moneda_id });
@@ -3080,7 +3088,7 @@ function FilaNueva({
         <label className="cc-c-num monto">
           Monto
           {conTasa ? (
-            <output className={`cc-resultado ${resta ? "cc-neg" : ""}`}>{monto ? `${resta ? "- " : ""}${simbolo}${formatearMonto(monto)}${otraMoneda ? ` ${entregaEn}` : ""}` : "—"}</output>
+            <output className={`cc-resultado ${resta ? "cc-neg" : ""}`}>{monto ? `${resta ? "- " : ""}${simbolo}${formatearMonto(monto)}${otraMoneda ? ` ${codigoMonto}` : ""}` : "—"}</output>
           ) : (
             <input value={montoDirecto} onChange={(e) => setMontoDirecto(e.target.value)} inputMode="decimal" placeholder="sin tasa: monto directo" autoComplete="off" />
           )}

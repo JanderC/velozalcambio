@@ -43,7 +43,7 @@ export function NuevoClienteCobrarModal({
   onCreado: (cuenta: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
   // el cliente ya existe: se abre su hoja aquí. false: no se pudo abrir y se sigue en el formulario.
-  onClienteExistente?: (terceroId: number, grupo: string) => Promise<boolean>;
+  onClienteExistente?: (terceroId: number, grupo: string, monedaId?: number) => Promise<boolean>;
 }) {
   const pagar = modulo === "POR_PAGAR";
   const elegibles = grupos.filter((g) => g !== SIN_GRUPO);
@@ -55,6 +55,10 @@ export function NuevoClienteCobrarModal({
   const [grupo, setGrupo] = useState(elegibles.includes(grupoInicial) ? grupoInicial : (elegibles[0] ?? NUEVO));
   const [grupoNuevo, setGrupoNuevo] = useState("");
   const cop = monedas.find((m) => m.codigo === "COP");
+  // en qué moneda se le lleva la contabilidad: pesos, dólares, USDT…
+  const [monedaId, setMonedaId] = useState<number | "">("");
+  const moneda = monedas.find((m) => m.id === monedaId) ?? cop;
+  const codigo = moneda?.codigo ?? "COP";
   // El primer movimiento (opcional): referencia, y el monto directo o cantidad × tasa
   const [conMovimiento, setConMovimiento] = useState(false);
   const [referencia, setReferencia] = useState("");
@@ -66,7 +70,7 @@ export function NuevoClienteCobrarModal({
   const nCantidad = cantidad.trim() ? (leerNumero(cantidad)?.replace(/^-/, "") ?? null) : null;
   const nTasa = tasa.trim() ? (leerNumero(tasa)?.replace(/^-/, "") ?? null) : null;
   const conTasa = !!nTasa && /[1-9]/.test(nTasa);
-  const total = nCantidad && /[1-9]/.test(nCantidad) ? (conTasa ? multiplicarDecimales(nCantidad, nTasa!, 0) : nCantidad) : null;
+  const total = nCantidad && /[1-9]/.test(nCantidad) ? (conTasa ? multiplicarDecimales(nCantidad, nTasa!, codigo === "COP" ? 0 : 2) : nCantidad) : null;
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -74,7 +78,7 @@ export function NuevoClienteCobrarModal({
     const grupoFinal = grupo === NUEVO ? grupoNuevo.trim() : grupo;
     if (!existente && nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
     if (!grupoFinal) return setError("Escribí el nombre del grupo nuevo.");
-    if (!cop) return setError("No se pudo cargar la moneda. Cerrá y volvé a abrir.");
+    if (!moneda) return setError("No se pudo cargar la moneda. Cerrá y volvé a abrir.");
     if (conMovimiento) {
       if (!total) return setError("Escribí el monto del movimiento (o quitá el movimiento para registrar solo el cliente).");
       if (tasa.trim() && !conTasa) return setError("La tasa no es un número válido.");
@@ -87,7 +91,7 @@ export function NuevoClienteCobrarModal({
           : { nuevoTercero: { nombre: nombre.trim(), tipo: "CLIENTE" as const, telefono: telefono.trim() || undefined } }),
         modulo,
         grupoCobro: grupoFinal,
-        monedaId: cop.id,
+        monedaId: moneda.id,
       };
       const cuenta = await crearCuentaCorriente(datos).catch((err) => {
         // ya hay un cliente con ese nombre (en otro módulo): ¿es el mismo?
@@ -151,7 +155,7 @@ export function NuevoClienteCobrarModal({
               lista={existentes.lista}
               modulo={modulo}
               onUsar={async (c) => {
-                if (!(await onClienteExistente?.(c.id, grupo === NUEVO ? grupoNuevo.trim() : grupo))) setExistente(c);
+                if (!(await onClienteExistente?.(c.id, grupo === NUEVO ? grupoNuevo.trim() : grupo, moneda?.id))) setExistente(c);
               }}
             />
           </>
@@ -173,6 +177,17 @@ export function NuevoClienteCobrarModal({
             <input value={grupoNuevo} onChange={(e) => setGrupoNuevo(e.target.value)} placeholder="ej. Proveedores" maxLength={60} autoComplete="off" />
           </label>
         )}
+
+        <label>
+          Moneda de su contabilidad
+          <select value={moneda?.id ?? ""} onChange={(e) => setMonedaId(Number(e.target.value))}>
+            {monedas.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nombre} ({m.codigo})
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="cxc-con-movimiento">
           <input type="checkbox" checked={conMovimiento} onChange={(e) => setConMovimiento(e.target.checked)} />
@@ -197,9 +212,9 @@ export function NuevoClienteCobrarModal({
             <small>
               {total
                 ? conTasa
-                  ? `${formatearMonto(nCantidad!)} × ${formatearMonto(nTasa!)} = ${dinero(total, "COP")} ${pagar ? "por pagar" : "por cobrar"}`
-                  : `${dinero(total, "COP")} ${pagar ? "por pagar" : "por cobrar"}`
-                : "Como en Cuentas Corrientes: el monto en pesos, o la cantidad (dólares, bolívares…) con su tasa."}
+                  ? `${formatearMonto(nCantidad!)} × ${formatearMonto(nTasa!)} = ${dinero(total, codigo)} ${pagar ? "por pagar" : "por cobrar"}`
+                  : `${dinero(total, codigo)} ${pagar ? "por pagar" : "por cobrar"}`
+                : `Como en Cuentas Corrientes: el monto en ${codigo}, o la cantidad con su tasa.`}
             </small>
           </div>
         )}
