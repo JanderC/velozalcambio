@@ -306,6 +306,21 @@ export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: nu
   return api.get<CuentaCorrienteResumen[]>(`/cuentas-corrientes${q ? `?${q}` : ""}`);
 }
 
+/** Un movimiento del cliente en Confirmaciones, en cualquiera de sus cuentas. */
+export interface MovimientoCliente {
+  id: number;
+  cuenta_id: number;
+  fecha: string;
+  descripcion: string | null;
+  tipo: string;
+  monto: string;
+  moneda_codigo: string;
+}
+
+export function getUltimosDelCliente(terceroId: number) {
+  return api.get<MovimientoCliente[]>(`/cuentas-corrientes/cliente/${terceroId}/ultimos`);
+}
+
 export function getMovimientosCuentaCorriente(cuentaId: number) {
   return api.get<MovimientoCC[]>(`/cuentas-corrientes/${cuentaId}/movimientos`);
 }

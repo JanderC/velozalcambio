@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
@@ -172,8 +172,11 @@ export function HojaCuenta({
   onAbrirCuenta,
   irA = null,
   abrirCon = null,
+  resumenCliente = null,
 }: {
   cuenta: CuentaCorrienteResumen;
+  // Confirmaciones: los movimientos del cliente en todas sus cuentas, debajo de la cabeza de la hoja
+  resumenCliente?: ReactNode;
   // desde el buscador: ir al día de este movimiento y resaltarlo (clave cambia en cada búsqueda para volver a ir)
   irA?: { id: number; fecha: string; clave: number } | null;
   // recién creado desde Confirmaciones: el formulario abre con varias transferencias o pago repartido marcado
@@ -797,6 +800,7 @@ export function HojaCuenta({
           )}
         </div>
       </div>
+      {resumenCliente}
       {editandoCliente && (
         <EditarClienteModal
           cuenta={actual}

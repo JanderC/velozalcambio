@@ -684,3 +684,23 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-entrega-regla { display: block; margin-top: 4px; font-size: 0.86rem; color: var(--color-navy-dark); }
 .cc-varias-progreso { display: block; font-size: 0.8rem; color: #4b5563; margin: 2px 0 6px; line-height: 1.4; }
 .cc-varias-destino { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 0.85rem; flex-wrap: wrap; }
+
+/* Confirmaciones: el cliente es uno solo; sus hojas y sus últimos movimientos, juntos */
+.cc-cliente { border: 1px solid #e6e9ef; border-radius: 10px; background: #fafbfc; padding: 10px 12px; margin-bottom: 14px; }
+.cc-cliente-cuentas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.cc-cliente-cuentas button { border: 1px solid #d7dbe2; background: white; color: #4b5563; border-radius: 16px; padding: 4px 11px; font-family: inherit; font-size: 0.8rem; cursor: pointer; }
+.cc-cliente-cuentas button b { color: var(--color-navy-dark); margin-left: 3px; font-variant-numeric: tabular-nums; }
+.cc-cliente-cuentas button.activa { background: var(--color-navy); border-color: var(--color-navy); color: white; }
+.cc-cliente-cuentas button.activa b { color: white; }
+.cc-cliente-movs { list-style: none; margin: 0; padding: 0; }
+.cc-cliente-movs li + li { border-top: 1px solid #eef0f4; }
+.cc-cliente-movs button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 7px 4px; text-align: left; font-family: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
+.cc-cliente-movs button:hover { background: #f0f3f7; }
+.cc-cliente-punto { width: 8px; height: 8px; border-radius: 50%; background: var(--color-navy); }
+.cc-cliente-punto.pago { background: #1a7f37; }
+.cc-cliente-texto { min-width: 0; font-size: 0.86rem; color: var(--color-navy-dark); }
+.cc-cliente-texto b { font-weight: 600; }
+.cc-cliente-texto i { font-style: normal; font-size: 0.68rem; font-weight: 600; color: var(--color-navy); background: #e4ecf5; border-radius: 9px; padding: 1px 7px; margin-left: 6px; }
+.cc-cliente-texto small { display: block; font-size: 0.75rem; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-cliente-monto { font-weight: 700; font-size: 0.88rem; color: var(--color-navy-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cc-cliente-mas { display: block; margin: 4px auto 0; border: none; background: none; color: var(--color-navy); font-family: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }

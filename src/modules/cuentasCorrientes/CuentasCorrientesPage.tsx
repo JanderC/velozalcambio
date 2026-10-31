@@ -11,6 +11,7 @@ import { ApiError } from "../../api/client";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
+import { ResumenCliente } from "./ResumenCliente";
 import { PersonalizarCanalesModal } from "./PersonalizarCanalesModal";
 import "./cuentasCorrientes.css";
 
@@ -43,6 +44,20 @@ const SENTIDOS: { valor: string; etiqueta: string }[] = [
 const conSaldo = (c: CuentaCorrienteResumen) => /[1-9]/.test(c.saldo_actual);
 // En Confirmaciones el saldo se lee al revés: lo que le compramos al cliente (positivo) es lo que le debemos
 const yoDebo = (c: CuentaCorrienteResumen) => conSaldo(c) && c.saldo_actual.startsWith("-") !== (c.modulo === "CAJA");
+
+/** Suma por moneda lo de las cuentas de un cliente (saldo, lo de hoy). */
+function sumaPorMoneda(cuentas: CuentaCorrienteResumen[], campo: "saldo_actual" | "vendido_hoy" | "abonado_hoy") {
+  const suma = new Map<string, string>();
+  for (const c of cuentas) suma.set(c.moneda_codigo, sumarDecimales(suma.get(c.moneda_codigo) ?? "0", c[campo]));
+  return [...suma.entries()].filter(([, v]) => /[1-9]/.test(v));
+}
+
+/** La cuenta que representa al cliente en la lista: donde apareció lo buscado, la que tiene saldo o la de su último movimiento. */
+function cuentaPrincipal(cuentas: CuentaCorrienteResumen[]) {
+  const fecha = (c: CuentaCorrienteResumen) => (c.ultimo_movimiento ? new Date(c.ultimo_movimiento).getTime() : 0);
+  const peso = (c: CuentaCorrienteResumen) => (c.movimiento_coincide ? 2 : conSaldo(c) ? 1 : 0);
+  return [...cuentas].sort((a, b) => peso(b) - peso(a) || fecha(b) - fecha(a))[0]!;
+}
 
 function montoTexto(valor: string, moneda: string) {
   const negativo = valor.startsWith("-");
@@ -182,7 +197,29 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
     return [...filtradas].sort((a, b) => Math.abs(Number(b.saldo_actual)) - Math.abs(Number(a.saldo_actual)));
   }, [cuentas, enCobrar, sentido, modo, buscar, canalId]);
 
-  const seleccionada = cuentas.find((c) => c.id === seleccionadaId) ?? null;
+  // Confirmaciones: una fila por cliente, no por medio ni por moneda. Adentro se ven todas sus cuentas.
+  const filas = useMemo(() => {
+    if (modo !== "cajas") return visibles.map((c) => ({ c, todas: [c] }));
+    const porCliente = new Map<number, CuentaCorrienteResumen[]>();
+    for (const c of visibles) porCliente.set(c.tercero_id, [...(porCliente.get(c.tercero_id) ?? []), c]);
+    return [...porCliente.values()].map((todas) => ({ c: cuentaPrincipal(todas), todas }));
+  }, [visibles, modo]);
+
+  // todas las cuentas del cliente abierto: buscando por referencia la lista trae solo la que coincide
+  const [cuentasCliente, setCuentasCliente] = useState<CuentaCorrienteResumen[]>([]);
+  const [versionCliente, setVersionCliente] = useState(0);
+  const seleccionada = cuentas.find((c) => c.id === seleccionadaId) ?? cuentasCliente.find((c) => c.id === seleccionadaId) ?? null;
+  const clienteAbierto = modo === "cajas" ? seleccionada?.tercero_id : undefined;
+  useEffect(() => {
+    if (!clienteAbierto) return setCuentasCliente([]);
+    let vigente = true;
+    getCuentasCorrientes({ terceroId: clienteAbierto, vista: "cajas" })
+      .then((l) => vigente && setCuentasCliente(l))
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [clienteAbierto, versionCliente]);
   const chips = enCobrar ? SENTIDOS : TIPOS;
   const chipActivo = enCobrar ? sentido : tipo;
   const elegirChip = enCobrar ? setSentido : setTipo;
@@ -329,13 +366,13 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
             </div>
           )}
           <ul className="cc-cuentas">
-            {visibles.map((c) => (
+            {filas.map(({ c, todas }) => (
               <li key={c.id}>
                 {/* la fila es un div (no un botón) para que el selector de qué es el cliente funcione adentro */}
                 <div
                   role="button"
                   tabIndex={0}
-                  className={`cc-fila-cuenta ${seleccionadaId === c.id ? "activa" : ""}`}
+                  className={`cc-fila-cuenta ${todas.some((x) => x.id === seleccionadaId) ? "activa" : ""}`}
                   onClick={() => abrir(c)}
                   onKeyDown={(e) => {
                     if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
@@ -349,7 +386,13 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                     {c.estado !== "DISPONIBLE" && <span className={`cc-estado-badge cc-estado-${c.estado.toLowerCase()}`}>{c.estado.toLowerCase()}</span>}
                     {enCobrar && c.modulo === "POR_COBRAR" && <span className="cc-estado-badge cc-estado-cobrar">solo por cobrar</span>}
                   </span>
-                  <span className={`cc-cuenta-saldo ${yoDebo(c) ? "cc-neg" : ""}`}>{montoTexto(c.modulo === "CAJA" ? c.saldo_actual.replace(/^-/, "") : c.saldo_actual, c.moneda_codigo)}</span>
+                  <span className={`cc-cuenta-saldo ${todas.some(yoDebo) ? "cc-neg" : ""}`}>
+                    {c.modulo === "CAJA"
+                      ? sumaPorMoneda(todas, "saldo_actual")
+                          .map(([moneda, v]) => montoTexto(v.replace(/^-/, ""), moneda))
+                          .join(" · ") || montoTexto("0", c.moneda_codigo)
+                      : montoTexto(c.saldo_actual, c.moneda_codigo)}
+                  </span>
                   <span className="cc-cuenta-detalle">
                     {puedeCrear && !enConfirmaciones ? (
                       <select
@@ -378,14 +421,16 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                     ) : (
                       "Mixto"
                     )}
-                    {c.canal_nombre === "SIN_BANCO" ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
+                    {c.canal_nombre === "SIN_BANCO" || enConfirmaciones ? "" : ` · ${c.canal_nombre.replace(/_/g, " ")}`}
                     {enConfirmaciones && c.tercero_telefono ? ` · ${c.tercero_telefono}` : ""}
                     {enConfirmaciones && c.tercero_identificacion ? ` · CC ${c.tercero_identificacion}` : ""}
                     {c.referencia ? ` · ${c.referencia}` : ""}
-                    {conSaldo(c) ? (yoDebo(c) ? " · yo le debo" : " · me debe") : ""}
+                    {todas.some(yoDebo) ? " · yo le debo" : todas.some(conSaldo) ? " · me debe" : ""}
                   </span>
                   <span className="cc-cuenta-detalle derecha">
-                    {c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : "sin movimientos"}
+                    {todas.some((x) => x.ultimo_movimiento)
+                      ? new Date(Math.max(...todas.map((x) => (x.ultimo_movimiento ? new Date(x.ultimo_movimiento).getTime() : 0)))).toLocaleDateString("es-CO", { day: "numeric", month: "short" })
+                      : "sin movimientos"}
                   </span>
                   {c.movimiento_coincide && (
                     <span className="cc-cuenta-coincide">
@@ -405,9 +450,10 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                       )}
                     </span>
                   )}
-                  {(/[1-9]/.test(c.vendido_hoy) || /[1-9]/.test(c.abonado_hoy)) && (
+                  {todas.some((x) => /[1-9]/.test(x.vendido_hoy) || /[1-9]/.test(x.abonado_hoy)) && (
                     <span className="cc-cuenta-hoy">
-                      Hoy: {c.modulo === "CAJA" ? "le compramos" : "le vendí"} <b>{montoTexto(c.vendido_hoy, c.moneda_codigo)}</b> · {c.modulo === "CAJA" ? "le vendimos" : "me vendió o abonó"} <b>{montoTexto(c.abonado_hoy.replace(/^-/, ""), c.moneda_codigo)}</b>
+                      Hoy: {c.modulo === "CAJA" ? "le compramos" : "le vendí"} <b>{sumaPorMoneda(todas, "vendido_hoy").map(([moneda, v]) => montoTexto(v, moneda)).join(" + ") || montoTexto("0", c.moneda_codigo)}</b> · {c.modulo === "CAJA" ? "le vendimos" : "me vendió o abonó"}{" "}
+                      <b>{sumaPorMoneda(todas, "abonado_hoy").map(([moneda, v]) => montoTexto(v.replace(/^-/, ""), moneda)).join(" + ") || montoTexto("0", c.moneda_codigo)}</b>
                     </span>
                   )}
                 </div>
@@ -422,7 +468,28 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
             cuenta={seleccionada}
             irA={irA && irA.cuentaId === seleccionada.id ? irA : null}
             abrirCon={abrirCon && abrirCon.cuentaId === seleccionada.id ? abrirCon.modo : null}
-            onActualizar={cargar}
+            onActualizar={() => {
+              setVersionCliente((v) => v + 1);
+              void cargar();
+            }}
+            resumenCliente={
+              enConfirmaciones && cuentasCliente.length > 0 ? (
+                <ResumenCliente
+                  cuentas={cuentasCliente}
+                  cuentaId={seleccionada.id}
+                  terceroId={seleccionada.tercero_id}
+                  version={versionCliente}
+                  onElegirCuenta={(id) => {
+                    setIrA(null);
+                    setSeleccionadaId(id);
+                  }}
+                  onVerMovimiento={(m) => {
+                    setIrA({ cuentaId: m.cuenta_id, id: m.id, fecha: m.fecha, clave: Date.now() });
+                    setSeleccionadaId(m.cuenta_id);
+                  }}
+                />
+              ) : null
+            }
             onVolver={() => setSeleccionadaId(null)}
             medio={enConfirmaciones ? (canales.find((c) => c.id === canalId) ?? null) : null}
             medios={enConfirmaciones ? bancosConfirmaciones : []}
@@ -431,6 +498,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
             onAbrirCuenta={(id) => {
               setBuscar(seleccionada.tercero_nombre);
               setSeleccionadaId(id);
+              setVersionCliente((v) => v + 1);
               void cargar();
             }}
           />
