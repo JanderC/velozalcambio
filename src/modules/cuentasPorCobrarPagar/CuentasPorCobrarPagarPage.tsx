@@ -5,10 +5,11 @@ import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
-import { cambiarGrupoCobro, getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { cambiarGrupoCobro, crearCuentaCorriente, getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { alAbrirWhatsApp, enlaceWhatsApp, telefonoWhatsApp } from "../../utils/whatsapp";
 import { HojaCuenta } from "../cuentasCorrientes/HojaCuenta";
+import { ListaEnOtrosModulos, useEnOtrosModulos } from "../cuentasCorrientes/EnOtrosModulos";
 import { compartirImagen, copiarImagen, descargarBlob } from "../cuentasCorrientes/imagenReporte";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import { SIN_GRUPO, detalleMoneda, dinero, enPesos, fechaDeHoy, grupoDe, gruposDe, mensajeDeCobro, mismoGrupo, totalEnPesos, totalesPorMoneda } from "./cobrar";
@@ -20,6 +21,7 @@ import { generarReporteCobrar } from "./reporteCobrar";
 import "./cuentasPorCobrar.css";
 
 const NUEVO_GRUPO = "__nuevo__";
+const sinTildes = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /**
  * Cuentas por Cobrar: clientes propios del módulo, agrupados como en el Excel (Cerveloza, Zelle, Préstamos…).
@@ -70,10 +72,12 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
   const grupos = useMemo(() => gruposDe(todas), [todas]);
   // lo buscado: por nombre o por teléfono (comparando solo los dígitos)
   const visibles = useMemo(() => {
-    const texto = buscar.trim().toLowerCase();
+    const texto = sinTildes(buscar.trim());
     if (!texto) return todas;
     const digitos = texto.replace(/\D/g, "");
-    return todas.filter((c) => c.tercero_nombre.toLowerCase().includes(texto) || (digitos.length >= 3 && (c.tercero_telefono ?? "").replace(/\D/g, "").includes(digitos)));
+    // el número escrito con 0 o con país (0424…, +58 424…) contra el guardado
+    const numero = digitos.length > 10 ? digitos.slice(-10) : digitos.replace(/^0+/, "") || digitos;
+    return todas.filter((c) => sinTildes(c.tercero_nombre).includes(texto) || (digitos.length >= 3 && (c.tercero_telefono ?? "").replace(/\D/g, "").includes(numero)));
   }, [todas, buscar]);
   const delGrupo = useCallback((lista: CuentaCorrienteResumen[], g: string) => lista.filter((c) => mismoGrupo(grupoDe(c), g)), []);
   const general = useMemo(() => totalEnPesos(todas), [todas]);
@@ -89,6 +93,28 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
   const otrasMonedas = useMemo(() => totalesPorMoneda(todas), [todas]);
   const abierta = abiertaId !== null ? (todas.find((c) => c.id === abiertaId) ?? null) : null;
   const buscando = buscar.trim() !== "";
+  const moduloAqui = pagar ? "POR_PAGAR" : "POR_COBRAR";
+  // Una sola lista de clientes: el que está en otro módulo se lleva aquí sin crearlo de nuevo
+  const enOtros = useEnOtrosModulos(buscar, moduloAqui);
+  async function llevarCliente(terceroId: number, grupo?: string) {
+    try {
+      const suyas = await getCuentasCorrientes({ terceroId, soloCliente: true });
+      if (!suyas.length) return false;
+      const yaAqui = suyas.find((c) => c.modulo === moduloAqui && c.activo);
+      const cop = monedas.find((m) => m.codigo === "COP");
+      if (!yaAqui && !cop) return false;
+      const grupoCobro = grupo && grupo !== SIN_GRUPO ? grupo : undefined;
+      const cuenta = yaAqui ?? (await crearCuentaCorriente({ terceroId, modulo: moduloAqui, monedaId: cop!.id, grupoCobro, usarExistente: true }));
+      enOtros.limpiar();
+      await cargar();
+      setCreandoEn(null);
+      setAbiertaId(cuenta.id);
+      return true;
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo traer el cliente.");
+      return false;
+    }
+  }
 
   async function compartirReporte() {
     setGenerando(true);
@@ -253,6 +279,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
 
       {error && <p className="cxc-error">{error}</p>}
       {!cuentas && !error && <p className="cxc-aviso">Cargando…</p>}
+      <ListaEnOtrosModulos lista={enOtros.lista} etiqueta="Llevar aquí" puedeTraer={puedeEditar} onTraer={(c) => void llevarCliente(c.tercero_id)} />
 
       {verLesDebo && lesDebo.length > 0 && (
         <section className="cxc-les-debo" aria-label="Clientes a los que les debo">
@@ -422,6 +449,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
           grupoInicial={creandoEn}
           monedas={monedas}
           modulo={pagar ? "POR_PAGAR" : "POR_COBRAR"}
+          onClienteExistente={llevarCliente}
           onCerrar={() => setCreandoEn(null)}
           onCreado={() => {
             setCreandoEn(null);

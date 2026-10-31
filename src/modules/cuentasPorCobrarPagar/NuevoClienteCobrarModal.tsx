@@ -33,6 +33,7 @@ export function NuevoClienteCobrarModal({
   modulo = "POR_COBRAR",
   onCreado,
   onCerrar,
+  onClienteExistente,
 }: {
   grupos: string[];
   grupoInicial: string;
@@ -41,6 +42,8 @@ export function NuevoClienteCobrarModal({
   monedas: Moneda[];
   onCreado: (cuenta: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
+  // el cliente ya existe: se abre su hoja aquí. false: no se pudo abrir y se sigue en el formulario.
+  onClienteExistente?: (terceroId: number, grupo: string) => Promise<boolean>;
 }) {
   const pagar = modulo === "POR_PAGAR";
   const elegibles = grupos.filter((g) => g !== SIN_GRUPO);
@@ -144,7 +147,13 @@ export function NuevoClienteCobrarModal({
               Teléfono (para enviarle el saldo por WhatsApp)
               <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="ej. 314 349 8481" inputMode="tel" autoComplete="off" />
             </label>
-            <AvisoClienteExistente lista={existentes.lista} modulo={modulo} onUsar={setExistente} />
+            <AvisoClienteExistente
+              lista={existentes.lista}
+              modulo={modulo}
+              onUsar={async (c) => {
+                if (!(await onClienteExistente?.(c.id, grupo === NUEVO ? grupoNuevo.trim() : grupo))) setExistente(c);
+              }}
+            />
           </>
         )}
         <label>
