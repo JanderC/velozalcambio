@@ -171,4 +171,4 @@
 @media (max-width: 720px) { .cxc-hero-debo { justify-items: start; text-align: left; } .cxc-les-debo { margin: 12px 10px 0; } }
 /* lo buscado que está en otro módulo: alineado con el buscador */
 .cxc-page .cc-otros-modulos { margin: 12px 40px 0; }
-@media (max-width: 900px) { .cxc-page .cc-otros-modulos { margin: 12px 14px 0; } }
+@media (max-width: 900px) { .cxc-page .cc-otros-modulos { margin: 12px 10px 0; } }
