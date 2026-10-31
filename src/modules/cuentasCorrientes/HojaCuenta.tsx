@@ -4,12 +4,11 @@ import {
   anularMovimientoCC,
   confirmarMovimientoCC,
   avisarClienteCuenta,
-  buscarMovimientoPorNumero,
+  buscarCapturasParecidas,
   buscarOperacionIgual,
-  confirmarOperacionIgual,
   codigosDeReferencia,
   eliminarCuentaCorriente,
-  type MovimientoConNumero,
+  type CaptureParecido,
   cerrarDiaCuenta,
   configurarCobroCuenta,
   crearCuentaCorriente,
@@ -55,6 +54,7 @@ import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multipl
 import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { motivoDeLectura, motivosDeMonto, VerificarMontosModal, type MontoAVerificar, type Verificacion } from "./verificarMontos";
+import { useCaptureParecido } from "./CaptureParecido";
 import { LINEAS_WA, whatsappApi, type ConexionWa, type LineaWa } from "../../api/whatsapp.api";
 import { abrirChatEnBurbuja } from "../../components/whatsapp/BurbujaWhatsapp";
 import { EnviarReportePorVinculado } from "../../components/whatsapp/EnviarReportePorVinculado";
@@ -1430,7 +1430,8 @@ export function HojaCuenta({
 }
 
 // Lo que hace falta de un movimiento ya cargado para saber si es la misma transferencia
-type MovimientoIgual = { descripcion: string | null; fecha: string; cantidad_base: string | null; monto: string; anulado?: boolean; reverso_de_id?: number | null };
+const NO_SE_REGISTRO = "No se registró: es la misma operación.";
+type MovimientoIgual = { id: number; descripcion: string | null; fecha: string; cantidad_base: string | null; monto: string; anulado?: boolean; reverso_de_id?: number | null };
 
 function FilaNueva({
   cuenta,
@@ -1874,7 +1875,8 @@ function FilaNueva({
   // con varias capturas hay varias referencias: ninguna puede estar ya registrada
   const numerosMovimiento = nMtcn.length >= 4 ? [nMtcn] : pidePersona ? codigosDeReferencia(persona) : [];
   const numeroMovimiento = numerosMovimiento[0] ?? null;
-  const [repetido, setRepetido] = useState<MovimientoConNumero | null>(null);
+  const [repetido, setRepetido] = useState<CaptureParecido | null>(null);
+  const capturaParecida = useCaptureParecido();
   // En Confirmaciones el bloqueo es por medio de pago (el del cliente): la misma referencia puede estar en Bancolombia
   // y en Nequi, pero no dos veces en el mismo medio. En los demás módulos el medio no es el canal: se busca en todos.
   const canalDelBloqueo = enConfirmaciones ? medioMov.id : undefined;
@@ -1882,14 +1884,14 @@ function FilaNueva({
     setRepetido(null);
     if (!numeroMovimiento) return;
     const t = setTimeout(() => {
-      buscarMovimientoPorNumero(numeroMovimiento, canalDelBloqueo)
-        .then(setRepetido)
+      buscarCapturasParecidas(numeroMovimiento, canalDelBloqueo)
+        .then((l) => setRepetido(l[0] ?? null))
         .catch(() => {});
     }, 400);
     return () => clearTimeout(t);
   }, [numeroMovimiento, canalDelBloqueo]);
-  const avisoRepetido = (m: MovimientoConNumero, numero: string | null = numeroMovimiento) =>
-    `Ya hay un movimiento con la referencia ${numero}${canalDelBloqueo && m.canal_nombre ? ` por ${m.canal_nombre.replace(/_/g, " ")}` : ""}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
+  const avisoRepetido = (m: CaptureParecido, numero: string | null = numeroMovimiento) =>
+    `${m.exacta ? "Ya hay un movimiento con la referencia" : "Hay un movimiento con una referencia parecida a"} ${numero}${canalDelBloqueo && m.canal_nombre ? ` por ${m.canal_nombre.replace(/_/g, " ")}` : ""}: "${m.descripcion}" de ${m.tercero_nombre}, del ${fechaCorta(m.fecha)}.`;
   const personaObligatoria = pidePersona && /zelle/i.test(referencia);
   // Confirmaciones: si no se escribe la operación, es "Compra Nequi" / "Venta Zelle"… según el botón y el medio del cliente.
   // (La referencia de la transferencia es el otro casillero: llenar ese no tiene que pedir este.)
@@ -2032,7 +2034,7 @@ function FilaNueva({
           continue;
         }
         vistas.add(clave);
-        const ya = await buscarMovimientoPorNumero(ref, canalDelBloqueo).catch(() => null);
+        const ya = (await buscarCapturasParecidas(ref, canalDelBloqueo).catch(() => []))[0];
         if (ya) encontradas[clave] = avisoRepetido(ya, ref);
       }
       setRepetidasVarias(encontradas);
@@ -2059,11 +2061,24 @@ function FilaNueva({
   const filasDeTransferencias = (cantidades: (string | null)[]) =>
     transferencias.map((t, i) => ({ etiqueta: `Transferencia ${i + 1}${t.referencia.trim() ? ` · ${t.referencia.trim()}` : ""}`, valor: dineroEn(cantidades[i] ?? "0", codigoLlega) }));
 
+  /** Varias transferencias: una referencia no puede ir dos veces en la lista, y lo parecido se compara con su capture. */
+  async function revisarVarias() {
+    const refs = referenciasVarias ? referenciasVarias.split("|") : [];
+    if (new Set(refs.map((r) => r.toLowerCase())).size < refs.length) {
+      setError("Hay una referencia que está dos veces en esta lista: corregila antes de cargar.");
+      return false;
+    }
+    const imagenes = transferencias.flatMap((t) => (t.captura ? [t.captura] : []));
+    if (await capturaParecida.revisar(refs, canalDelBloqueo, imagenes)) return true;
+    setError(NO_SE_REGISTRO);
+    return false;
+  }
+
   /** Las transferencias van a Cuentas por Pagar: lo enviado se le junta ahí (sin comisión) hasta que complete. */
   async function cargarVariasAPagar() {
     const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto, incluidaVarias);
     if (r.cantidades.some((c) => !c || !/[1-9]/.test(c))) return setError("Falta el monto de una transferencia.");
-    if (Object.keys(repetidasVarias).length) return setError("Hay una referencia que ya está registrada: corregila antes de cargar.");
+    if (!(await revisarVarias())) return;
     if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
     const monedaLlega = monedas.find((m) => m.codigo === codigoLlega);
     if (!monedaLlega) return setError(`No encuentro la moneda ${codigoLlega}.`);
@@ -2146,7 +2161,7 @@ function FilaNueva({
     if (destinoVarias === "pagar") return cargarVariasAPagar();
     const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto, incluidaVarias);
     if (r.error || !r.resultado) return setError(r.error ?? "Revisá los montos.");
-    if (Object.keys(repetidasVarias).length) return setError("Hay una referencia que ya está registrada: corregila antes de cargar.");
+    if (!(await revisarVarias())) return;
     if (esWestern && nMtcn.length < 6) return setError("Por Western Union hace falta el MTCN (el número de referencia del envío).");
     if (otraMoneda && !monedaEntrega) return setError(`No encuentro la moneda ${codigoMonto}.`);
     const pagarCon = !resta && pago.modo === "otro" ? pago : null;
@@ -2300,15 +2315,7 @@ function FilaNueva({
     if (nCantidad && Number(sinSigno(nCantidad)) !== Number(repartidoTotal)) {
       return setError(`Las partes suman ${formatearMonto(repartidoTotal)} ${codigoLlega} y en Cantidad dice ${formatearMonto(sinSigno(nCantidad))}. Ajustá las partes (o dejá Cantidad vacía).`);
     }
-    for (const numero of numerosMovimiento) {
-      const ya = (numero === numeroMovimiento ? repetido : null) ?? (await buscarMovimientoPorNumero(numero, canalDelBloqueo).catch(() => null));
-      if (ya) {
-        if (numero === numeroMovimiento) setRepetido(ya);
-        const aviso = `${avisoRepetido(ya, numero)} No se puede registrar dos veces: el movimiento NO se generó.`;
-        window.alert(`Referencia repetida\n\n${aviso}`);
-        return setError(aviso);
-      }
-    }
+    if (!(await capturaParecida.revisar(numerosMovimiento, canalDelBloqueo, imagenesAdjuntas))) return setError(NO_SE_REGISTRO);
     const verificado = await confirmarVerificacion(
       cuentas.map((c, i) => ({ monto: c.total!, codigo: partes[i]!.moneda })),
       [
@@ -2456,23 +2463,13 @@ function FilaNueva({
     if (convierte && esPorcentaje) return setError(`Un % no pasa de ${monedaMov} a ${codigoMonto}: usá la tasa (× o ÷).`);
     if (conCaja && cajaId === "") return setError(cajaObligatoria ? "Elegí qué caja alimenta este movimiento." : "Elegí la caja o banco que también se mueve.");
     if (conCaja && !monedaCaja) return setError(`No encuentro la moneda ${movimientoCaja?.codigo ?? ""} para mover la caja.`);
-    for (const numero of numerosMovimiento) {
-      // se vuelve a consultar al guardar: el aviso de arriba puede no haber llegado todavía
-      const ya = (numero === numeroMovimiento ? repetido : null) ?? (await buscarMovimientoPorNumero(numero, canalDelBloqueo).catch(() => null));
-      if (ya) {
-        if (numero === numeroMovimiento) setRepetido(ya);
-        // referencia repetida: no se genera el movimiento y se avisa con una alerta
-        const aviso = `${avisoRepetido(ya, numero)} No se puede registrar dos veces: el movimiento NO se generó.`;
-        window.alert(`Referencia repetida\n\n${aviso}`);
-        return setError(aviso);
-      }
-    }
+    if (!(await capturaParecida.revisar(numerosMovimiento, canalDelBloqueo, imagenesAdjuntas))) return setError(NO_SE_REGISTRO);
 
     // Zelle no trae número: el mismo capture se puede registrar dos veces, incluso a otro cliente
     if (enConfirmaciones && !resta && esZelle && canalDelBloqueo) {
       const montos = [conTasa && nCantidad ? sinSigno(nCantidad) : null, monto].filter((v): v is string => !!v);
       const igual = await buscarOperacionIgual(canalDelBloqueo, montos, cuenta.id).catch(() => null);
-      if (igual && !confirmarOperacionIgual(igual)) return setError("No se registró: es la misma operación.");
+      if (igual && !(await capturaParecida.mostrar([igual], imagenesAdjuntas))) return setError(NO_SE_REGISTRO);
     }
 
     // Misma persona que envía y mismo monto que un movimiento ya cargado en esta cuenta: puede ser la misma
@@ -2496,11 +2493,22 @@ function FilaNueva({
         .catch(() => undefined); // sin conexión para consultar: no se frena la carga
       if (igual) {
         const cuanto = igual.cantidad_base ? formatearMonto(sinSigno(igual.cantidad_base)) : `${simbolo}${formatearMonto(sinSigno(igual.monto))}`;
-        const agregar = window.confirm(
-          `Posible transferencia repetida\n\nYa hay un movimiento de "${persona.trim()}" por ${cuanto} en esta cuenta:\n"${igual.descripcion}" del ${fechaCorta(igual.fecha)}.\n\n` +
-            `¿Agregarla de todos modos?\nAceptar: se agrega (es otra transferencia). Cancelar: no se agrega.`
-        );
-        if (!agregar) return setError(`No se agregó: ya había un movimiento de "${persona.trim()}" por ${cuanto} del ${fechaCorta(igual.fecha)}.`);
+        const parecido: CaptureParecido = {
+          id: igual.id,
+          transferencia_id: null,
+          fecha: igual.fecha,
+          descripcion: igual.descripcion ?? "",
+          monto: igual.monto,
+          moneda_codigo: cuenta.moneda_codigo,
+          referencia: "",
+          tiene_comprobante: true,
+          exacta: false,
+          bloquea: false,
+          tercero_nombre: cuenta.tercero_nombre,
+          canal_nombre: medioMov.nombre,
+          registrado_por: null,
+        };
+        if (!(await capturaParecida.mostrar([parecido], imagenesAdjuntas))) return setError(`No se agregó: ya había un movimiento de "${persona.trim()}" por ${cuanto} del ${fechaCorta(igual.fecha)}.`);
       }
     }
 
@@ -2755,6 +2763,7 @@ function FilaNueva({
     </button>
     {abierta && <div className="cc-velo" onClick={() => setAbierta(false)} />}
     {verificacion && <VerificarMontosModal verificacion={verificacion} />}
+    {capturaParecida.modal}
     <form className={`cc-nueva ${abierta ? "abierta" : ""}`} onSubmit={guardar}>
       <div className="cc-nueva-titulo">
         Nuevo movimiento

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Modal } from "../../components/common/Modal";
 import { Camera } from "lucide-react";
-import { buscarMovimientoPorNumero, buscarOperacionIgual, codigosDeReferencia, confirmarOperacionIgual, crearCuentaCorriente, pagarConfirmacionOtroMetodo, pagarParteConfirmacion, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { buscarOperacionIgual, codigosDeReferencia, crearCuentaCorriente, pagarConfirmacionOtroMetodo, pagarParteConfirmacion, registrarMovimientoCC, subirComprobanteMovimiento, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { buscarTerceros, type Tercero } from "../../api/terceros.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { ApiError } from "../../api/client";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
 import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
+import { useCaptureParecido } from "./CaptureParecido";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, montoParte, type PagoElegido } from "./PagoConfirmacion";
 import { METODOS, comisionPara, detectarMetodo, esFacturaBancolombia, formulaDeOperacion, nombreMetodo, sigueLaRegla, tasaDeOperacion, tasaDelMetodo, type Metodo } from "./metodoPago";
@@ -50,6 +51,7 @@ export function NuevaCuentaModal({
   onCerrar: () => void;
 }) {
   const [modo, setModo] = useState<"nuevo" | "existente">("nuevo");
+  const capturaParecida = useCaptureParecido();
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO" | "EVENTUAL">(modulo === "CAJA" ? "CLIENTE" : "PROVEEDOR");
   const [referencia, setReferencia] = useState(""); // dato libre del cliente (Confirmaciones)
@@ -392,21 +394,14 @@ export function NuevaCuentaModal({
       // Un número de transferencia no se registra dos veces
       // (con varias capturas hay varias referencias: se revisan todas)
       const numeros = !conMovimiento ? [] : nMovMtcn.length >= 4 ? [nMovMtcn] : codigosDeReferencia(movPersona);
-      for (const numero of numeros) {
-        // en Confirmaciones solo se busca dentro del medio elegido: la misma referencia puede existir en otro banco
-        const ya = await buscarMovimientoPorNumero(numero, enLinea ? medio?.id : undefined).catch(() => null);
-        if (ya) {
-          // referencia repetida: no se crea el cliente ni se genera el movimiento, y se avisa con una alerta
-          const aviso = `Ya hay un movimiento con la referencia ${numero}${enLinea && etiquetaMedio ? ` por ${etiquetaMedio}` : ""}:"${ya.descripcion}" de ${ya.tercero_nombre}. No se puede registrar dos veces: el movimiento NO se generó.`;
-          window.alert(`Referencia repetida\n\n${aviso}`);
-          return setError(aviso);
-        }
-      }
+      // en Confirmaciones solo se busca dentro del medio elegido: la misma referencia puede existir en otro banco
+      // si es la misma: no se crea el cliente ni se genera el movimiento
+      if (!(await capturaParecida.revisar(numeros, enLinea ? medio?.id : undefined, imagenesAdjuntas))) return setError("No se registró: es la misma operación.");
       // Zelle no trae número: el mismo capture se puede registrar dos veces, incluso a otro cliente
       if (conMovimiento && !movResta && medio?.nombre === "ZELLE") {
         const montos = [nMovCantidad, movMonto].filter((v): v is string => !!v).map((v) => v.replace(/^-/, ""));
         const igual = await buscarOperacionIgual(medio.id, montos).catch(() => null);
-        if (igual && !confirmarOperacionIgual(igual)) return setError("No se registró: es la misma operación.");
+        if (igual && !(await capturaParecida.mostrar([igual], imagenesAdjuntas))) return setError("No se registró: es la misma operación.");
       }
       const datosCuenta = {
         ...(modo === "existente" ? { terceroId: tercero!.id, usarExistente: true } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
@@ -524,6 +519,7 @@ export function NuevaCuentaModal({
 
   const formulario = (
       <form className="cc-modal" onSubmit={guardar}>
+        {capturaParecida.modal}
         {!enLinea && (
           <div className="cc-segmento" role="tablist">
             <button type="button" role="tab" aria-selected={modo === "nuevo"} className={modo === "nuevo" ? "activo" : ""} onClick={() => setModo("nuevo")}>

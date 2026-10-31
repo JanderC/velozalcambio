@@ -212,13 +212,21 @@ export function cerrarDiaCuenta(cuentaId: number, dia: string) {
   return api.post<EstadoCuenta>(`/cuentas-corrientes/${cuentaId}/cierres`, { dia });
 }
 
-export interface MovimientoConNumero {
+/** Un movimiento ya registrado que se parece al que se va a registrar: lo necesario para comparar los captures. */
+export interface CaptureParecido {
   id: number;
+  transferencia_id: number | null; // la captura está en una de las transferencias de ese movimiento
   fecha: string;
   descripcion: string;
   monto: string;
+  moneda_codigo: string;
+  referencia: string;
+  tiene_comprobante: boolean;
+  exacta: boolean; // la misma referencia, no solo parecida
+  bloquea: boolean; // no se puede registrar: el medio no repite números
   tercero_nombre: string;
-  canal_nombre?: string; // el medio de pago donde está registrada
+  canal_nombre: string;
+  registrado_por: string | null;
 }
 
 /**
@@ -237,27 +245,18 @@ export function codigosDeReferencia(texto: string): string[] {
 }
 
 /**
- * El movimiento ya registrado con ese número de transferencia, si lo hay.
- * canalId: se busca solo dentro de ese medio de pago. La misma referencia puede existir en Bancolombia y en Nequi,
- * pero no dos veces en el mismo medio. Sin canal se busca en todos.
+ * Los movimientos con esa referencia o una parecida (sin importar guiones ni ceros a la izquierda).
+ * canalId: se busca solo dentro de ese medio de pago. La misma referencia puede existir en Bancolombia y en Nequi.
  */
-export async function buscarMovimientoPorNumero(numero: string, canalId?: number) {
+export function buscarCapturasParecidas(numero: string, canalId?: number) {
   const filtro = canalId ? `?canalId=${canalId}` : "";
-  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/numero/${encodeURIComponent(numero)}${filtro}`)).movimiento;
+  return api.get<CaptureParecido[]>(`/cuentas-corrientes/movimientos/parecidos/${encodeURIComponent(numero)}${filtro}`);
 }
 
 /** Zelle no trae número: una operación de las últimas 24 horas por ese medio y con ese monto, en cualquier cliente. */
 export async function buscarOperacionIgual(canalId: number, montos: string[], cuentaId?: number) {
   const filtro = cuentaId ? `&cuentaId=${cuentaId}` : "";
-  return (await api.get<{ movimiento: MovimientoConNumero | null }>(`/cuentas-corrientes/movimientos/operacion-igual?canalId=${canalId}&montos=${montos.join(",")}${filtro}`)).movimiento;
-}
-
-/** Pregunta antes de registrar otra operación igual. true: seguir. */
-export function confirmarOperacionIgual(ya: MovimientoConNumero) {
-  return window.confirm(
-    `Posible capture repetido\n\nHace poco se registró una operación igual por ${ya.canal_nombre}:\n${ya.tercero_nombre} · ${ya.descripcion} · ${Number(ya.monto).toLocaleString("es-CO")}\n\n` +
-      `Aceptar: es otra transferencia, se registra.\nCancelar: es la misma, no se registra nada.`
-  );
+  return (await api.get<{ movimiento: CaptureParecido | null }>(`/cuentas-corrientes/movimientos/operacion-igual?canalId=${canalId}&montos=${montos.join(",")}${filtro}`)).movimiento;
 }
 
 /** Manda un mensaje al cliente por el WhatsApp conectado al sistema. */
