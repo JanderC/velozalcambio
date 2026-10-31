@@ -214,6 +214,8 @@ export function NuevaCuentaModal({
       setMovValor(delDia ? escrita(delDia) : "");
     }
     setMovFormula(regla === "multiplicar" ? "tasa" : regla);
+    // ya no es con comisión: que el aviso de la captura no lo siga diciendo
+    if (regla !== "comision") setAvisoLectura((a) => a?.replace(/: comisión [d.,]+% ([^)]*)/, "") ?? null);
   }
   function aplicarMetodo(metodo: Metodo, total: string | null, referenciaLeida: string | null) {
     setPreguntaMetodo(null);
