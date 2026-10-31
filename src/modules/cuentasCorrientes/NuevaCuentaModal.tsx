@@ -603,6 +603,9 @@ export function NuevaCuentaModal({
                 setTercero(null);
                 // en Confirmaciones no hay buscador: se vuelve a escribir el cliente
                 if (enLinea) setModo("nuevo");
+                // sin el número: con ese teléfono se volvería a elegir el mismo cliente
+                tocado.current.telefono = true;
+                setTelefono("");
               }}
             >
               Cambiar

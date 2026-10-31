@@ -323,6 +323,7 @@ export function TransferenciaCobrarModal({
             onChange={(e) => {
               setNombre(e.target.value);
               setElegida(null);
+              if (existente) setTelefono(""); // con ese número se volvería a elegir el mismo cliente
               setExistente(null);
             }}
             placeholder="Nombre del cliente"

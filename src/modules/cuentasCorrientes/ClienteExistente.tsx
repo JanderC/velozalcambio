@@ -38,6 +38,11 @@ export function AvisoClienteExistente({
   modulo: string;
   onUsar: (c: ClienteExistente) => void;
 }) {
+  // Un número es de un solo cliente: con ese teléfono no hay nada que preguntar, se usa ese cliente
+  const delTelefono = lista.find((c) => c.mismo_telefono);
+  useEffect(() => {
+    if (delTelefono) onUsar(delTelefono);
+  }, [delTelefono?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (lista.length === 0) return null;
   const aqui = NOMBRE_DEL_MODULO[modulo] ?? "este módulo";
   return (
@@ -56,7 +61,7 @@ export function AvisoClienteExistente({
                 {c.telefono ? `${c.telefono} · ` : ""}
                 {donde.length ? `está en ${donde.join(", ")}` : "registrado, sin cuentas abiertas"}
                 {" · "}
-                {c.mismo_nombre && c.mismo_telefono ? "mismo nombre y teléfono" : c.mismo_nombre ? "mismo nombre" : "mismo teléfono"}
+                {c.mismo_nombre && c.mismo_telefono ? "mismo nombre y teléfono" : c.mismo_nombre ? "mismo nombre" : c.mismo_telefono ? "mismo teléfono" : "nombre parecido"}
               </small>
             </div>
             <span className="cc-existente-acciones">

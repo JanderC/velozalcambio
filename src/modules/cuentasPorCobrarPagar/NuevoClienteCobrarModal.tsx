@@ -124,7 +124,13 @@ export function NuevoClienteCobrarModal({
         {existente ? (
           <p className="cc-elegido">
             <strong>{existente.nombre}</strong> · {existente.telefono ? `${existente.telefono} · ` : ""}ya está en el sistema: se le abre su cuenta aquí
-            <button type="button" onClick={() => setExistente(null)}>
+            <button
+              type="button"
+              onClick={() => {
+                setExistente(null);
+                setTelefono(""); // con ese número se volvería a elegir el mismo cliente
+              }}
+            >
               Cambiar
             </button>
           </p>

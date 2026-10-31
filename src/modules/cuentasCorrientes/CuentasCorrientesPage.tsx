@@ -119,31 +119,45 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
     return () => clearTimeout(t);
   }, [cargar, buscar]);
 
-  // Cuentas Corrientes: si lo buscado no está acá pero el cliente existe en otro módulo (Cuentas por Cobrar o
-  // Confirmaciones), se dice dónde está y se le puede abrir una cuenta corriente sin volver a crearlo
+  // Una sola lista de clientes: lo buscado que tiene cuenta en otro módulo (y no aquí) también sale, con dónde está,
+  // y se le abre su cuenta aquí sin volver a crearlo
   const [enOtrosModulos, setEnOtrosModulos] = useState<CuentaCorrienteResumen[]>([]);
-  const sinResultados = modo === "corrientes" && !cargando && cuentas.length === 0 && buscar.trim().length >= 3;
+  const moduloAqui = modo === "cajas" ? "CAJA" : "CORRIENTE";
+  const buscaEnTodos = modo !== "cobrar" && buscar.trim().length >= 3;
   useEffect(() => {
-    if (!sinResultados) return setEnOtrosModulos([]);
+    if (!buscaEnTodos) return setEnOtrosModulos([]);
     let vigente = true;
-    getCuentasCorrientes({ buscar })
-      .then((todas) => vigente && setEnOtrosModulos(todas.filter((c) => c.modulo !== "CORRIENTE")))
-      .catch(() => vigente && setEnOtrosModulos([]));
+    const t = setTimeout(() => {
+      getCuentasCorrientes({ buscar })
+        .then((todas) => {
+          if (!vigente) return;
+          const yaAqui = new Set(todas.filter((c) => c.modulo === moduloAqui).map((c) => c.tercero_id));
+          const unaPorCliente = new Map(todas.filter((c) => !yaAqui.has(c.tercero_id)).map((c) => [c.tercero_id, c]));
+          setEnOtrosModulos([...unaPorCliente.values()]);
+        })
+        .catch(() => vigente && setEnOtrosModulos([]));
+    }, 300);
     return () => {
       vigente = false;
+      clearTimeout(t);
     };
-  }, [sinResultados, buscar]);
+  }, [buscaEnTodos, buscar, moduloAqui]);
   async function abrirCuentaAqui(c: CuentaCorrienteResumen) {
     try {
-      const nueva = await crearCuentaCorriente({ terceroId: c.tercero_id, modulo: "CORRIENTE", monedaId: c.moneda_id });
+      const nueva = await crearCuentaCorriente(
+        modo === "cajas"
+          ? { terceroId: c.tercero_id, modulo: "CAJA", monedaId: c.moneda_id, canalId: canalId || c.canal_id, usarExistente: true }
+          : { terceroId: c.tercero_id, modulo: "CORRIENTE", monedaId: c.moneda_id }
+      );
+      setEnOtrosModulos([]);
       await cargar();
       setSeleccionadaId(nueva.id);
     } catch (e) {
       setError((e as Error).message);
     }
   }
-  const NOMBRE_MODULO: Record<string, string> = { POR_COBRAR: "Cuentas por Cobrar y Pagar", POR_PAGAR: "Cuentas por Pagar", CAJA: "Confirmaciones" };
-  const RUTA_MODULO: Record<string, string> = { POR_COBRAR: "/cuentas-por-cobrar-pagar", POR_PAGAR: "/cuentas-por-pagar", CAJA: "/cajas-confirmaciones" };
+  const NOMBRE_MODULO: Record<string, string> = { CORRIENTE: "Cuentas Corrientes", POR_COBRAR: "Cuentas por Cobrar y Pagar", POR_PAGAR: "Cuentas por Pagar", CAJA: "Confirmaciones" };
+  const RUTA_MODULO: Record<string, string> = { CORRIENTE: "/cuentas-corrientes", POR_COBRAR: "/cuentas-por-cobrar-pagar", POR_PAGAR: "/cuentas-por-pagar", CAJA: "/cajas-confirmaciones" };
 
   // Totales por moneda: lo que me deben y lo que debo
   const resumen = useMemo(() => {
@@ -275,7 +289,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
 
           {error && <p className="cc-form-error cc-pad">{error}</p>}
           {cargando && <p className="cc-lista-aviso">Cargando…</p>}
-          {!cargando && visibles.length === 0 && !error && (
+          {!cargando && visibles.length === 0 && enOtrosModulos.length === 0 && !error && (
             <p className="cc-lista-aviso">
               {buscar || tipo || sentido || (canalId && modo !== "cajas")
                 ? modo === "cajas"
@@ -302,9 +316,9 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
                       </small>
                     </span>
                     <span className="cc-otros-modulos-acciones">
-                      {puedeCrear && (
-                        <button type="button" onClick={() => void abrirCuentaAqui(c)} title="Le abre una cuenta en Cuentas Corrientes al mismo cliente (no se crea de nuevo; lo de allá no se toca)">
-                          Abrirle cuenta aquí
+                      {(puedeCrear || modo === "cajas") && (
+                        <button type="button" onClick={() => void abrirCuentaAqui(c)} title={`Le abre una cuenta en ${NOMBRE_MODULO[moduloAqui]} al mismo cliente (no se crea de nuevo; lo de allá no se toca)`}>
+                          {modo === "cajas" ? "Traer a Confirmaciones" : "Abrirle cuenta aquí"}
                         </button>
                       )}
                       {RUTA_MODULO[c.modulo] && <Link to={RUTA_MODULO[c.modulo]!}>Ver allá</Link>}
