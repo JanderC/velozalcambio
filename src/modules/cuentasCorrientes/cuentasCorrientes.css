@@ -685,9 +685,15 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-varias-progreso { display: block; font-size: 0.8rem; color: #4b5563; margin: 2px 0 6px; line-height: 1.4; }
 .cc-varias-destino { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 0.85rem; flex-wrap: wrap; }
 
-/* Confirmaciones: el cliente es uno solo; sus hojas y sus últimos movimientos, juntos */
-.cc-cliente { border: 1px solid #e6e9ef; border-radius: 10px; background: #fafbfc; padding: 10px 12px; margin-bottom: 14px; }
-.cc-cliente-cuentas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+/* Confirmaciones: el cliente es uno solo; sus hojas en una barra y sus últimos movimientos desplegados encima de la hoja */
+.cc-cliente { position: relative; border: 1px solid #e6e9ef; border-radius: 10px; background: #fafbfc; padding: 6px 8px 6px 12px; margin-bottom: 14px; }
+.cc-cliente-barra { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.cc-cliente-rotulo { font-size: 0.82rem; color: #6b7280; }
+.cc-cliente-flecha { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0; margin-left: auto; border: none; border-radius: 50%; background: none; color: var(--color-navy); cursor: pointer; transition: transform 0.15s ease; }
+.cc-cliente-flecha:hover { background: #eaf1f8; }
+.cc-cliente-flecha.abierta { transform: rotate(180deg); }
+.cc-cliente-panel { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; max-height: 320px; overflow-y: auto; background: white; border: 1px solid #e6e9ef; border-radius: 10px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12); padding: 6px 10px 8px; }
+.cc-cliente-cuentas { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .cc-cliente-cuentas button { border: 1px solid #d7dbe2; background: white; color: #4b5563; border-radius: 16px; padding: 4px 11px; font-family: inherit; font-size: 0.8rem; cursor: pointer; }
 .cc-cliente-cuentas button b { color: var(--color-navy-dark); margin-left: 3px; font-variant-numeric: tabular-nums; }
 .cc-cliente-cuentas button.activa { background: var(--color-navy); border-color: var(--color-navy); color: white; }
