@@ -11,7 +11,7 @@ import { ApiError } from "../../api/client";
 import { HojaCuenta } from "./HojaCuenta";
 import { ImportarSaldosForm } from "./ImportarSaldosForm";
 import { NuevaCuentaModal } from "./NuevaCuentaModal";
-import { ResumenCliente } from "./ResumenCliente";
+import { ResumenCliente, cuentaPrincipal } from "./ResumenCliente";
 import { ListaEnOtrosModulos, cuentaParaTraer, useEnOtrosModulos } from "./EnOtrosModulos";
 import { PersonalizarCanalesModal } from "./PersonalizarCanalesModal";
 import "./cuentasCorrientes.css";
@@ -54,13 +54,6 @@ function sumaPorMoneda(cuentas: CuentaCorrienteResumen[], campo: "saldo_actual" 
 }
 
 const sinTildes = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-/** La cuenta que representa al cliente en la lista: donde apareció lo buscado, la que tiene saldo o la de su último movimiento. */
-function cuentaPrincipal(cuentas: CuentaCorrienteResumen[]) {
-  const fecha = (c: CuentaCorrienteResumen) => (c.ultimo_movimiento ? new Date(c.ultimo_movimiento).getTime() : 0);
-  const peso = (c: CuentaCorrienteResumen) => (c.movimiento_coincide ? 2 : conSaldo(c) ? 1 : 0);
-  return [...cuentas].sort((a, b) => peso(b) - peso(a) || fecha(b) - fecha(a))[0]!;
-}
 
 function montoTexto(valor: string, moneda: string) {
   const negativo = valor.startsWith("-");

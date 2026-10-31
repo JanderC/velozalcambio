@@ -6,6 +6,13 @@ import { formatearMonto } from "../../utils/montos";
 const MEDIO: Record<string, string> = { BOLIVARES: "Bolívares", BANCOLOMBIA: "Bancolombia", NEQUI: "Nequi", USDT: "USDT", WESTERN_UNION: "Western Union", ZELLE: "Zelle" };
 const VISIBLES = 4;
 
+/** La cuenta que representa al cliente en una lista: donde apareció lo buscado, la que tiene saldo o la de su último movimiento. */
+export function cuentaPrincipal(cuentas: CuentaCorrienteResumen[]) {
+  const fecha = (c: CuentaCorrienteResumen) => (c.ultimo_movimiento ? new Date(c.ultimo_movimiento).getTime() : 0);
+  const peso = (c: CuentaCorrienteResumen) => (c.movimiento_coincide ? 2 : /[1-9]/.test(c.saldo_actual) ? 1 : 0);
+  return [...cuentas].sort((a, b) => peso(b) - peso(a) || fecha(b) - fecha(a))[0]!;
+}
+
 const dinero = (valor: string, moneda: string) => {
   const numero = formatearMonto(valor.replace(/^-/, ""));
   return moneda === "COP" ? `$${numero}` : `${numero} ${moneda}`;
@@ -13,13 +20,14 @@ const dinero = (valor: string, moneda: string) => {
 const cuando = (fecha: string) => new Date(fecha).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 /**
- * Confirmaciones: el cliente es uno solo aunque haya pagado por varios medios o en varias monedas. Arriba de su hoja va
+ * El cliente es uno solo aunque haya pagado por varios medios o en varias monedas. Arriba de su hoja va
  * una barra con sus hojas y una flecha: los últimos movimientos se despliegan encima de la hoja, sin correrla.
  */
 export function ResumenCliente({
   cuentas,
   cuentaId,
   terceroId,
+  modulo = "CAJA",
   version,
   onElegirCuenta,
   onVerMovimiento,
@@ -27,6 +35,7 @@ export function ResumenCliente({
   cuentas: CuentaCorrienteResumen[];
   cuentaId: number;
   terceroId: number;
+  modulo?: CuentaCorrienteResumen["modulo"];
   version: number; // cambia cuando se registra algo: se vuelven a traer los movimientos
   onElegirCuenta: (id: number) => void;
   onVerMovimiento: (m: MovimientoCliente) => void;
@@ -37,13 +46,13 @@ export function ResumenCliente({
   const barra = useRef<HTMLElement>(null);
   useEffect(() => {
     let vigente = true;
-    getUltimosDelCliente(terceroId)
+    getUltimosDelCliente(terceroId, modulo)
       .then((l) => vigente && setMovimientos(l))
       .catch(() => vigente && setMovimientos([]));
     return () => {
       vigente = false;
     };
-  }, [terceroId, version]);
+  }, [terceroId, modulo, version]);
 
   // se cierra al tocar por fuera o con Escape; al volver a abrir empieza compacto
   useEffect(() => {
@@ -71,7 +80,7 @@ export function ResumenCliente({
           <div className="cc-cliente-cuentas" role="tablist" aria-label="Hojas del cliente">
             {cuentas.map((c) => (
               <button key={c.id} type="button" role="tab" aria-selected={c.id === cuentaId} className={c.id === cuentaId ? "activa" : ""} onClick={() => onElegirCuenta(c.id)}>
-                {MEDIO[c.canal_nombre] ?? c.canal_nombre.replace(/_/g, " ")} <b>{dinero(c.saldo_actual, c.moneda_codigo)}</b>
+                {c.canal_nombre === "SIN_BANCO" ? "Hoja" : (MEDIO[c.canal_nombre] ?? c.canal_nombre.replace(/_/g, " "))} <b>{dinero(c.saldo_actual, c.moneda_codigo)}</b>
               </button>
             ))}
           </div>

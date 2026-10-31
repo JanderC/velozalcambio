@@ -5,11 +5,12 @@ import { Header } from "../../components/common/Header";
 import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
-import { cambiarGrupoCobro, crearCuentaCorriente, getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { cambiarCanalCuenta, cambiarGrupoCobro, crearCuentaCorriente, getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { alAbrirWhatsApp, enlaceWhatsApp, telefonoWhatsApp } from "../../utils/whatsapp";
 import { HojaCuenta } from "../cuentasCorrientes/HojaCuenta";
 import { ListaEnOtrosModulos, useEnOtrosModulos } from "../cuentasCorrientes/EnOtrosModulos";
+import { ResumenCliente, cuentaPrincipal } from "../cuentasCorrientes/ResumenCliente";
 import { compartirImagen, copiarImagen, descargarBlob } from "../cuentasCorrientes/imagenReporte";
 import "../cuentasCorrientes/cuentasCorrientes.css";
 import { SIN_GRUPO, detalleMoneda, dinero, enPesos, fechaDeHoy, grupoDe, gruposDe, mensajeDeCobro, mismoGrupo, totalEnPesos, totalesPorMoneda } from "./cobrar";
@@ -21,6 +22,13 @@ import { generarReporteCobrar } from "./reporteCobrar";
 import "./cuentasPorCobrar.css";
 
 const NUEVO_GRUPO = "__nuevo__";
+/** Una fila por cliente: sus cuentas de aquí juntas, aunque las lleve en varias monedas. */
+function filasPorCliente(lista: CuentaCorrienteResumen[]) {
+  const porCliente = new Map<number, CuentaCorrienteResumen[]>();
+  for (const c of lista) porCliente.set(c.tercero_id, [...(porCliente.get(c.tercero_id) ?? []), c]);
+  return [...porCliente.values()].map((suyas) => ({ c: cuentaPrincipal(suyas), suyas }));
+}
+
 const sinTildes = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /**
@@ -38,6 +46,9 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
   const ver = (v: string) => (!pagar ? v : v.startsWith("-") ? v.slice(1) : /[1-9]/.test(v) ? `-${v}` : v);
   const [cuentas, setCuentas] = useState<CuentaCorrienteResumen[] | null>(null);
   const [monedas, setMonedas] = useState<Moneda[]>([]);
+  const [canales, setCanales] = useState<Canal[]>([]);
+  const [versionCliente, setVersionCliente] = useState(0);
+  const [irA, setIrA] = useState<{ cuentaId: number; id: number; fecha: string; clave: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
   // ?cuenta=: se entra directo a esa cuenta (desde Capital de giros)
@@ -66,6 +77,9 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
     getMonedas()
       .then(setMonedas)
       .catch(() => {});
+    getCanales()
+      .then(setCanales)
+      .catch(() => {});
   }, [cargar]);
 
   // Un cliente que se lleva en dólares no se repite con su cuenta en pesos vacía
@@ -84,6 +98,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
     return todas.filter((c) => sinTildes(c.tercero_nombre).includes(texto) || (digitos.length >= 3 && (c.tercero_telefono ?? "").replace(/\D/g, "").includes(numero)));
   }, [todas, buscar]);
   const delGrupo = useCallback((lista: CuentaCorrienteResumen[], g: string) => lista.filter((c) => mismoGrupo(grupoDe(c), g)), []);
+  const filas = useMemo(() => filasPorCliente(visibles), [visibles]);
   const general = useMemo(() => totalEnPesos(todas), [todas]);
   // Cuentas por Cobrar: a veces el cliente me manda de más y soy yo el que le debe. Eso va aparte, y se le envía a
   // taquilla para que venga a recogerlo.
@@ -100,7 +115,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
   const moduloAqui = pagar ? "POR_PAGAR" : "POR_COBRAR";
   // Una sola lista de clientes: el que está en otro módulo se lleva aquí sin crearlo de nuevo
   const enOtros = useEnOtrosModulos(buscar, moduloAqui);
-  async function llevarCliente(terceroId: number, grupo?: string, monedaId?: number) {
+  async function llevarCliente(terceroId: number, grupo?: string, monedaId?: number, canalId?: number) {
     try {
       const suyas = await getCuentasCorrientes({ terceroId, soloCliente: true });
       if (!suyas.length) return false;
@@ -108,7 +123,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
       const moneda = monedaId ?? monedas.find((m) => m.codigo === "COP")?.id;
       if (!yaAqui && !moneda) return false;
       const grupoCobro = grupo && grupo !== SIN_GRUPO ? grupo : undefined;
-      const cuenta = yaAqui ?? (await crearCuentaCorriente({ terceroId, modulo: moduloAqui, monedaId: moneda!, grupoCobro, usarExistente: true }));
+      const cuenta = yaAqui ?? (await crearCuentaCorriente({ terceroId, modulo: moduloAqui, monedaId: moneda!, grupoCobro, usarExistente: true, ...(canalId ? { canalId } : {}) }));
       enOtros.limpiar();
       await cargar();
       setCreandoEn(null);
@@ -141,6 +156,15 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
     setReporte(null);
   }
 
+  async function cambiarCuentaQueLleva(cuenta: CuentaCorrienteResumen, canalId: number) {
+    try {
+      await cambiarCanalCuenta(cuenta.id, canalId);
+      await cargar();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo cambiar la cuenta.");
+    }
+  }
+
   async function moverDeGrupo(cuenta: CuentaCorrienteResumen, destino: string) {
     let grupo: string | null = destino;
     if (destino === NUEVO_GRUPO) {
@@ -171,6 +195,18 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
           )}
           {puedeEditar && (
             <label>
+              Cuenta que lleva
+              <select value={abierta.canal_id} onChange={(e) => void cambiarCuentaQueLleva(abierta, Number(e.target.value))}>
+                {canales.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre === "SIN_BANCO" ? "Sin banco" : c.nombre.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {puedeEditar && (
+            <label>
               Grupo
               <select value={grupos.find((g) => mismoGrupo(g, grupoDe(abierta))) ?? SIN_GRUPO} onChange={(e) => void moverDeGrupo(abierta, e.target.value)}>
                 {grupos.map((g) => (
@@ -190,7 +226,28 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
           <HojaCuenta
             key={`${abierta.id}-${pagosHechos}`}
             cuenta={abierta}
-            onActualizar={cargar}
+            irA={irA && irA.cuentaId === abierta.id ? irA : null}
+            resumenCliente={
+              <ResumenCliente
+                cuentas={(cuentas ?? []).filter((c) => c.tercero_id === abierta.tercero_id)}
+                cuentaId={abierta.id}
+                terceroId={abierta.tercero_id}
+                modulo={moduloAqui}
+                version={versionCliente}
+                onElegirCuenta={(id) => {
+                  setIrA(null);
+                  setAbiertaId(id);
+                }}
+                onVerMovimiento={(m) => {
+                  setIrA({ cuentaId: m.cuenta_id, id: m.id, fecha: m.fecha, clave: Date.now() });
+                  setAbiertaId(m.cuenta_id);
+                }}
+              />
+            }
+            onActualizar={() => {
+              setVersionCliente((v) => v + 1);
+              void cargar();
+            }}
             onVolver={() => setAbiertaId(null)}
             // el movimiento se llevó aparte, en otra moneda: se abre la cuenta de este cliente en esa moneda
             onAbrirCuenta={(id) => void cargar().then(() => setAbiertaId(id))}
@@ -276,14 +333,14 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
         <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar cliente por nombre o teléfono" aria-label="Buscar cliente" />
         {buscando && (
           <span>
-            {visibles.length} {visibles.length === 1 ? "resultado" : "resultados"}
+            {filas.length} {filas.length === 1 ? "resultado" : "resultados"}
           </span>
         )}
       </div>
 
       {error && <p className="cxc-error">{error}</p>}
       {!cuentas && !error && <p className="cxc-aviso">Cargando…</p>}
-      <ListaEnOtrosModulos lista={enOtros.lista} etiqueta="Llevar aquí" puedeTraer={puedeEditar} onTraer={(c, monedaId) => void llevarCliente(c.tercero_id, undefined, monedaId)} />
+      <ListaEnOtrosModulos lista={enOtros.lista} etiqueta="Llevar aquí" puedeTraer={puedeEditar} onTraer={(c, monedaId) => void llevarCliente(c.tercero_id, undefined, monedaId, c.canal_id)} />
 
       {verLesDebo && lesDebo.length > 0 && (
         <section className="cxc-les-debo" aria-label="Clientes a los que les debo">
@@ -313,10 +370,10 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
       {cuentas && (
         <div className="cxc-tablero">
           {grupos.map((g) => {
-            const lista = delGrupo(visibles, g);
+            const lista = filas.filter((f) => mismoGrupo(grupoDe(f.c), g));
             // al buscar, los grupos sin coincidencias no estorban
             if (buscando && lista.length === 0) return null;
-            const total = totalEnPesos(lista);
+            const total = totalEnPesos(lista.flatMap((f) => f.suyas));
             return (
               <section key={g} className="cxc-grupo" aria-label={`${NOMBRE} ${g}`}>
                 <header>
@@ -339,9 +396,11 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
                     </tr>
                   </thead>
                   <tbody>
-                    {lista.map((c) => {
+                    {lista.map(({ c, suyas }) => {
                       const pesos = enPesos(c);
-                      const detalle = detalleMoneda(c);
+                      const varias = suyas.length > 1;
+                      const cuenta = c.canal_nombre === "SIN_BANCO" ? null : c.canal_nombre.replace(/_/g, " ");
+                      const detalle = [cuenta, varias ? null : detalleMoneda(c)].filter(Boolean).join(" · ");
                       const telefono = telefonoWhatsApp(c.tercero_telefono);
                       const mensaje = mensajeDeCobro(c);
                       return (
@@ -350,7 +409,9 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
                             <span className="cxc-nombre">{c.tercero_nombre}</span>
                             {detalle && <small>{detalle}</small>}
                           </td>
-                          <td className={`num ${pesos !== null && ver(pesos).startsWith("-") ? "favor" : ""}`}>{pesos === null ? dinero(ver(c.saldo_actual), c.moneda_codigo) : dinero(ver(pesos), "COP")}</td>
+                          <td className={`num ${pesos !== null && ver(pesos).startsWith("-") ? "favor" : ""}`}>
+                            {varias ? suyas.map((x) => dinero(ver(x.saldo_actual), x.moneda_codigo)).join(" · ") : pesos === null ? dinero(ver(c.saldo_actual), c.moneda_codigo) : dinero(ver(pesos), "COP")}
+                          </td>
                           <td className="cxc-wa">
                             {puedeEditar && !pagar && c.saldo_actual.startsWith("-") && /[1-9]/.test(c.saldo_actual) && (
                               <button
@@ -453,6 +514,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
           grupoInicial={creandoEn}
           monedas={monedas}
           modulo={pagar ? "POR_PAGAR" : "POR_COBRAR"}
+          canales={canales}
           onClienteExistente={llevarCliente}
           onCerrar={() => setCreandoEn(null)}
           onCreado={() => {

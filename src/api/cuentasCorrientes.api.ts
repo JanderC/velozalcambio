@@ -318,8 +318,12 @@ export interface MovimientoCliente {
   moneda_codigo: string;
 }
 
-export function getUltimosDelCliente(terceroId: number) {
-  return api.get<MovimientoCliente[]>(`/cuentas-corrientes/cliente/${terceroId}/ultimos`);
+export function getUltimosDelCliente(terceroId: number, modulo: ModuloCuenta = "CAJA") {
+  return api.get<MovimientoCliente[]>(`/cuentas-corrientes/cliente/${terceroId}/ultimos?modulo=${modulo}`);
+}
+
+export function cambiarCanalCuenta(id: number, canalId: number) {
+  return api.put<CuentaCorrienteResumen>(`/cuentas-corrientes/${id}/canal`, { canalId });
 }
 
 export function getMovimientosCuentaCorriente(cuentaId: number) {

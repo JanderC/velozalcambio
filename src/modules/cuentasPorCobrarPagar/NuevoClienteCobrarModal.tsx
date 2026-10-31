@@ -6,6 +6,7 @@ import type { Moneda } from "../../api/monedas.api";
 import { formatearMonto, leerNumero, multiplicarDecimales } from "../../utils/montos";
 import { SIN_GRUPO, dinero } from "./cobrar";
 import { AvisoClienteExistente, useClienteExistente } from "../cuentasCorrientes/ClienteExistente";
+import type { Canal } from "../../api/cuentasCorrientes.api";
 import type { ClienteExistente } from "../../api/cuentasCorrientes.api";
 
 const NUEVO = "__nuevo__";
@@ -22,14 +23,14 @@ export function conPuntos(escrito: string) {
 }
 
 /**
- * Registrar un cliente de Cuentas por Cobrar: nombre, teléfono y grupo, igual que en Cuentas Corrientes. La cuenta se
- * lleva en pesos y cada movimiento puede ir con cantidad × tasa (dólares, bolívares…), así que no se elige moneda.
- * Si se quiere, el primer movimiento se anota acá mismo.
+ * Registrar un cliente de Cuentas por Cobrar: nombre, teléfono, grupo, moneda de su contabilidad y la cuenta que lleva,
+ * igual que en Cuentas Corrientes. Si se quiere, el primer movimiento se anota acá mismo.
  */
 export function NuevoClienteCobrarModal({
   grupos,
   grupoInicial,
   monedas,
+  canales = [],
   modulo = "POR_COBRAR",
   onCreado,
   onCerrar,
@@ -40,10 +41,11 @@ export function NuevoClienteCobrarModal({
   // por cobrar (me debe) o por pagar (le debo)
   modulo?: "POR_COBRAR" | "POR_PAGAR";
   monedas: Moneda[];
+  canales?: Canal[];
   onCreado: (cuenta: CuentaCorrienteResumen) => void;
   onCerrar: () => void;
   // el cliente ya existe: se abre su hoja aquí. false: no se pudo abrir y se sigue en el formulario.
-  onClienteExistente?: (terceroId: number, grupo: string, monedaId?: number) => Promise<boolean>;
+  onClienteExistente?: (terceroId: number, grupo: string, monedaId?: number, canalId?: number) => Promise<boolean>;
 }) {
   const pagar = modulo === "POR_PAGAR";
   const elegibles = grupos.filter((g) => g !== SIN_GRUPO);
@@ -59,6 +61,8 @@ export function NuevoClienteCobrarModal({
   const [monedaId, setMonedaId] = useState<number | "">("");
   const moneda = monedas.find((m) => m.id === monedaId) ?? cop;
   const codigo = moneda?.codigo ?? "COP";
+  // la cuenta que se le lleva (Zelle, Bancolombia…), como en Cuentas Corrientes
+  const [canalId, setCanalId] = useState<number | "">("");
   // El primer movimiento (opcional): referencia, y el monto directo o cantidad × tasa
   const [conMovimiento, setConMovimiento] = useState(false);
   const [referencia, setReferencia] = useState("");
@@ -82,7 +86,7 @@ export function NuevoClienteCobrarModal({
     // el cliente ya existe y no hay movimiento que anotar: se abre su hoja en la moneda elegida
     if (existente && !conMovimiento && onClienteExistente) {
       setEnviando(true);
-      const abierta = await onClienteExistente(existente.id, grupoFinal, moneda.id);
+      const abierta = await onClienteExistente(existente.id, grupoFinal, moneda.id, canalId || undefined);
       setEnviando(false);
       if (abierta) return;
     }
@@ -99,6 +103,7 @@ export function NuevoClienteCobrarModal({
         modulo,
         grupoCobro: grupoFinal,
         monedaId: moneda.id,
+        ...(canalId ? { canalId } : {}),
       };
       const cuenta = await crearCuentaCorriente(datos).catch((err) => {
         // ya hay un cliente con ese nombre (en otro módulo): ¿es el mismo?
@@ -187,6 +192,20 @@ export function NuevoClienteCobrarModal({
                 {m.nombre} ({m.codigo})
               </option>
             ))}
+          </select>
+        </label>
+
+        <label>
+          Cuenta que lleva (opcional)
+          <select value={canalId} onChange={(e) => setCanalId(e.target.value ? Number(e.target.value) : "")}>
+            <option value="">Sin banco</option>
+            {canales
+              .filter((c) => c.nombre !== "SIN_BANCO")
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre.replace(/_/g, " ")}
+                </option>
+              ))}
           </select>
         </label>
 
