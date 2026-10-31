@@ -295,12 +295,13 @@ export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }
 
-export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; tipoTercero?: string; vista?: "corrientes" | "cobrar" | "pagar" | "cajas" }) {
+export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; soloCliente?: boolean; tipoTercero?: string; vista?: "corrientes" | "cobrar" | "pagar" | "cajas" }) {
   const params = new URLSearchParams();
   if (filtros.vista) params.set("vista", filtros.vista);
   if (filtros.terceroId) params.set("terceroId", String(filtros.terceroId));
   if (filtros.canalId) params.set("canalId", String(filtros.canalId));
   if (filtros.buscar?.trim()) params.set("buscar", filtros.buscar.trim());
+  if (filtros.soloCliente) params.set("soloCliente", "1");
   if (filtros.tipoTercero) params.set("tipoTercero", filtros.tipoTercero);
   const q = params.toString();
   return api.get<CuentaCorrienteResumen[]>(`/cuentas-corrientes${q ? `?${q}` : ""}`);

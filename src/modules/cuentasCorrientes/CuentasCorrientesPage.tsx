@@ -52,6 +52,8 @@ function sumaPorMoneda(cuentas: CuentaCorrienteResumen[], campo: "saldo_actual" 
   return [...suma.entries()].filter(([, v]) => /[1-9]/.test(v));
 }
 
+const sinTildes = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 /** La cuenta que representa al cliente en la lista: donde apareció lo buscado, la que tiene saldo o la de su último movimiento. */
 function cuentaPrincipal(cuentas: CuentaCorrienteResumen[]) {
   const fecha = (c: CuentaCorrienteResumen) => (c.ultimo_movimiento ? new Date(c.ultimo_movimiento).getTime() : 0);
@@ -143,7 +145,8 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
     if (!buscaEnTodos) return setEnOtrosModulos([]);
     let vigente = true;
     const t = setTimeout(() => {
-      getCuentasCorrientes({ buscar })
+      // solo por los datos del cliente: que un movimiento diga "Yisel" no hace que ese cliente sea Yisel
+      getCuentasCorrientes({ buscar, soloCliente: true })
         .then((todas) => {
           if (!vigente) return;
           const yaAqui = new Set(todas.filter((c) => c.modulo === moduloAqui).map((c) => c.tercero_id));
@@ -202,8 +205,12 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
     if (modo !== "cajas") return visibles.map((c) => ({ c, todas: [c] }));
     const porCliente = new Map<number, CuentaCorrienteResumen[]>();
     for (const c of visibles) porCliente.set(c.tercero_id, [...(porCliente.get(c.tercero_id) ?? []), c]);
-    return [...porCliente.values()].map((todas) => ({ c: cuentaPrincipal(todas), todas }));
-  }, [visibles, modo]);
+    const lista = [...porCliente.values()].map((todas) => ({ c: cuentaPrincipal(todas), todas }));
+    // primero los que se llaman así; después los que solo lo tienen en un movimiento
+    const texto = sinTildes(buscar.trim());
+    const porNombre = (c: CuentaCorrienteResumen) => (sinTildes(c.tercero_nombre).includes(texto) ? 0 : 1);
+    return lista.sort((a, b) => porNombre(a.c) - porNombre(b.c));
+  }, [visibles, modo, buscar]);
 
   // todas las cuentas del cliente abierto: buscando por referencia la lista trae solo la que coincide
   const [cuentasCliente, setCuentasCliente] = useState<CuentaCorrienteResumen[]>([]);
