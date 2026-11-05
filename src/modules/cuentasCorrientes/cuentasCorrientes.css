@@ -731,3 +731,7 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-parecido dt { color: #5b6472; }
 .cc-parecido dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 @media (max-width: 720px) { .cc-parecido-columnas { grid-template-columns: 1fr; } .cc-parecido-imagen { max-height: 32vh; } }
+
+/* el botón Agregar mientras revisa y guarda */
+.cc-girando { animation: cc-girar 0.9s linear infinite; }
+@keyframes cc-girar { to { transform: rotate(360deg); } }

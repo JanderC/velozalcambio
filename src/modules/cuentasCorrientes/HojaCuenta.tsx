@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Loader2, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -1821,6 +1821,11 @@ function FilaNueva({
   // Los guardados van en fila, uno detrás de otro: así quedan en el orden en que se cargaron
   const cola = useRef<Promise<unknown>>(Promise.resolve());
   const pendientes = useRef(0);
+  // Un solo guardado a la vez: mientras revisa y guarda, otro clic o Enter no registra lo mismo otra vez
+  const guardandoYa = useRef(false);
+  const [ocupado, setOcupado] = useState(false);
+  // el último que se agregó: si se vuelve a agregar igualito al rato, se pregunta antes
+  const ultimoAgregado = useRef<{ clave: string; cuando: number; parecido: CaptureParecido } | null>(null);
   const decimales = otraMoneda ? (codigoMonto === "COP" ? 0 : 2) : Number(cuenta.moneda_decimales ?? 0);
 
   // Confirmaciones: las monedas hacen falta para elegir en cuál se le entrega (antes solo se cargaban al marcar la caja)
@@ -2163,6 +2168,18 @@ function FilaNueva({
   }
 
   async function cargarVarias() {
+    if (guardandoYa.current) return;
+    guardandoYa.current = true;
+    setOcupado(true);
+    try {
+      await cargarVariasUnaVez();
+    } finally {
+      guardandoYa.current = false;
+      setOcupado(false);
+    }
+  }
+
+  async function cargarVariasUnaVez() {
     setError(null);
     if (destinoVarias === "pagar") return cargarVariasAPagar();
     const r = calcularResumen(transferencias, formulaVarias, valorVarias, codigoLlega, codigoMonto, incluidaVarias);
@@ -2416,6 +2433,18 @@ function FilaNueva({
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
+    if (guardandoYa.current) return;
+    guardandoYa.current = true;
+    setOcupado(true);
+    try {
+      await guardarUnaVez();
+    } finally {
+      guardandoYa.current = false;
+      setOcupado(false);
+    }
+  }
+
+  async function guardarUnaVez() {
     setError(null);
     if (repartido) return guardarRepartido();
     if (varias) return setError("Con varias transferencias se registra con el botón \"Cargar\" del cuadro de transferencias.");
@@ -2480,6 +2509,8 @@ function FilaNueva({
 
     // Misma persona que envía y mismo monto que un movimiento ya cargado en esta cuenta: puede ser la misma
     // transferencia. Se avisa y quien carga decide si la agrega igual (dos envíos iguales también pasan).
+    // si ya se preguntó por un movimiento igual, no se vuelve a preguntar con otro cuadro
+    let yaPregunto = false;
     const quienEnvia = textoLlano(persona);
     if (quienEnvia.length >= 3) {
       const valores = [conTasa && nCantidad ? sinSigno(nCantidad) : null, monto].filter((v): v is string => !!v).map(Number);
@@ -2514,8 +2545,17 @@ function FilaNueva({
           canal_nombre: medioMov.nombre,
           registrado_por: null,
         };
+        yaPregunto = true;
         if (!(await capturaParecida.mostrar([parecido], imagenesAdjuntas))) return setError(`No se agregó: ya había un movimiento de "${persona.trim()}" por ${cuanto} del ${fechaCorta(igual.fecha)}.`);
       }
+    }
+
+    // El mismo movimiento (misma referencia, persona y monto) agregado otra vez hace un momento: casi siempre es un
+    // doble clic o se creyó que no había quedado. Se muestra el que ya está y quien carga decide.
+    const claveRepetida = [cuenta.id, referenciaFinal, textoLlano(persona), montoConSigno, nCantidad ?? "", nTasa ?? "", fecha].join("|");
+    const anterior = ultimoAgregado.current;
+    if (!yaPregunto && anterior && anterior.clave === claveRepetida && Date.now() - anterior.cuando < 3 * 60_000) {
+      if (!(await capturaParecida.mostrar([anterior.parecido], imagenesAdjuntas))) return setError("No se agregó: ese mismo movimiento ya se había agregado hace un momento.");
     }
 
     const verificado = await confirmarVerificacion(
@@ -2658,6 +2698,25 @@ function FilaNueva({
     cola.current = turno.catch(() => {});
     try {
       const creado = await turno;
+      ultimoAgregado.current = {
+        clave: claveRepetida,
+        cuando: Date.now(),
+        parecido: {
+          id: creado.movimiento.id,
+          transferencia_id: null,
+          fecha: new Date().toISOString(),
+          descripcion: datos.descripcion,
+          monto: montoConSigno,
+          moneda_codigo: codigoMonto,
+          referencia: "",
+          tiene_comprobante: adjuntas.length > 0,
+          exacta: false,
+          bloquea: false,
+          tercero_nombre: cuenta.tercero_nombre,
+          canal_nombre: medioMov.nombre,
+          registrado_por: null,
+        },
+      };
       // pagada por otro método: se le paga ya, desde la cuenta de la empresa elegida (no pasa a taquilla)
       let pagadaPor: string | null = null;
       if (pagarCon) {
@@ -2918,7 +2977,7 @@ function FilaNueva({
           destino={resta ? "caja" : destinoVarias}
           onDestino={resta ? undefined : setDestinoVarias}
           repetidas={repetidasVarias}
-          cargando={cargandoVarias}
+          cargando={cargandoVarias || ocupado}
           textoBoton={!resta && pago.modo === "otro" && pago.nombre ? `Enviar y pagar por ${pago.nombre}` : !resta ? "Enviar a caja" : "Enviar"}
           onCargar={() => void cargarVarias()}
         />
@@ -3094,8 +3153,14 @@ function FilaNueva({
           )}
           <small>{!conTasa && nDirecto ? `${resta ? "- " : ""}${simbolo}${formatearMonto(sinSigno(nDirecto))}` : " "}</small>
         </label>
-        <button type="submit" className="cc-guardar">
-          Agregar
+        <button type="submit" className="cc-guardar" disabled={ocupado} aria-busy={ocupado}>
+          {ocupado ? (
+            <>
+              <Loader2 size={15} className="cc-girando" /> Guardando…
+            </>
+          ) : (
+            "Agregar"
+          )}
         </button>
       </div>
 
