@@ -343,6 +343,16 @@ export function cambiarCanalCuenta(id: number, canalId: number) {
   return api.put<CuentaCorrienteResumen>(`/cuentas-corrientes/${id}/canal`, { canalId });
 }
 
+/** La moneda en que se lleva la contabilidad del cliente: la cuenta pasa a esa moneda sin convertir lo anotado. */
+export function cambiarMonedaCuenta(id: number, monedaId: number) {
+  return api.put<CuentaCorrienteResumen>(`/cuentas-corrientes/${id}/moneda`, { monedaId });
+}
+
+/** Dos cuentas del mismo cliente en una sola: los movimientos de esta pasan (tal cual) a la otra, y esta se cierra. */
+export function unirCuentasCorrientes(id: number, destinoId: number) {
+  return api.post<{ cuenta: CuentaCorrienteResumen; movimientos: number }>(`/cuentas-corrientes/${id}/unir`, { destinoId });
+}
+
 export function getMovimientosCuentaCorriente(cuentaId: number) {
   return api.get<MovimientoCC[]>(`/cuentas-corrientes/${cuentaId}/movimientos`);
 }

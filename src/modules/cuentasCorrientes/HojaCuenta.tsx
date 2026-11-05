@@ -15,6 +15,8 @@ import {
   descargarExcelEstadoCuenta,
   getCanales,
   getCuentasCorrientes,
+  cambiarMonedaCuenta,
+  unirCuentasCorrientes,
   getEstadoCuenta,
   getMovimientosCuentaCorriente,
   getTasasRecientes,
@@ -203,6 +205,36 @@ export function HojaCuenta({
   const puedeEditarMovimientos = usuario?.rol === "ADMIN" && cuenta.modulo !== "CAJA";
   const [movimientoEditado, setMovimientoEditado] = useState<FilaEstadoCuenta | null>(null);
   const [movimientoMovido, setMovimientoMovido] = useState<FilaEstadoCuenta | null>(null); // el que se pasa a otro cliente
+  // Cuentas Corrientes y por Cobrar: el cliente se lleva en una sola cuenta. Si tiene otra en este módulo (otra moneda u
+  // otro medio), se avisa y se pueden unir.
+  const [otrasCuentas, setOtrasCuentas] = useState<CuentaCorrienteResumen[]>([]);
+  const [uniendo, setUniendo] = useState<CuentaCorrienteResumen | null>(null);
+  const [unirOcupado, setUnirOcupado] = useState(false);
+  useEffect(() => {
+    if (cuenta.modulo === "CAJA") return setOtrasCuentas([]);
+    let vigente = true;
+    getCuentasCorrientes({ terceroId: cuenta.tercero_id, soloCliente: true })
+      .then((l) => vigente && setOtrasCuentas(l.filter((c) => c.id !== cuenta.id && c.modulo === cuenta.modulo && c.activo !== false)))
+      .catch(() => vigente && setOtrasCuentas([]));
+    return () => {
+      vigente = false;
+    };
+  }, [cuenta.id, cuenta.tercero_id, cuenta.modulo, cuenta.saldo_actual]);
+  async function unirEn(origen: CuentaCorrienteResumen, destino: CuentaCorrienteResumen) {
+    setUnirOcupado(true);
+    try {
+      await unirCuentasCorrientes(origen.id, destino.id);
+      setUniendo(null);
+      onActualizar();
+      if (destino.id !== cuenta.id) onAbrirCuenta?.(destino.id);
+      else setOtrasCuentas((l) => l.filter((c) => c.id !== origen.id));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudieron unir las cuentas.");
+      setUniendo(null);
+    } finally {
+      setUnirOcupado(false);
+    }
+  }
   // los movimientos armados con varias transferencias que tienen el desglose abierto
   const [desglosados, setDesglosados] = useState<Set<number>>(new Set());
   async function verCapturaTransferencia(t: TransferenciaFila) {
@@ -755,6 +787,11 @@ export function HojaCuenta({
               <button type="button" className="cc-mover cc-eliminar" onClick={eliminar}>
                 Eliminar
               </button>
+              {otrasCuentas.map((o) => (
+                <button key={o.id} type="button" className="cc-mover cc-unir" onClick={() => setUniendo(o)} title="El cliente se lleva en una sola cuenta">
+                  También tiene cuenta en {o.moneda_codigo}{o.canal_id !== cuenta.canal_id && o.canal_nombre !== "SIN_BANCO" ? ` (${o.canal_nombre.replace(/_/g, " ")})` : ""}: unir en una sola
+                </button>
+              ))}
               {(cuenta.modulo === "CORRIENTE" || cuenta.modulo === "POR_PAGAR" || (cuenta.modulo === "POR_COBRAR" && saldoActual.startsWith("-"))) && (
                 <button
                   type="button"
@@ -987,6 +1024,31 @@ export function HojaCuenta({
             onActualizar();
           }}
         />
+      )}
+      {uniendo && (
+        <Modal titulo={`Unir las cuentas de ${cuenta.tercero_nombre}`} onCerrar={() => !unirOcupado && setUniendo(null)}>
+          <div className="cc-unir-modal">
+            <p>
+              Tiene dos cuentas: en <b>{cuenta.moneda_codigo}</b> (saldo {dineroEn(cuenta.saldo_actual, cuenta.moneda_codigo)}) y en <b>{uniendo.moneda_codigo}</b> (saldo{" "}
+              {dineroEn(uniendo.saldo_actual, uniendo.moneda_codigo)}). ¿En cuál queda todo?
+            </p>
+            <p className="cc-unir-aviso">
+              Los movimientos pasan tal cual, <b>sin convertir</b>. Hacelo si lo anotado en las dos ya está en la misma moneda (por ejemplo, dólares anotados en la
+              cuenta de pesos).
+            </p>
+            <div className="cc-form-acciones">
+              <button type="button" className="cc-btn-secundario" disabled={unirOcupado} onClick={() => setUniendo(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="cc-guardar" disabled={unirOcupado} onClick={() => void unirEn(cuenta, uniendo)}>
+                Todo en {uniendo.moneda_codigo}
+              </button>
+              <button type="button" className="cc-guardar" disabled={unirOcupado} onClick={() => void unirEn(uniendo, cuenta)}>
+                Todo en {cuenta.moneda_codigo}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
       {enviandoAConf !== null && (
         <EnviarAConfirmacionesModal
@@ -1833,6 +1895,13 @@ function FilaNueva({
   const pendientes = useRef(0);
   // Un solo guardado a la vez: mientras revisa y guarda, otro clic o Enter no registra lo mismo otra vez
   const guardandoYa = useRef(false);
+  // el total queda en otra moneda y el cliente no tiene cuenta en esa moneda: se pregunta antes de abrirle otra
+  const [preguntaMoneda, setPreguntaMoneda] = useState<{ codigo: string; resolver: (v: "una" | "otra" | null) => void } | null>(null);
+  const preguntarMoneda = (codigo: string) => new Promise<"una" | "otra" | null>((resolver) => setPreguntaMoneda({ codigo, resolver }));
+  const responderMoneda = (v: "una" | "otra" | null) => {
+    preguntaMoneda?.resolver(v);
+    setPreguntaMoneda(null);
+  };
   const [ocupado, setOcupado] = useState(false);
   // el último que se agregó: si se vuelve a agregar igualito al rato, se pregunta antes
   const ultimoAgregado = useRef<{ clave: string; cuando: number; parecido: CaptureParecido } | null>(null);
@@ -2578,6 +2647,20 @@ function FilaNueva({
       if (!(await capturaParecida.mostrar([anterior.parecido], imagenesAdjuntas))) return setError("No se agregó: ese mismo movimiento ya se había agregado hace un momento.");
     }
 
+    // Un cliente se lleva en una sola cuenta: si el total queda en otra moneda y no tiene cuenta en esa moneda, no se le
+    // abre otra sin preguntar. Con la cuenta vacía, simplemente pasa a esa moneda.
+    let enEstaCuenta = false;
+    if (!enConfirmaciones && otraMoneda && monedaEntrega) {
+      const suyas = await getCuentasCorrientes({ terceroId: cuenta.tercero_id }).catch(() => null);
+      const yaTiene = suyas?.some((c) => c.modulo === cuenta.modulo && c.moneda_id === monedaEntrega.id);
+      if (suyas && !yaTiene) {
+        const vacia = !cuenta.ultimo_movimiento && !/[1-9]/.test(cuenta.saldo_actual);
+        const eleccion = vacia ? "una" : await preguntarMoneda(codigoMonto);
+        if (!eleccion) return setError("No se agregó: elegí cómo llevar la cuenta del cliente.");
+        enEstaCuenta = eleccion === "una";
+      }
+    }
+
     const verificado = await confirmarVerificacion(
       [{ monto: sinSigno(montoConSigno), codigo: codigoMonto }],
       [
@@ -2710,6 +2793,12 @@ function FilaNueva({
     let otraCuentaId: number | null = null;
     const turno = cola.current.then(async () => {
       if (!otraMoneda) return registrarMovimientoCC(datos);
+      // su contabilidad pasa a esa moneda: queda en esta misma cuenta
+      if (enEstaCuenta) {
+        await cambiarMonedaCuenta(cuenta.id, monedaEntrega!.id);
+        otraCuentaId = cuenta.id;
+        return registrarMovimientoCC({ ...datos, monedaId: monedaEntrega!.id });
+      }
       // en otra moneda y sin convertir: va a la cuenta del mismo cliente en esa moneda (se abre si no la tiene)
       const destino = enConfirmaciones
         ? await crearCuentaCorriente({ terceroId: cuenta.tercero_id, canalId: cuenta.canal_id, modulo: "CAJA", monedaId: monedaEntrega!.id, usarExistente: true })
@@ -2862,6 +2951,33 @@ function FilaNueva({
     {abierta && <div className="cc-velo" onClick={() => setAbierta(false)} />}
     {verificacion && <VerificarMontosModal verificacion={verificacion} />}
     {capturaParecida.modal}
+    {preguntaMoneda && (
+      <Modal titulo={`¿En qué moneda se lleva ${cuenta.tercero_nombre}?`} onCerrar={() => responderMoneda(null)}>
+        <div className="cc-unir-modal">
+          <p>
+            Su cuenta está en <b>{cuenta.moneda_codigo}</b> y este movimiento queda en <b>{preguntaMoneda.codigo}</b>.
+          </p>
+          <div className="cc-elegir-moneda">
+            <button type="button" className="cc-opcion-moneda recomendada" onClick={() => responderMoneda("una")}>
+              <b>Llevar su cuenta en {preguntaMoneda.codigo}</b>
+              <small>
+                Una sola cuenta. Lo que ya tiene anotado (saldo {dineroEn(cuenta.saldo_actual, cuenta.moneda_codigo)}) queda tal cual, ahora en {preguntaMoneda.codigo}: elegilo si eso ya
+                está en {preguntaMoneda.codigo === "USD" ? "dólares" : preguntaMoneda.codigo}.
+              </small>
+            </button>
+            <button type="button" className="cc-opcion-moneda" onClick={() => responderMoneda("otra")}>
+              <b>Abrirle otra cuenta en {preguntaMoneda.codigo}</b>
+              <small>Queda aparte: el cliente tendrá dos cuentas, una en {cuenta.moneda_codigo} y otra en {preguntaMoneda.codigo}.</small>
+            </button>
+          </div>
+          <div className="cc-form-acciones">
+            <button type="button" className="cc-btn-secundario" onClick={() => responderMoneda(null)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )}
     <form className={`cc-nueva ${abierta ? "abierta" : ""}`} onSubmit={guardar}>
       <div className="cc-nueva-titulo">
         Nuevo movimiento

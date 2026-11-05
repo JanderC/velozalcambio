@@ -437,7 +437,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
 
         {seleccionada ? (
           <HojaCuenta
-            key={seleccionada.id}
+            key={`${seleccionada.id}-${seleccionada.moneda_id}`}
             cuenta={seleccionada}
             irA={irA && irA.cuentaId === seleccionada.id ? irA : null}
             abrirCon={abrirCon && abrirCon.cuentaId === seleccionada.id ? abrirCon.modo : null}

@@ -224,7 +224,7 @@ export function CuentasPorCobrarPagarPage({ modo = "cobrar" }: { modo?: "cobrar"
         <div className="cc-layout con-hoja cxc-hoja">
           {/* la hoja se vuelve a montar al pagar, para que muestre el abono recién anotado */}
           <HojaCuenta
-            key={`${abierta.id}-${pagosHechos}`}
+            key={`${abierta.id}-${abierta.moneda_id}-${pagosHechos}`}
             cuenta={abierta}
             irA={irA && irA.cuentaId === abierta.id ? irA : null}
             resumenCliente={
