@@ -735,3 +735,10 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 /* el botón Agregar mientras revisa y guarda */
 .cc-girando { animation: cc-girar 0.9s linear infinite; }
 @keyframes cc-girar { to { transform: rotate(360deg); } }
+
+/* Confirmaciones: la cuenta de la empresa que sale en el capture y se alimenta sola */
+.cc-banco-capture { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 0.85rem; }
+.cc-banco-capture svg { flex-shrink: 0; }
+.cc-banco-capture span { flex: 1; }
+.cc-banco-capture button { background: none; border: 1px solid #6ee7b7; color: #065f46; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
+.cc-banco-capture button:hover { background: #d1fae5; }

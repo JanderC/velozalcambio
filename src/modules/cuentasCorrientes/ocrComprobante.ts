@@ -13,6 +13,8 @@ export interface DatosComprobante {
   banco: string | null;
   remitente: string | null;
   destinatario?: string | null; // a quién se le envió
+  cuentaOrigen?: string | null; // la cuenta o el teléfono de donde salió ("0102****8515")
+  cuentaDestino?: string | null; // la cuenta o el teléfono a donde llegó ("04147320762")
   fuente?: "ia" | "local"; // quién la leyó: la IA del servidor o el lector del navegador
   metodo?: string | null; // qué es (Nequi, Zelle, Remitly…): lo dice la IA
   texto?: string; // el texto leído en el navegador (para reconocer el método sin IA)
@@ -204,10 +206,42 @@ function buscarBanco(texto: string): string | null {
 }
 
 /** Saca los datos del texto ya leído de un comprobante. Separado del OCR para poder probarlo. */
+/**
+ * La cuenta o el teléfono que sigue a una etiqueta ("Origen: 0102****8515", "Destino: 04147320762"), en la misma
+ * línea o en la siguiente. Tiene que parecer una cuenta: enmascarada o con 7 dígitos o más.
+ */
+export function buscarCuenta(lineas: string[], etiqueta: RegExp): string | null {
+  const parece = (v: string) => /\d{3,}\s*[*xX•]{2,}|[*xX•]{2,}\s*\d{3,}/.test(v) || v.replace(/\D/g, "").length >= 7;
+  for (let i = 0; i < lineas.length; i++) {
+    const m = etiqueta.exec(lineas[i]!);
+    if (!m) continue;
+    const resto = lineas[i]!.slice(m.index + m[0].length).replace(/^[\s:.\-]+/, "");
+    const enLinea = /[\d*xX•][\d*xX•\s-]{5,}/.exec(resto)?.[0]?.trim();
+    if (enLinea && parece(enLinea)) return enLinea;
+    const siguiente = lineas[i + 1]?.trim();
+    if (!resto && siguiente && /^[\d*xX•\s-]{6,}$/.test(siguiente) && parece(siguiente)) return siguiente;
+  }
+  return null;
+}
+const ETIQUETA_ORIGEN = /\b(cuenta\s+(de\s+)?origen|producto\s+origen|origen|cuenta\s+debitada|desde\s+la\s+cuenta)\b/i;
+const ETIQUETA_DESTINO = /\b(cuenta\s+(de\s+)?destino|producto\s+destino|destino|cuenta\s+acreditada|tel[eé]fono(\s+destino)?|celular)\b/i;
+
 export function extraerDatos(texto: string): DatosComprobante {
   const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const { monto, moneda } = buscarMonto(lineas, texto);
-  return { referencia: buscarReferencia(lineas), monto, moneda, fecha: buscarFecha(texto), hora: buscarHora(texto), banco: buscarBanco(texto), remitente: null, destinatario: buscarDestinatario(lineas), texto };
+  return {
+    referencia: buscarReferencia(lineas),
+    monto,
+    moneda,
+    fecha: buscarFecha(texto),
+    hora: buscarHora(texto),
+    banco: buscarBanco(texto),
+    remitente: null,
+    destinatario: buscarDestinatario(lineas),
+    cuentaOrigen: buscarCuenta(lineas, ETIQUETA_ORIGEN),
+    cuentaDestino: buscarCuenta(lineas, ETIQUETA_DESTINO),
+    texto,
+  };
 }
 
 /** Lee la imagen de un comprobante en el navegador (OCR): referencia, monto y fecha de la transacción. */
@@ -304,6 +338,8 @@ async function leerLocal(imagen: File): Promise<DatosComprobante> {
     banco: mejor.banco ?? otro.banco,
     remitente: mejor.remitente ?? otro.remitente,
     destinatario: mejor.destinatario ?? otro.destinatario,
+    cuentaOrigen: mejor.cuentaOrigen ?? otro.cuentaOrigen,
+    cuentaDestino: mejor.cuentaDestino ?? otro.cuentaDestino,
     texto: `${mejor.texto ?? ""}
 ${otro.texto ?? ""}`,
   };
@@ -356,7 +392,7 @@ async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
   if (deLaIA && deLaIA.monto && deLaIA.referencia) {
     if (deLaIA.metodo) return { ...deLaIA, fuente: "ia" };
     const otro = await Promise.race([local, new Promise<null>((r) => setTimeout(() => r(null), 4_000))]);
-    return { ...deLaIA, hora: deLaIA.hora ?? otro?.d?.hora, texto: otro?.d?.texto, fuente: "ia" };
+    return { ...deLaIA, hora: deLaIA.hora ?? otro?.d?.hora, cuentaOrigen: deLaIA.cuentaOrigen ?? otro?.d?.cuentaOrigen, cuentaDestino: deLaIA.cuentaDestino ?? otro?.d?.cuentaDestino, texto: otro?.d?.texto, fuente: "ia" };
   }
   const { d: delNavegador, error } = await local;
   if (!deLaIA) {
@@ -373,6 +409,8 @@ async function leerSinRevisar(imagen: File): Promise<DatosComprobante> {
     banco: deLaIA.banco ?? delNavegador.banco,
     remitente: deLaIA.remitente ?? delNavegador.remitente,
     destinatario: deLaIA.destinatario ?? delNavegador.destinatario,
+    cuentaOrigen: deLaIA.cuentaOrigen ?? delNavegador.cuentaOrigen,
+    cuentaDestino: deLaIA.cuentaDestino ?? delNavegador.cuentaDestino,
     metodo: deLaIA.metodo,
     texto: delNavegador.texto,
     fuente: "ia",

@@ -259,6 +259,23 @@ export async function buscarOperacionIgual(canalId: number, montos: string[], cu
   return (await api.get<{ movimiento: CaptureParecido | null }>(`/cuentas-corrientes/movimientos/operacion-igual?canalId=${canalId}&montos=${montos.join(",")}${filtro}`)).movimiento;
 }
 
+/** La cuenta de la empresa (Capital de giros) que sale en el capture: a donde llegó (entra) o de donde salió (sale). */
+export interface BancoReconocido {
+  cajaId: number;
+  nombre: string;
+  monedaId: number | null;
+  moneda: string | null;
+  rol: "destino" | "origen";
+  dato: string; // con qué se reconoció: "cuenta terminada en 8515", "pago móvil 4147320762"
+}
+export async function reconocerBancoEmpresa(origen?: string | null, destino?: string | null) {
+  if (!origen && !destino) return null;
+  const q = new URLSearchParams();
+  if (origen) q.set("origen", origen);
+  if (destino) q.set("destino", destino);
+  return (await api.get<{ cuenta: BancoReconocido | null }>(`/cuentas-corrientes/bancos-empresa/reconocer?${q}`)).cuenta;
+}
+
 /** Manda un mensaje al cliente por el WhatsApp conectado al sistema. */
 export function avisarClienteCuenta(id: number, texto: string, linea: 1 | 2 | 3 = 1) {
   // linea: por cuál de los WhatsApp vinculados sale (1 Bolívares, 2 Pesos, 3 Dólares)

@@ -296,3 +296,11 @@ td .cap-menu { margin-left: 6px; }
   .cap-cierre-cf td:first-child { white-space: normal; }
   .cap-sugerido { display: inline-block; margin: 2px 0 0; }
 }
+
+/* Capital de giros: con qué se reconoce cada cuenta en los captures */
+.cap-banco-datos { display: block; font-size: 0.72rem; color: #6b7280; font-weight: 400; margin-top: 2px; }
+.cap-datos-banco .cap-sub { margin: 0 0 10px; }
+.cap-datos-lista { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cap-datos-lista li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.88rem; }
+.cap-datos-lista button { background: none; border: none; color: #b91c1c; cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; }
+.cap-datos-lista button:hover { background: #fee2e2; }

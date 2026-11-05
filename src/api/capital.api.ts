@@ -7,11 +7,22 @@ export interface CajaDelSistema {
   saldos: { codigo: string; monto: string }[];
 }
 
+// Con qué se reconoce una cuenta de la empresa en un capture
+export interface DatoBanco {
+  id: number;
+  tipo: "CUENTA" | "PAGO_MOVIL";
+  banco: string | null; // código: 0102 Banco de Venezuela
+  numero: string | null;
+  cedula: string | null;
+  telefono: string | null; // 10 dígitos, sin el 0: 4147320762
+}
+
 export interface BancoDelSistema {
   id: number;
   nombre: string;
   moneda: string | null; // la moneda de la cuenta (null en las viejas: se toman como pesos)
   saldos: { codigo: string; monto: string | number }[];
+  datos?: DatoBanco[];
 }
 
 export interface MovimientoBanco {
@@ -60,6 +71,10 @@ export const capitalApi = {
   movimientoBanco: (id: number, d: { tipo: "INGRESO" | "EGRESO"; moneda: string; monto: string; nota: string }) =>
     api.post<{ cuenta: string; antes: string; ahora: string }>(`/capital/bancos/${id}/movimiento`, d),
   movimientosBanco: (id: number) => api.get<MovimientoBanco[]>(`/capital/bancos/${id}/movimientos`),
+  datosBanco: (id: number) => api.get<DatoBanco[]>(`/capital/bancos/${id}/datos`),
+  agregarDatoBanco: (id: number, d: { tipo: "CUENTA" | "PAGO_MOVIL"; banco?: string; numero?: string; cedula?: string; telefono?: string }) =>
+    api.post<DatoBanco>(`/capital/bancos/${id}/datos`, d),
+  quitarDatoBanco: (datoId: number) => api.delete<{ quitado: true }>(`/capital/bancos/datos/${datoId}`),
   transferirBancos: (d: { origenId: number; destinoId: number; moneda: string; monto: string; nota?: string }) =>
     api.post<{ de: string; a: string; monto: string; moneda: string }>("/capital/bancos/transferir", d),
   // lo que se va escribiendo (tasas, filas a mano), guardado al instante

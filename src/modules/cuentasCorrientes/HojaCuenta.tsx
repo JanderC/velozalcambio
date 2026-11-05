@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Loader2, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Landmark, Loader2, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -53,6 +53,7 @@ import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, pctDeComision, sumarDecimales } from "../../utils/montos";
 import { alAbrirWhatsApp, enlaceWhatsApp } from "../../utils/whatsapp";
 import { leerCapturas, unirImagenes } from "./comprobantesVarios";
+import { reconocerBancoEmpresa, type BancoReconocido } from "../../api/cuentasCorrientes.api";
 import { motivoDeLectura, motivosDeMonto, VerificarMontosModal, type MontoAVerificar, type Verificacion } from "./verificarMontos";
 import { useCaptureParecido } from "./CaptureParecido";
 import { LINEAS_WA, whatsappApi, type ConexionWa, type LineaWa } from "../../api/whatsapp.api";
@@ -1592,6 +1593,8 @@ function FilaNueva({
   const [preguntaMetodo, setPreguntaMetodo] = useState<{ total: string | null; referencia: string | null } | null>(null);
   // lo que dice la captura: "Aquí fue un pago por Bancolombia" (en todos los módulos)
   const [metodoDetectado, setMetodoDetectado] = useState<string | null>(null);
+  // Confirmaciones: la cuenta de la empresa que sale en el capture; con el movimiento se alimenta sola (se puede quitar)
+  const [bancoCapture, setBancoCapture] = useState<BancoReconocido | null>(null);
   // el método de la captura, y cada cuánto hay que volver a poner la cuenta (ver el efecto de la regla, más abajo)
   const metodoAplicado = useRef<Metodo | null>(null);
   const [pedidoRegla, setPedidoRegla] = useState(0);
@@ -1686,6 +1689,13 @@ function FilaNueva({
         // de la captura quedaba escondido en otro día). Si es de otro día, se avisa y se cambia a mano en "Fecha".
         const fechaLeida = l.primera?.fecha;
         if (fechaLeida && fechaLeida < hoyBogota()) partes.push(`la captura es del ${fechaCorta(`${fechaLeida}T12:00:00-05:00`)} (el movimiento queda con la fecha de hoy)`);
+      }
+      if (enConfirmaciones && !sumando) {
+        setBancoCapture(null);
+        const leida = l.primera;
+        void reconocerBancoEmpresa(leida?.cuentaOrigen, leida?.cuentaDestino)
+          .then(setBancoCapture)
+          .catch(() => setBancoCapture(null));
       }
       // Qué es la captura (Bancolombia, Nequi, Zelle…): se avisa y la referencia queda "Pago de Bancolombia"
       if (!sumando) {
@@ -2031,6 +2041,16 @@ function FilaNueva({
 
   // Lo que llegó: la moneda del medio (USD por Zelle, USDT, bolívares…); si el medio no la define, la de la cuenta
   const codigoLlega = delMedio ?? cuenta.moneda_codigo;
+  // Confirmaciones: cuánto entra o sale de la cuenta de la empresa del capture (lo que mandó el cliente, en su moneda)
+  const monedaBanco = bancoCapture ? (bancoCapture.moneda ?? "COP") : null;
+  const montoBanco =
+    !bancoCapture || conCaja || !monedaBanco
+      ? null
+      : conTasa && nCantidad && codigoLlega === monedaBanco
+        ? sinSigno(nCantidad)
+        : montoConSigno && codigoMonto === monedaBanco
+          ? sinSigno(montoConSigno)
+          : null;
   // Las referencias de las transferencias se revisan contra las ya registradas (por el medio de este movimiento)
   const referenciasVarias = varias ? transferencias.map((t) => t.referencia.trim()).filter((r) => r.length >= 4).join("|") : "";
   useEffect(() => {
@@ -2590,9 +2610,11 @@ function FilaNueva({
     // La tasa con la que se cobró en la otra moneda queda como la tasa de la cuenta (la última usada)
     const tasaCobroNueva = !otraMoneda && enCobro && conTasa && cuenta.moneda_cobro_id && nTasa !== cuenta.tasa_cobro ? { monedaCobroId: cuenta.moneda_cobro_id, tasaCobro: nTasa! } : null;
     const adjuntas = imagenesAdjuntas;
+    const banco = bancoCapture && montoBanco && bancoCapture.monedaId ? { ...bancoCapture, monto: montoBanco } : null;
     setImagenesAdjuntas([]);
     setCapturasDudosas(0);
     setAvisoLectura(null);
+    setBancoCapture(null);
     const escrito = { referencia, persona, mtcn, confirmada, cuentaDestino, cantidad, tasa, montoDirecto, resta, esPorcentaje, enCobro, entregaEn, esFactura };
     setEnCobro(iniciaEnCobro);
     setEntregaEn(entregaPorDefecto);
@@ -2670,6 +2692,15 @@ function FilaNueva({
         : confirmadaDirecto
           ? { estadoConfirmacion: "CONFIRMADA" as const }
           : {}),
+      // la cuenta de la empresa del capture: lo que llegó a ella entra, lo que salió de ella sale (al anular, se devuelve)
+      ...(banco
+        ? {
+            cajaId: banco.cajaId,
+            monedaCajaId: banco.monedaId!,
+            montoCaja: `${banco.rol === "destino" ? "" : "-"}${banco.monto}`,
+            observacionCaja: `Confirmación ${cuenta.tercero_nombre} · ${referenciaFinal}${persona.trim() ? ` · ${persona.trim()}` : ""} (${banco.dato})`.slice(0, 200),
+          }
+        : {}),
       ...(conCaja && cajaId !== "" && movimientoCaja && monedaCaja
         ? { cajaId, monedaCajaId: monedaCaja.id, montoCaja: `${entraACaja ? "" : "-"}${movimientoCaja.cantidad}` }
         : {}),
@@ -3166,6 +3197,24 @@ function FilaNueva({
 
       {avisoLectura && metodoDetectado && <p className="cc-metodo-detectado">Aquí fue un pago por {metodoDetectado}</p>}
       {avisoLectura && <p className="cc-aviso-lectura">{avisoLectura}</p>}
+      {enConfirmaciones && bancoCapture && !conCaja && (
+        <p className="cc-banco-capture">
+          <Landmark size={15} />
+          <span>
+            {bancoCapture.rol === "destino" ? "Llegó a" : "Salió de"} <b>{bancoCapture.nombre}</b> ({bancoCapture.dato}):{" "}
+            {montoBanco ? (
+              <>
+                al agregar {bancoCapture.rol === "destino" ? "entran" : "salen"} <b>{dineroEn(montoBanco, monedaBanco!)}</b> en Capital de giros.
+              </>
+            ) : (
+              <>se alimenta cuando el monto esté en {monedaBanco}.</>
+            )}
+          </span>
+          <button type="button" onClick={() => setBancoCapture(null)} title="No mover esa cuenta con este movimiento">
+            No alimentar
+          </button>
+        </p>
+      )}
       {/* no se reconoció el método de la captura: se elige y se aplica su medio y su comisión */}
       {preguntaMetodo && (
         <div className="cc-pregunta-metodo" role="group" aria-label="Método de pago de la captura">

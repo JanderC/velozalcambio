@@ -3,8 +3,9 @@ import { Modal } from "../../components/common/Modal";
 import { ApiError } from "../../api/client";
 import { capitalApi, type BancoDelSistema, type MovimientoBanco } from "../../api/capital.api";
 import { formatearMonto, leerNumero } from "../../utils/montos";
+import { DatosBancoModal } from "./DatosBancoModal";
 
-export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo";
+export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo" | "datos";
 
 /** Lo que se va escribiendo, con los puntos de miles puestos solos y decimales con coma. */
 function conPuntos(escrito: string) {
@@ -30,12 +31,14 @@ export function BancoAccionModal({
   banco,
   bancos,
   onHecho,
+  onCambio,
   onCerrar,
 }: {
   accion: AccionBanco;
   banco: BancoDelSistema;
   bancos: BancoDelSistema[];
   onHecho: (mensaje: string) => void;
+  onCambio?: () => void; // cambió algo sin cerrar (los datos de la cuenta)
   onCerrar: () => void;
 }) {
   const moneda = banco.moneda ?? "COP";
@@ -91,6 +94,8 @@ export function BancoAccionModal({
   }
 
   const titulo = accion === "saldo" ? "Cargar saldo real" : accion === "renombrar" ? "Editar cuenta" : accion === "movimiento" ? "Ingreso o egreso" : accion === "traslado" ? "Pasar a otra cuenta" : "Movimientos de la cuenta";
+
+  if (accion === "datos") return <DatosBancoModal banco={banco} onCambio={() => onCambio?.()} onCerrar={onCerrar} />;
 
   if (accion === "historial") {
     return (

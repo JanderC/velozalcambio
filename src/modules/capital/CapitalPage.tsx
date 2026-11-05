@@ -698,6 +698,7 @@ export function CapitalPage() {
               banco={sistema.bancos.find((b) => b.id === accionBanco.bancoId)!}
               bancos={sistema.bancos}
               onCerrar={() => setAccionBanco(null)}
+              onCambio={() => void recargarSistema()}
               onHecho={(mensaje) => {
                 setAccionBanco(null);
                 setAviso(mensaje);

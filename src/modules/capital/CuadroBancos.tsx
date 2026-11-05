@@ -3,6 +3,7 @@ import { Check, MoreHorizontal, Plus } from "lucide-react";
 import type { BancoDelSistema } from "../../api/capital.api";
 import { formatearMonto, leerNumero } from "../../utils/montos";
 import type { AccionBanco } from "./BancoAccionModal";
+import { textoDato } from "./DatosBancoModal";
 
 const pesos = (n: number) => `${n < 0 ? "−" : ""}$${formatearMonto(String(Math.round(Math.abs(n))))}`;
 const conDecimales = (n: number) => `${n < 0 ? "−" : ""}${formatearMonto(Math.abs(n).toFixed(2))}`;
@@ -42,6 +43,9 @@ export function MenuBanco({ onAccion }: { onAccion: (a: AccionBanco) => void }) 
         </button>
         <button type="button" onClick={(e) => elegir(e, "saldo")}>
           Cargar saldo real
+        </button>
+        <button type="button" onClick={(e) => elegir(e, "datos")}>
+          Cuenta y pago móvil
         </button>
         <button type="button" onClick={(e) => elegir(e, "renombrar")}>
           Editar nombre
@@ -122,7 +126,11 @@ export function CuadroBancos({
               const diferencia = escrito !== null ? Number(escrito) - enSistema : 0;
               return (
                 <tr key={b.id}>
-                  <td className="cap-banco-nombre">{b.nombre}</td>
+                  <td className="cap-banco-nombre">
+                    {b.nombre}
+                    {/* con qué se reconoce en los captures de Confirmaciones */}
+                    {!!b.datos?.length && <small className="cap-banco-datos">{b.datos.map((d) => textoDato(d)).join(" · ")}</small>}
+                  </td>
                   <td className="num">{fmt(enSistema)}</td>
                   {!soloLectura && (
                     <td className="num cap-banco-cierre">
