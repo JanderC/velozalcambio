@@ -752,3 +752,7 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-opcion-moneda:hover { border-color: var(--color-navy); background: #f8fafc; }
 .cc-opcion-moneda.recomendada { border-color: #10b981; background: #ecfdf5; }
 .cc-opcion-moneda small { color: #4b5563; font-size: 0.8rem; }
+
+/* Ir al último movimiento del cliente */
+.cc-dia-hoy.cc-dia-ultimo { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; font-weight: 600; white-space: nowrap; }
+.cc-dia button:disabled { opacity: 0.35; cursor: default; }

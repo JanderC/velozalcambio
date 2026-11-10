@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, Download, Landmark, Loader2, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Landmark, Loader2, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -346,6 +346,27 @@ export function HojaCuenta({
     setCargando(true);
     void cargar();
   }, [cargar]);
+
+  // Los días en que el cliente tiene movimientos: para ir a su última contabilidad y saltar de un día con movimientos
+  // al siguiente sin pasar por los vacíos. Se vuelven a pedir cuando cambia la hoja (se agregó o anuló algo).
+  const [diasConMovimientos, setDiasConMovimientos] = useState<string[]>([]);
+  const huellaHoja = `${estado?.saldoFinal ?? ""}|${estado?.movimientos.length ?? 0}|${cuenta.ultimo_movimiento ?? ""}`;
+  useEffect(() => {
+    let vigente = true;
+    getMovimientosCuentaCorriente(cuenta.id)
+      .then((l) => {
+        if (!vigente) return;
+        const dias = new Set(l.map((m) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(m.fecha))));
+        setDiasConMovimientos([...dias].sort());
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [cuenta.id, huellaHoja]);
+  const ultimoDia = diasConMovimientos[diasConMovimientos.length - 1] ?? null;
+  const diaAnteriorConMov = [...diasConMovimientos].reverse().find((d) => d < dia) ?? null;
+  const diaSiguienteConMov = diasConMovimientos.find((d) => d > dia) ?? null;
 
   // Western ya verificó: el movimiento pasa a confirmado y queda listo el mensaje para el cliente
   async function confirmar(m: FilaEstadoCuenta) {
@@ -882,6 +903,9 @@ export function HojaCuenta({
           </span>
         )}
         <span className="cc-dia">
+          <button onClick={() => diaAnteriorConMov && setDia(diaAnteriorConMov)} disabled={!diaAnteriorConMov} aria-label="Día anterior con movimientos" title={diaAnteriorConMov ? `Día anterior con movimientos (${fechaCorta(`${diaAnteriorConMov}T12:00:00-05:00`)})` : "No hay días anteriores con movimientos"}>
+            <ChevronsLeft size={16} />
+          </button>
           <button onClick={() => setDia(moverDia(dia, -1))} aria-label="Día anterior" title="Día anterior">
             <ChevronLeft size={16} />
           </button>
@@ -889,6 +913,14 @@ export function HojaCuenta({
           <button onClick={() => setDia(moverDia(dia, 1))} disabled={dia >= hoyBogota()} aria-label="Día siguiente" title="Día siguiente">
             <ChevronRight size={16} />
           </button>
+          <button onClick={() => diaSiguienteConMov && setDia(diaSiguienteConMov)} disabled={!diaSiguienteConMov} aria-label="Día siguiente con movimientos" title={diaSiguienteConMov ? `Día siguiente con movimientos (${fechaCorta(`${diaSiguienteConMov}T12:00:00-05:00`)})` : "No hay días siguientes con movimientos"}>
+            <ChevronsRight size={16} />
+          </button>
+          {ultimoDia && dia !== ultimoDia && (
+            <button className="cc-dia-hoy cc-dia-ultimo" onClick={() => setDia(ultimoDia)} title="Ir al último día con movimientos de este cliente">
+              Último movimiento · {fechaCorta(`${ultimoDia}T12:00:00-05:00`).slice(0, 5)}
+            </button>
+          )}
           {dia !== hoyBogota() && (
             <button className="cc-dia-hoy" onClick={() => setDia(hoyBogota())}>
               Hoy
