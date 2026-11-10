@@ -96,3 +96,8 @@
 .tt-editar.tt-copiar:hover { filter: brightness(1.08); background: var(--color-gold); }
 .tt-editar:disabled { opacity: 0.6; cursor: default; }
 .tt-compartir { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+/* Referencia pequeña del mercado (BCV, paralelo, TRM): no sale en la imagen */
+.tt-ref { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+.tt-ref-item { display: inline-flex; flex-direction: column; align-items: flex-start; padding: 4px 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); line-height: 1.15; }
+.tt-ref-item span { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+.tt-ref-item b { font-size: 0.86rem; color: #fff; font-variant-numeric: tabular-nums; }

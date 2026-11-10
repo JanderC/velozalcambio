@@ -1,7 +1,8 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toBlob } from "html-to-image";
 import { ArrowDownRight, ArrowUpRight, Check, Copy, Download, PencilLine, Share2, X } from "lucide-react";
 import { ApiError } from "../../api/client";
+import { getTasasExternas, getTrmColombia } from "../../api/tasas.api";
 import { DOLAR_COMPRA, DOLAR_VENTA, EURO_COMPRA, EURO_VENTA, OTRAS, escrita, guardarTablero, tendencia, useTablero, type Casilla, type Tablero, type ValoresTablero } from "./tablero";
 import { PreferenciaTasaUsada } from "./TasasDelDia";
 import { useAuth } from "../../auth/useAuth";
@@ -157,6 +158,7 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
           <span>Tasa del día</span>
           <h2>La mejor tasa del mercado</h2>
         </div>
+        <ReferenciaMercado />
         <div className="tt-fecha">
           <div>
             <span>Fecha</span>
@@ -275,5 +277,45 @@ function Valor({
         </span>
       )}
     </label>
+  );
+}
+
+const conDecimales = (n: number) => n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Referencia pequeña para actualizar las tasas: dólar BCV y paralelo (Binance) en Venezuela, y la TRM de Colombia.
+ * Solo informativa y no sale en la imagen que se manda a los clientes. Se refresca sola cada 5 minutos.
+ */
+function ReferenciaMercado() {
+  const [ref, setRef] = useState<{ bcv: number | null; paralelo: number | null; trm: number | null } | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    const cargar = async () => {
+      const [ext, trm] = await Promise.all([getTasasExternas().catch(() => []), getTrmColombia().catch(() => null)]);
+      const usd = (fuente: string) => {
+        const t = ext.find((x) => x.origen === "DolarApi" && x.moneda === "USD" && x.fuente.toLowerCase() === fuente);
+        return t ? (t.promedio ?? t.venta ?? t.compra) : null;
+      };
+      if (vigente) setRef({ bcv: usd("oficial"), paralelo: usd("paralelo"), trm: trm?.actual?.valor ?? null });
+    };
+    void cargar();
+    const intervalo = setInterval(() => void cargar(), 5 * 60_000);
+    return () => {
+      vigente = false;
+      clearInterval(intervalo);
+    };
+  }, []);
+  const item = (etiqueta: string, valor: number | null | undefined, titulo: string) => (
+    <span className="tt-ref-item" title={titulo}>
+      <span>{etiqueta}</span>
+      <b>{valor ? conDecimales(valor) : "—"}</b>
+    </span>
+  );
+  return (
+    <div className="tt-ref" data-no-imagen aria-label="Referencia del mercado">
+      {item("BCV", ref?.bcv, "Dólar oficial del Banco Central de Venezuela (Bs por dólar)")}
+      {item("Paralelo (Binance)", ref?.paralelo, "Dólar paralelo en Venezuela, del mercado de Binance (Bs por dólar)")}
+      {item("TRM", ref?.trm, "Tasa representativa del mercado de Colombia (pesos por dólar)")}
+    </div>
   );
 }
