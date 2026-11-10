@@ -90,3 +90,9 @@
 .cpm-campo { display: inline-flex; align-items: center; gap: 4px; }
 .cpm-campo input { width: 96px; padding: 5px 8px; border: 1px solid #d7dbe2; border-radius: 6px; font: inherit; text-align: right; }
 .cpm-grupo > small { font-size: 0.74rem; color: #8a93a3; }
+
+/* Copiar imagen: la acción principal para mandar la tasa (se pega con Ctrl+V) */
+.tt-editar.tt-copiar { background: var(--color-gold); color: #0b0e13; border-color: var(--color-gold); }
+.tt-editar.tt-copiar:hover { filter: brightness(1.08); background: var(--color-gold); }
+.tt-editar:disabled { opacity: 0.6; cursor: default; }
+.tt-compartir { display: inline-flex; flex-wrap: wrap; gap: 8px; }

@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from "react";
 import { toBlob } from "html-to-image";
-import { ArrowDownRight, ArrowUpRight, Check, PencilLine, Share2, X } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Check, Copy, Download, PencilLine, Share2, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { DOLAR_COMPRA, DOLAR_VENTA, EURO_COMPRA, EURO_VENTA, OTRAS, escrita, guardarTablero, tendencia, useTablero, type Casilla, type Tablero, type ValoresTablero } from "./tablero";
 import { PreferenciaTasaUsada } from "./TasasDelDia";
@@ -41,46 +41,74 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
   const tarjeta = useRef<HTMLFormElement>(null);
   const [compartiendo, setCompartiendo] = useState(false);
 
+  const [copiando, setCopiando] = useState(false);
+  // en el teléfono "Compartir" abre WhatsApp y las demás apps; en el computador no sirve (abre la ventana de Windows)
+  const esCelular = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches && "share" in navigator;
+  const avisar = (t: string) => {
+    setAviso(t);
+    setTimeout(() => setAviso(null), 6000);
+  };
+
   // La imagen del tablero para mandarla a los clientes: sin botones, avisos ni quién la actualizó
+  async function crearImagen() {
+    if (!tarjeta.current) throw new Error("sin tablero");
+    const blob = await toBlob(tarjeta.current, {
+      pixelRatio: 2,
+      backgroundColor: "#0b0e13",
+      filter: (n) => !(n instanceof HTMLElement && n.dataset.noImagen !== undefined),
+    });
+    if (!blob) throw new Error("sin imagen");
+    return blob;
+  }
+  const nombreArchivo = () => `tasa-del-dia-${tablero?.actual ? fechaCorta(tablero.actual.actualizado).replace(/\//g, "-") : "hoy"}.png`;
+
+  /**
+   * Copiar la imagen para pegarla donde sea (WhatsApp Web, un chat, un documento) con Ctrl+V. El portapapeles recibe
+   * la imagen como promesa, en el mismo clic: así el navegador no pierde el permiso mientras se arma la imagen.
+   */
+  async function copiar() {
+    setCopiando(true);
+    setError(null);
+    const imagen = crearImagen();
+    try {
+      if (!navigator.clipboard || !("ClipboardItem" in window)) throw new Error("sin portapapeles");
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": imagen })]);
+      avisar("Imagen copiada: pégala donde quieras con Ctrl+V (en el celular, mantén presionado y Pegar).");
+    } catch {
+      // el navegador no deja copiar imágenes: se descarga para mandarla igual
+      try {
+        descargar(new File([await imagen], nombreArchivo(), { type: "image/png" }), "No se pudo copiar: la imagen se descargó para que la mandes.");
+      } catch {
+        setError("No se pudo crear la imagen de las tasas.");
+      }
+    } finally {
+      setCopiando(false);
+    }
+  }
+
+  // Compartir (celular) o descargar (computador)
   async function compartir() {
-    if (!tarjeta.current) return;
     setCompartiendo(true);
     setError(null);
     try {
-      const blob = await toBlob(tarjeta.current, {
-        pixelRatio: 2,
-        backgroundColor: "#0b0e13",
-        filter: (n) => !(n instanceof HTMLElement && n.dataset.noImagen !== undefined),
-      });
-      if (!blob) throw new Error();
-      const dia = tablero?.actual ? fechaCorta(tablero.actual.actualizado).replace(/\//g, "-") : "hoy";
-      const archivo = new File([blob], `tasa-del-dia-${dia}.png`, { type: "image/png" });
-      // en el celular abre WhatsApp y las demás apps; en el computador se copia o se descarga
-      if (navigator.canShare?.({ files: [archivo] })) {
+      const archivo = new File([await crearImagen()], nombreArchivo(), { type: "image/png" });
+      if (esCelular && navigator.canShare?.({ files: [archivo] })) {
         await navigator.share({ files: [archivo], title: "Tasa del día" }).catch(() => undefined);
-      } else if (navigator.clipboard && "ClipboardItem" in window) {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          setAviso("Imagen copiada: pégala en el chat de WhatsApp (Ctrl+V).");
-        } catch {
-          descargar(archivo);
-        }
-        setTimeout(() => setAviso(null), 6000);
-      } else descargar(archivo);
+      } else descargar(archivo, "Imagen descargada: ya la puedes mandar por WhatsApp.");
     } catch {
       setError("No se pudo crear la imagen de las tasas.");
     } finally {
       setCompartiendo(false);
     }
   }
-  function descargar(archivo: File) {
+  function descargar(archivo: File, mensaje: string) {
     const url = URL.createObjectURL(archivo);
     const a = document.createElement("a");
     a.href = url;
     a.download = archivo.name;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setAviso("Imagen descargada: ya la puedes mandar por WhatsApp.");
+    avisar(mensaje);
   }
 
   function empezar() {
@@ -140,9 +168,14 @@ export function TableroTasas({ puedeEditar }: { puedeEditar: boolean }) {
           </div>
         </div>
         {!editando && tablero?.actual && (
-          <button type="button" className="tt-editar" onClick={() => void compartir()} disabled={compartiendo} data-no-imagen>
-            <Share2 size={16} /> {compartiendo ? "Creando imagen…" : "Compartir imagen"}
-          </button>
+          <div className="tt-compartir" data-no-imagen>
+            <button type="button" className="tt-editar tt-copiar" onClick={() => void copiar()} disabled={copiando} data-no-imagen title="Copiar la imagen para pegarla con Ctrl+V">
+              <Copy size={16} /> {copiando ? "Copiando…" : "Copiar imagen"}
+            </button>
+            <button type="button" className="tt-editar" onClick={() => void compartir()} disabled={compartiendo} data-no-imagen>
+              {esCelular ? <Share2 size={16} /> : <Download size={16} />} {compartiendo ? "Creando imagen…" : esCelular ? "Compartir" : "Descargar"}
+            </button>
+          </div>
         )}
         {puedeEditar &&
           (editando ? (
