@@ -365,6 +365,16 @@ export function HojaCuenta({
     };
   }, [cuenta.id, huellaHoja]);
   const ultimoDia = diasConMovimientos[diasConMovimientos.length - 1] ?? null;
+  // Al entrar a la contabilidad del cliente se abre en su último día con movimientos (como el botón), una sola vez.
+  // No si se llegó a un movimiento desde el buscador, ni en Confirmaciones (ahí se trabaja el día de hoy).
+  const fueAlUltimo = useRef(false);
+  useEffect(() => {
+    if (fueAlUltimo.current || !ultimoDia) return;
+    fueAlUltimo.current = true;
+    if (cuenta.modulo === "CAJA" || irA || dia !== hoyBogota()) return;
+    if (ultimoDia !== dia) setDia(ultimoDia);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ultimoDia]);
   const diaAnteriorConMov = [...diasConMovimientos].reverse().find((d) => d < dia) ?? null;
   const diaSiguienteConMov = diasConMovimientos.find((d) => d > dia) ?? null;
 
