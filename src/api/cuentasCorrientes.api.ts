@@ -353,6 +353,11 @@ export function unirCuentasCorrientes(id: number, destinoId: number) {
   return api.post<{ cuenta: CuentaCorrienteResumen; movimientos: number }>(`/cuentas-corrientes/${id}/unir`, { destinoId });
 }
 
+/** Lo ya escrito en las referencias y descripciones de un módulo (las más usadas primero). */
+export function getTextosUsados(modulo: string) {
+  return api.get<{ referencias: string[]; descripciones: string[] }>(`/cuentas-corrientes/textos-usados?modulo=${modulo}`);
+}
+
 export function getMovimientosCuentaCorriente(cuentaId: number) {
   return api.get<MovimientoCC[]>(`/cuentas-corrientes/${cuentaId}/movimientos`);
 }

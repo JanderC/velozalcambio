@@ -19,6 +19,7 @@ import {
   unirCuentasCorrientes,
   getEstadoCuenta,
   getMovimientosCuentaCorriente,
+  getTextosUsados,
   getTasasRecientes,
   getUrlComprobante,
   getUrlComprobanteTransferencia,
@@ -63,6 +64,8 @@ import { abrirChatEnBurbuja } from "../../components/whatsapp/BurbujaWhatsapp";
 import { EnviarReportePorVinculado } from "../../components/whatsapp/EnviarReportePorVinculado";
 import { CobroModal } from "./CobroModal";
 
+// lo ya escrito en cada módulo (referencias y descripciones): se pide una vez y se comparte entre las hojas
+const textosDelModulo = new Map<string, { referencias: string[]; descripciones: string[] }>();
 const REFERENCIAS_COMUNES = ["Venta de Zelle", "Venta de bss", "Venta de USDT", "Deteriorado", "Comisión", "Abono Zelle", "Abono dólares", "Abono efectivo", "Abono transferencia"];
 
 // Referencias que no se sugieren, aunque exista el banco o se hayan usado antes
@@ -742,8 +745,10 @@ export function HojaCuenta({
 
   const referencias = useMemo(() => {
     const usadas = (estado?.movimientos ?? []).map((m) => m.descripcion).filter((d): d is string => !!d && !d.startsWith("Reverso de")).map((d) => d.split(SEPARADOR_PERSONA)[0]!.replace(/ \([\d.,]+ [A-Z]{3,5} a [\d.,]+\)$/, ""));
-    return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])].filter((r) => !REFERENCIAS_OCULTAS.test(r.trim()));
-  }, [estado, ventasPorBanco]);
+    // Confirmaciones sigue con sus referencias de siempre; en las cuentas, solo lo que ya se escribió
+    if (cuenta.modulo === "CAJA") return [...new Set([...usadas.reverse().slice(0, 15), ...ventasPorBanco, ...REFERENCIAS_COMUNES])].filter((r) => !REFERENCIAS_OCULTAS.test(r.trim()));
+    return [...new Set(usadas.reverse().slice(0, 30))];
+  }, [estado, ventasPorBanco, cuenta.modulo]);
 
   return (
     <div className="cc-hoja">
@@ -1655,6 +1660,29 @@ function FilaNueva({
   const [preguntaMetodo, setPreguntaMetodo] = useState<{ total: string | null; referencia: string | null } | null>(null);
   // lo que dice la captura: "Aquí fue un pago por Bancolombia" (en todos los módulos)
   const [metodoDetectado, setMetodoDetectado] = useState<string | null>(null);
+  // Cuentas: lo que ya se escribió en las referencias y descripciones del módulo (se sugiere y se va alimentando)
+  const [textos, setTextos] = useState<{ referencias: string[]; descripciones: string[] }>(() => textosDelModulo.get(cuenta.modulo) ?? { referencias: [], descripciones: [] });
+  useEffect(() => {
+    if (enConfirmaciones) return;
+    let vigente = true;
+    getTextosUsados(cuenta.modulo)
+      .then((t) => {
+        textosDelModulo.set(cuenta.modulo, t);
+        if (vigente) setTextos(t);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [cuenta.modulo, enConfirmaciones]);
+  const aprenderTextos = (ref: string, des: string) => {
+    const sumar = (lista: string[], t: string) => (t.trim().length >= 2 && !lista.some((x) => x.toLowerCase() === t.trim().toLowerCase()) ? [t.trim(), ...lista] : lista);
+    setTextos((t) => {
+      const nuevo = { referencias: sumar(t.referencias, ref), descripciones: /[a-záéíóúñ]/i.test(des) ? sumar(t.descripciones, des) : t.descripciones };
+      textosDelModulo.set(cuenta.modulo, nuevo);
+      return nuevo;
+    });
+  };
   // Confirmaciones: la cuenta de la empresa que sale en el capture; con el movimiento se alimenta sola (se puede quitar)
   const [bancoCapture, setBancoCapture] = useState<BancoReconocido | null>(null);
   // el método de la captura, y cada cuánto hay que volver a poner la cuenta (ver el efecto de la regla, más abajo)
@@ -2818,6 +2846,7 @@ function FilaNueva({
     cola.current = turno.catch(() => {});
     try {
       const creado = await turno;
+      if (!enConfirmaciones) aprenderTextos(escrito.referencia, escrito.persona);
       ultimoAgregado.current = {
         clave: claveRepetida,
         cuando: Date.now(),
@@ -3186,19 +3215,32 @@ function FilaNueva({
             list="cc-referencias"
             value={referencia}
             onChange={(e) => alCambiarReferencia(e.target.value)}
-            placeholder={enConfirmaciones ? `${operacionPorDefecto} (se pone sola)` : "Venta de Zelle, Venta de bss, Abono dólares…"}
+            placeholder={enConfirmaciones ? `${operacionPorDefecto} (se pone sola)` : "Escribe la referencia (queda para la próxima)"}
             autoComplete="off"
           />
           <datalist id="cc-referencias">
-            {(enConfirmaciones ? OPERACIONES_CONFIRMACIONES : [...new Set([...referencias, ...OPERACIONES_CONFIRMACIONES])]).map((r) => (
+            {(enConfirmaciones ? OPERACIONES_CONFIRMACIONES : [...new Set([...referencias, ...textos.referencias])]).map((r) => (
               <option key={r} value={r} />
             ))}
           </datalist>
         </label>
         {pidePersona && (
           <label className="cc-c-persona">
-            Referencia de la transferencia y quién envió{personaObligatoria ? "" : " (opcional)"}
-            <input value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Número de referencia, y el nombre de quien envió" autoComplete="off" />
+            {enConfirmaciones ? `Referencia de la transferencia y quién envió${personaObligatoria ? "" : " (opcional)"}` : `Descripción${personaObligatoria ? " (quién envió)" : ""}`}
+            <input
+              value={persona}
+              onChange={(e) => setPersona(e.target.value)}
+              list={enConfirmaciones ? undefined : "cc-descripciones"}
+              placeholder={enConfirmaciones ? "Número de referencia, y el nombre de quien envió" : "Bancolombia, Zelle, nombre de quien envió…"}
+              autoComplete="off"
+            />
+            {!enConfirmaciones && (
+              <datalist id="cc-descripciones">
+                {textos.descripciones.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
+            )}
             {repetido && <small className="cc-repetido">{avisoRepetido(repetido)}</small>}
           </label>
         )}
@@ -3208,10 +3250,12 @@ function FilaNueva({
             <input value={mtcn} onChange={(e) => setMtcn(e.target.value)} inputMode="numeric" placeholder="10 dígitos" autoComplete="off" />
           </label>
         )}
-        <label className="cc-c-destino">
-          Cuenta a la que se pagó (opcional)
-          <input value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)} placeholder="ej. Bancolombia ahorros 1234, Nequi 300…" autoComplete="off" maxLength={120} />
-        </label>
+        {enConfirmaciones && (
+          <label className="cc-c-destino">
+            Cuenta a la que se pagó (opcional)
+            <input value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)} placeholder="ej. Bancolombia ahorros 1234, Nequi 300…" autoComplete="off" maxLength={120} />
+          </label>
+        )}
         <div className="cc-c-signo" role="group" aria-label={enConfirmaciones ? "Compra o venta" : "Egreso o ingreso"}>
           <button
             type="button"
