@@ -107,7 +107,20 @@ function abrirAplicacion(destino: string) {
  *   Alt + clic: lo contrario de lo habitual en esa PC (WhatsApp Web, o la aplicación si la PC quedó en Web).
  *   En el teléfono no se toca: el enlace wa.me abre la aplicación.
  */
+// WhatsApp pega el texto al borrador que ya tiene el chat: si se toca dos veces el botón antes de enviar, el cliente
+// recibe el mensaje dos veces seguidas en una sola burbuja. El mismo mensaje no se vuelve a abrir en 20 segundos.
+let ultimoAbierto: { clave: string; hora: number } | null = null;
+const ESPERA_REABRIR = 20_000;
+
 export function alAbrirWhatsApp(e: MouseEvent<HTMLAnchorElement>, telefono: string | null | undefined, mensaje: string) {
+  const clave = `${telefono ?? ""}|${mensaje}`;
+  const ahora = Date.now();
+  if (ultimoAbierto && ultimoAbierto.clave === clave && ahora - ultimoAbierto.hora < ESPERA_REABRIR) {
+    e.preventDefault();
+    aviso("Ese mensaje ya se abrió en WhatsApp: envíalo desde allá. Si lo abres otra vez, WhatsApp lo pega dos veces.", [], 6);
+    return;
+  }
+  ultimoAbierto = { clave, hora: ahora };
   if (esTelefono()) return;
   e.preventDefault();
   const destino = `${telefono ? `phone=${telefono}&` : ""}text=${encodeURIComponent(mensaje)}`;

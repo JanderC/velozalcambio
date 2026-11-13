@@ -185,12 +185,14 @@ export function sugerenciasDeTasa(
 }
 
 // ---------- ¿guardar la tasa que se cambió a mano? (se pregunta una vez y se recuerda la respuesta) ----------
-export type PreferenciaTasa = "preguntar" | "guardar" | "no-guardar";
+// Ya no existe "guardar siempre": el tablero cambiaba solo cada vez que alguien usaba la tasa de un cliente. Quien la
+// tenía puesta vuelve a "preguntar"; el tablero solo cambia si la persona dice que sí en ese momento.
+export type PreferenciaTasa = "preguntar" | "no-guardar";
 const clavePref = (usuarioId: number) => `tasa-dia-preferencia-${usuarioId}`;
 export function preferenciaTasa(usuarioId: number): PreferenciaTasa {
   try {
     const v = localStorage.getItem(clavePref(usuarioId));
-    return v === "guardar" || v === "no-guardar" ? v : "preguntar";
+    return v === "no-guardar" ? v : "preguntar";
   } catch {
     return "preguntar";
   }

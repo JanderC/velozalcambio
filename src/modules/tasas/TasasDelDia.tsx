@@ -38,26 +38,24 @@ export interface PropuestaTasa {
 }
 
 /**
- * Se usó otra tasa que la del día: ¿se guarda como la nueva tasa del día o se sigue con la misma? Se pregunta una sola
- * vez: la respuesta queda recordada y después se hace solo (se cambia en Tasas).
+ * Se usó otra tasa que la del día: ¿se guarda como la nueva tasa del día? Nunca se guarda sola: se pregunta, y solo
+ * cambia si la persona dice que sí. "Seguir con la del día" sí queda recordado (y deja de preguntar).
+ * Una tasa muy lejos de la del día (más de 15 % arriba o abajo) es la de un cliente o un error: ni se pregunta.
  */
-export function decidirTasaUsada(usuarioId: number, p: PropuestaTasa, preguntar: (p: PropuestaTasa) => void, avisar: (texto: string) => void) {
-  const pref = preferenciaTasa(usuarioId);
-  if (pref === "no-guardar") return;
-  if (pref === "guardar") {
-    void guardarUnaTasa(p.clave, p.nueva)
-      .then(() => avisar(`Tasa del día de ${p.etiqueta} actualizada a ${p.nueva.replace(".", ",")}.`))
-      .catch(() => {});
-    return;
-  }
+export function decidirTasaUsada(usuarioId: number, p: PropuestaTasa, preguntar: (p: PropuestaTasa) => void, _avisar?: (texto: string) => void) {
+  if (preferenciaTasa(usuarioId) === "no-guardar") return;
+  const delDia = Number(p.actual.replace(/\./g, "").replace(",", "."));
+  const nueva = Number(p.nueva);
+  if (!(delDia > 0) || !(nueva > 0) || Math.abs(nueva - delDia) / delDia > 0.15) return;
   preguntar(p);
 }
 
 export function AvisoGuardarTasa({ usuarioId, propuesta, onListo }: { usuarioId: number; propuesta: PropuestaTasa; onListo: (texto?: string) => void }) {
   const [enviando, setEnviando] = useState(false);
   const nueva = propuesta.nueva.replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  async function responder(p: PreferenciaTasa) {
-    recordarPreferenciaTasa(usuarioId, p);
+  async function responder(p: PreferenciaTasa | "guardar") {
+    // "sí" vale solo para esta vez; "no, seguir con la del día" queda recordado
+    if (p === "no-guardar") recordarPreferenciaTasa(usuarioId, p);
     if (p !== "guardar") return onListo();
     setEnviando(true);
     try {
@@ -80,7 +78,7 @@ export function AvisoGuardarTasa({ usuarioId, propuesta, onListo }: { usuarioId:
           No, seguir con {propuesta.actual}
         </button>
       </div>
-      <small>Tu respuesta queda recordada y este mensaje no vuelve a salir. Se puede cambiar en Tasas.</small>
+      <small>Si dices que no, no vuelve a preguntar (se cambia en Tasas). El tablero solo cambia si dices que sí.</small>
     </div>
   );
 }
@@ -97,8 +95,7 @@ export function PreferenciaTasaUsada({ usuarioId }: { usuarioId: number }) {
       <span>Cuando uses otra tasa en un movimiento:</span>
       {(
         [
-          ["preguntar", "Preguntarme"],
-          ["guardar", "Guardarla como tasa del día"],
+          ["preguntar", "Preguntarme si la guardo"],
           ["no-guardar", "Seguir con la del día"],
         ] as [PreferenciaTasa, string][]
       ).map(([p, t]) => (
