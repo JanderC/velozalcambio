@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Plus, Search } from "lucide-react";
 import { Header } from "../../components/common/Header";
 import { MiDiaHoy } from "../rendimiento/MiDiaHoy";
 import { useAuth } from "../../auth/useAuth";
 import { useSearchParams } from "react-router-dom";
-import { crearCuentaCorriente, getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
+import { TOPE_BUSQUEDA_CAJAS, crearCuentaCorriente, getCanales, getCuentasCorrientes, type Canal, type CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 import { formatearMonto, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 import { actualizarTercero, type TipoTercero } from "../../api/terceros.api";
 import { ApiError } from "../../api/client";
@@ -112,23 +112,44 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
     getCanales().then(setCanales).catch(() => setCanales([]));
   }, []);
 
+  // Confirmaciones tiene miles de clientes: no se trae la lista entera. Sin nada escrito solo se pide la cuenta que
+  // está abierta (si hay una); buscando, hacen falta al menos 2 letras o números y el servidor devuelve un tope.
+  const textoBuscado = buscar.trim();
+  const sinBusqueda = modo === "cajas" && textoBuscado.length < 2;
+  const cuentaSuelta = sinBusqueda ? seleccionadaId : null;
+  // cada pedido lleva su número: si mientras tanto se escribió otra cosa, la respuesta vieja se descarta
+  // (antes una búsqueda lenta podía llegar tarde y pisar la lista de la búsqueda nueva)
+  const pedido = useRef(0);
+  const [buscando, setBuscando] = useState(false);
   const cargar = useCallback(async () => {
+    const mio = ++pedido.current;
     try {
       // En Confirmaciones el medio elegido arriba NO filtra la lista: el cliente es uno solo aunque cambie de medio.
       // Ese botón solo dice con qué medio entra el próximo movimiento.
-      setCuentas(await getCuentasCorrientes({ canalId: modo === "cajas" ? undefined : canalId || undefined, tipoTercero: tipo || undefined, buscar, vista: modo }));
+      const lista = sinBusqueda
+        ? cuentaSuelta
+          ? await getCuentasCorrientes({ cuentaId: cuentaSuelta, vista: "cajas" })
+          : []
+        : await getCuentasCorrientes({ canalId: modo === "cajas" ? undefined : canalId || undefined, tipoTercero: tipo || undefined, buscar: textoBuscado, vista: modo });
+      if (mio !== pedido.current) return;
+      setCuentas(lista);
       setError(null);
     } catch (e) {
-      setError((e as Error).message);
+      if (mio === pedido.current) setError((e as Error).message);
     } finally {
-      setCargando(false);
+      if (mio === pedido.current) {
+        setCargando(false);
+        setBuscando(false);
+      }
     }
-  }, [canalId, tipo, buscar, modo]);
+  }, [canalId, tipo, textoBuscado, modo, sinBusqueda, cuentaSuelta]);
 
   useEffect(() => {
-    const t = setTimeout(cargar, buscar ? 300 : 0);
+    if (textoBuscado && !sinBusqueda) setBuscando(true);
+    // se espera a que se deje de escribir (un poco más en Confirmaciones, donde la búsqueda es la más pesada)
+    const t = setTimeout(cargar, textoBuscado && !sinBusqueda ? (modo === "cajas" ? 400 : 300) : 0);
     return () => clearTimeout(t);
-  }, [cargar, buscar]);
+  }, [cargar, textoBuscado, sinBusqueda, modo]);
 
   // Una sola lista de clientes: lo buscado que está en otro módulo sale aquí y se trae sin crearlo de nuevo
   const moduloAqui = modo === "cajas" ? "CAJA" : "CORRIENTE";
@@ -185,7 +206,7 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
   // En Cuentas por Cobrar: primero las deudas más grandes
   const visibles = useMemo(() => {
     // En Confirmaciones no se listan todos al entrar: solo lo que se busca
-    if (modo === "cajas" && !buscar.trim()) return [];
+    if (modo === "cajas" && buscar.trim().length < 2) return [];
     if (!enCobrar) return cuentas;
     const filtradas = cuentas.filter((c) => (sentido === "me-deben" ? conSaldo(c) && !yoDebo(c) : sentido === "yo-debo" ? yoDebo(c) : true));
     return [...filtradas].sort((a, b) => Math.abs(Number(b.saldo_actual)) - Math.abs(Number(a.saldo_actual)));
@@ -324,7 +345,12 @@ export function CuentasCorrientesPage({ modo = "corrientes" }: { modo?: "corrien
 
           {error && <p className="cc-form-error cc-pad">{error}</p>}
           {cargando && <p className="cc-lista-aviso">Cargando…</p>}
-          {!cargando && visibles.length === 0 && enOtrosModulos.length === 0 && !error && (
+          {!cargando && buscando && <p className="cc-lista-aviso cc-buscando">Buscando…</p>}
+          {!cargando && !buscando && modo === "cajas" && buscar.trim().length === 1 && <p className="cc-lista-aviso">Escribí al menos 2 letras o números para buscar.</p>}
+          {!buscando && modo === "cajas" && cuentas.length >= TOPE_BUSQUEDA_CAJAS && buscar.trim().length >= 2 && (
+            <p className="cc-lista-aviso">Hay muchos resultados: se muestran los primeros. Escribí algo más (apellido, teléfono o referencia) para afinar.</p>
+          )}
+          {!cargando && !buscando && visibles.length === 0 && enOtrosModulos.length === 0 && !error && !(modo === "cajas" && buscar.trim().length === 1) && (
             <p className="cc-lista-aviso">
               {buscar || tipo || sentido || (canalId && modo !== "cajas")
                 ? modo === "cajas"

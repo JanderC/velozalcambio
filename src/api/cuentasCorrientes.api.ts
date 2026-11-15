@@ -312,10 +312,14 @@ export function anularMovimientoCC(movimientoId: number) {
   return api.post(`/cuentas-corrientes/movimientos/${movimientoId}/anular`);
 }
 
-export function getCuentasCorrientes(filtros: { terceroId?: number; canalId?: number; buscar?: string; soloCliente?: boolean; tipoTercero?: string; vista?: "corrientes" | "cobrar" | "pagar" | "cajas" }) {
+/** Tope de cuentas que devuelve una búsqueda en Confirmaciones (igual que en el servidor). */
+export const TOPE_BUSQUEDA_CAJAS = 120;
+
+export function getCuentasCorrientes(filtros: { terceroId?: number; cuentaId?: number; canalId?: number; buscar?: string; soloCliente?: boolean; tipoTercero?: string; vista?: "corrientes" | "cobrar" | "pagar" | "cajas" }) {
   const params = new URLSearchParams();
   if (filtros.vista) params.set("vista", filtros.vista);
   if (filtros.terceroId) params.set("terceroId", String(filtros.terceroId));
+  if (filtros.cuentaId) params.set("cuentaId", String(filtros.cuentaId));
   if (filtros.canalId) params.set("canalId", String(filtros.canalId));
   if (filtros.buscar?.trim()) params.set("buscar", filtros.buscar.trim());
   if (filtros.soloCliente) params.set("soloCliente", "1");

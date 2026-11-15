@@ -711,17 +711,25 @@ function MoverCajaModal({ saldo, enCajaFuerte, onHecho, onCerrar }: { saldo: Sal
   const descuenta = elegido.descuenta;
   const conFuerte = modo === "TRAER" || modo === "ENVIAR";
   const [monto, setMonto] = useState("");
+  // la referencia es obligatoria: no se mueve dinero sin decir de dónde viene o a dónde va
+  const [referencia, setReferencia] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nMonto = monto.trim() ? leerNumero(monto)?.replace(/^-/, "") ?? null : null;
+  const faltaReferencia = referencia.trim().length < 3;
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!nMonto || !/[1-9]/.test(nMonto)) return setError("Escribí el monto.");
+    if (faltaReferencia) return setError("Escribí la referencia: de dónde viene o a dónde va el dinero.");
     setEnviando(true);
     try {
-      onHecho(conFuerte ? await moverConCajaFuerte(saldo.codigo as CodigoTaquilla, nMonto, modo) : await moverCajaTaquilla(saldo.codigo, `${descuenta ? "-" : ""}${nMonto}`));
+      onHecho(
+        conFuerte
+          ? await moverConCajaFuerte(saldo.codigo as CodigoTaquilla, nMonto, modo, referencia.trim())
+          : await moverCajaTaquilla(saldo.codigo as CodigoTaquilla, `${descuenta ? "-" : ""}${nMonto}`, referencia.trim())
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo mover la caja.");
     } finally {
@@ -753,12 +761,23 @@ function MoverCajaModal({ saldo, enCajaFuerte, onHecho, onCerrar }: { saldo: Sal
                 : "Ajuste sin contrapartida: queda anotado en la caja y entra en el cuadre del cierre."}
           </small>
         </label>
+        <label>
+          Referencia (obligatoria)
+          <input
+            value={referencia}
+            onChange={(e) => setReferencia(e.target.value)}
+            maxLength={300}
+            required
+            placeholder={descuenta ? "A dónde va: ej. cierre parcial, pago a proveedor…" : "De dónde viene: ej. reponer para pagos, capital…"}
+            aria-label="Referencia del movimiento"
+          />
+        </label>
         {error && <p className="cc-form-error">{error}</p>}
         <div className="cc-form-acciones">
           <button type="button" className="cc-btn-secundario" onClick={onCerrar}>
             Cancelar
           </button>
-          <button type="submit" className="cc-guardar" disabled={enviando}>
+          <button type="submit" className="cc-guardar" disabled={enviando || faltaReferencia} title={faltaReferencia ? "Escribí la referencia para poder mover el dinero" : undefined}>
             {enviando ? "Guardando…" : elegido.boton}
           </button>
         </div>

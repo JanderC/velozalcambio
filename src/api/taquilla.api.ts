@@ -151,8 +151,8 @@ export function abrirCajaTaquilla(montos: MontosPorMoneda, desdeCajaFuerte: bool
 }
 
 /** Traer efectivo de la Caja Fuerte a la taquilla, o enviárselo. */
-export function moverConCajaFuerte(monedaCodigo: CodigoTaquilla, monto: string, sentido: "TRAER" | "ENVIAR") {
-  return api.post<Taquilla>(`${base}/caja-fuerte`, { monedaCodigo, monto, sentido });
+export function moverConCajaFuerte(monedaCodigo: CodigoTaquilla, monto: string, sentido: "TRAER" | "ENVIAR", referencia: string) {
+  return api.post<Taquilla>(`${base}/caja-fuerte`, { monedaCodigo, monto, sentido, referencia });
 }
 
 /** Cierra y cuadra: lo que se contó en cada moneda. */
@@ -161,8 +161,8 @@ export function cerrarCajaTaquilla(contado: MontosPorMoneda) {
 }
 
 /** monto con signo: + suma a la caja, - descuenta. */
-export function moverCajaTaquilla(monedaCodigo: CodigoTaquilla, monto: string) {
-  return api.post<Taquilla>(`${base}/caja`, { monedaCodigo, monto });
+export function moverCajaTaquilla(monedaCodigo: CodigoTaquilla, monto: string, referencia: string) {
+  return api.post<Taquilla>(`${base}/caja`, { monedaCodigo, monto, referencia });
 }
 
 /** Solicitudes ya pagadas que coinciden con lo buscado, en cualquiera de las dos taquillas y de cualquier día. */
