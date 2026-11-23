@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { errorDatosCliente } from "./datosCliente";
 import { Modal } from "../../components/common/Modal";
 import { actualizarTercero, type TipoTercero } from "../../api/terceros.api";
 import { ApiError } from "../../api/client";
@@ -6,6 +7,7 @@ import type { CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 
 /** Corregir o completar los datos del cliente de la cuenta: nombre, qué es (cliente, eventual…), teléfono y cédula. */
 export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: CuentaCorrienteResumen; onGuardado: () => void; onCerrar: () => void }) {
+  const enConfirmaciones = cuenta.modulo === "CAJA";
   const [nombre, setNombre] = useState(cuenta.tercero_nombre);
   const [telefono, setTelefono] = useState(cuenta.tercero_telefono ?? "");
   const [cedula, setCedula] = useState(cuenta.tercero_identificacion ?? "");
@@ -17,6 +19,8 @@ export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: C
     e.preventDefault();
     setError(null);
     if (nombre.trim().length < 2) return setError("Escribí el nombre.");
+    // en Confirmaciones no se pueden dejar sin apellido o sin teléfono
+    if (enConfirmaciones && errorDatosCliente(nombre, telefono)) return setError(errorDatosCliente(nombre, telefono));
     setEnviando(true);
     try {
       // la cédula es única en el sistema: vacía no se manda (no se puede dejar en blanco dos veces)
@@ -33,8 +37,8 @@ export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: C
     <Modal titulo="Datos del cliente" onCerrar={onCerrar}>
       <form className="cc-modal" onSubmit={guardar}>
         <label>
-          Nombre
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+          {enConfirmaciones ? "Nombre y apellido (obligatorio)" : "Nombre"}
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus required={enConfirmaciones} placeholder={enConfirmaciones ? "ej. Daniel Pérez" : undefined} />
         </label>
         <label>
           Es
@@ -47,8 +51,8 @@ export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: C
           </select>
         </label>
         <label>
-          Número de teléfono
-          <input value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" placeholder="Con él se le envían los mensajes por WhatsApp" />
+          {enConfirmaciones ? "Número de teléfono (obligatorio)" : "Número de teléfono"}
+          <input required={enConfirmaciones} value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" placeholder="Con él se le envían los mensajes por WhatsApp" />
         </label>
         <label>
           Cédula

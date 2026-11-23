@@ -11,6 +11,7 @@ import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
 import { useCaptureParecido } from "./CaptureParecido";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, montoParte, type PagoElegido } from "./PagoConfirmacion";
+import { errorDatosCliente } from "./datosCliente";
 import { METODOS, comisionPara, detectarMetodo, esFacturaBancolombia, formulaDeOperacion, nombreMetodo, sigueLaRegla, tasaDeOperacion, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita, useTablero } from "../tasas/tablero";
 
@@ -322,6 +323,7 @@ export function NuevaCuentaModal({
   async function crearYSeguir(seguirCon: "varias" | "repartido") {
     setError(null);
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
+    if (modo === "nuevo" && modulo === "CAJA" && errorDatosCliente(nombre, telefono)) return setError(errorDatosCliente(nombre, telefono));
     if (modo === "existente" && !tercero) return setError("Buscá y elegí al cliente.");
     if (!medio) return setError("Elegí arriba el medio: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle.");
     const cop = monedas.find((m) => m.codigo === "COP");
@@ -360,6 +362,7 @@ export function NuevaCuentaModal({
     e.preventDefault();
     setError(null);
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre.");
+    if (modo === "nuevo" && modulo === "CAJA" && errorDatosCliente(nombre, telefono)) return setError(errorDatosCliente(nombre, telefono));
     if (modo === "existente" && !tercero) return setError("Buscá y elegí a quién le abrís la cuenta.");
     if (monedaId === "") return setError("Elegí la moneda.");
     const pagarCon = enLinea && hayMovimiento && !movResta && movPago.modo === "otro" ? movPago : null;
@@ -534,14 +537,15 @@ export function NuevaCuentaModal({
         {modo === "nuevo" ? (
           <>
             <label>
-              Nombre
+              {modulo === "CAJA" ? "Nombre y apellido (obligatorio)" : "Nombre"}
               <input
+                required={modulo === "CAJA"}
                 value={nombre}
                 onChange={(e) => {
                   tocado.current.nombre = true;
                   setNombre(e.target.value);
                 }}
-                placeholder="ej. Daniel"
+                placeholder={modulo === "CAJA" ? "ej. Daniel Pérez" : "ej. Daniel"}
                 autoFocus={!enLinea}
               />
             </label>
@@ -559,8 +563,10 @@ export function NuevaCuentaModal({
                 </label>
               )}
               <label>
-                {modulo === "CAJA" ? "Número telefónico del cliente" : "Teléfono (opcional)"}
+                {modulo === "CAJA" ? "Número telefónico del cliente (obligatorio)" : "Teléfono (opcional)"}
                 <input
+                  required={modulo === "CAJA"}
+                  placeholder={modulo === "CAJA" ? "ej. 3001234567 o +58 414 1234567" : undefined}
                   value={telefono}
                   onChange={(e) => {
                     tocado.current.telefono = true;
