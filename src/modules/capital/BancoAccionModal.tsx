@@ -4,8 +4,9 @@ import { ApiError } from "../../api/client";
 import { capitalApi, type BancoDelSistema, type MovimientoBanco } from "../../api/capital.api";
 import { formatearMonto, leerNumero } from "../../utils/montos";
 import { DatosBancoModal } from "./DatosBancoModal";
+import { LibroBancoModal } from "./LibroBancoModal";
 
-export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo" | "datos";
+export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo" | "datos" | "libro";
 
 /** Lo que se va escribiendo, con los puntos de miles puestos solos y decimales con coma. */
 function conPuntos(escrito: string) {
@@ -97,6 +98,7 @@ export function BancoAccionModal({
 
   if (accion === "datos") return <DatosBancoModal banco={banco} onCambio={() => onCambio?.()} onCerrar={onCerrar} />;
 
+  if (accion === "libro") return <LibroBancoModal banco={banco} onCambio={() => onCambio?.()} onCerrar={onCerrar} />;
   if (accion === "historial") {
     return (
       <Modal titulo={`${titulo} · ${banco.nombre}`} ancho="ancho" onCerrar={onCerrar}>

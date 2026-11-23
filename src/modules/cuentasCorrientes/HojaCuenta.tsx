@@ -52,6 +52,7 @@ import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteRep
 import { compartirImagen, copiarImagen, descargarBlob, generarImagenReporte, monedaDeLaTasa } from "./imagenReporte";
 import { getMonedas, type Moneda } from "../../api/monedas.api";
 import { Modal } from "../../components/common/Modal";
+import { CuentaDesconocidaModal, esCuentaVenezolana, type CuentasDelCapture } from "./CuentaDesconocidaModal";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, pctDeComision, sumarDecimales } from "../../utils/montos";
@@ -1687,6 +1688,12 @@ function FilaNueva({
   // La imagen se guarda con el movimiento al agregarlo, para verla después (en la hoja y en Taquilla)
   // El cliente puede mandar el monto en varias transferencias: se cargan varias capturas, se suman y se guardan juntas
   const [imagenesAdjuntas, setImagenesAdjuntas] = useState<File[]>([]);
+  // Confirmaciones: las cuentas que dice el capture y si alguna es de la empresa (si no, hay que confirmar dos veces)
+  const [cuentasCapture, setCuentasCapture] = useState<{ cuentas: CuentasDelCapture; nuestra: boolean | null } | null>(null);
+  const [preguntaCuenta, setPreguntaCuenta] = useState<{ cuentas: CuentasDelCapture; resolver: (s: boolean) => void } | null>(null);
+  useEffect(() => {
+    if (!imagenesAdjuntas.length) setCuentasCapture(null);
+  }, [imagenesAdjuntas.length]);
   const [capturasDudosas, setCapturasDudosas] = useState(0);
   const [verificacion, setVerificacion] = useState<Verificacion | null>(null);
   // Confirmaciones, pago repartido: lo enviado se le entrega en varias monedas (800 USD: 400 en pesos, 400 en bolívares).
@@ -1841,9 +1848,20 @@ function FilaNueva({
       if (enConfirmaciones && !sumando) {
         setBancoCapture(null);
         const leida = l.primera;
+        const cuentasLeidas = { origen: leida?.cuentaOrigen ?? null, destino: leida?.cuentaDestino ?? null };
+        // solo las de Venezuela (ahí están las cuentas de la empresa que se reconocen por los últimos 4 dígitos)
+        const venezolana = esCuentaVenezolana(cuentasLeidas.origen) || esCuentaVenezolana(cuentasLeidas.destino);
+        setCuentasCapture(venezolana ? { cuentas: cuentasLeidas, nuestra: null } : null);
         void reconocerBancoEmpresa(leida?.cuentaOrigen, leida?.cuentaDestino)
-          .then(setBancoCapture)
-          .catch(() => setBancoCapture(null));
+          .then((b) => {
+            setBancoCapture(b);
+            if (venezolana) setCuentasCapture({ cuentas: cuentasLeidas, nuestra: !!b });
+          })
+          .catch(() => {
+            setBancoCapture(null);
+            // sin conexión para saberlo no se frena a nadie
+            if (venezolana) setCuentasCapture({ cuentas: cuentasLeidas, nuestra: true });
+          });
       }
       // Qué es la captura (Bancolombia, Nequi, Zelle…): se avisa y la referencia queda "Pago de Bancolombia"
       if (!sumando) {
@@ -2639,8 +2657,18 @@ function FilaNueva({
     }
   }
 
+  /** La cuenta del capture no es de la empresa: se registra solo si se confirma dos veces. */
+  async function confirmarCuentaDelCapture() {
+    if (!enConfirmaciones || !cuentasCapture || cuentasCapture.nuestra !== false) return true;
+    const seguir = await new Promise<boolean>((resolver) => setPreguntaCuenta({ cuentas: cuentasCapture.cuentas, resolver }));
+    setPreguntaCuenta(null);
+    if (seguir) setCuentasCapture(null); // ya se confirmó: no se vuelve a preguntar por este capture
+    return seguir;
+  }
+
   async function guardarUnaVez() {
     setError(null);
+    if (!(await confirmarCuentaDelCapture())) return setError("No se registró: la cuenta del capture no es de las registradas de la empresa.");
     if (repartido) return guardarRepartido();
     if (varias) return setError("Con varias transferencias se registra con el botón \"Cargar\" del cuadro de transferencias.");
     if (!referenciaFinal) {
@@ -2888,6 +2916,7 @@ function FilaNueva({
             monedaCajaId: banco.monedaId!,
             montoCaja: `${banco.rol === "destino" ? "" : "-"}${banco.monto}`,
             observacionCaja: `Confirmación ${cuenta.tercero_nombre} · ${referenciaFinal}${persona.trim() ? ` · ${persona.trim()}` : ""} (${banco.dato})`.slice(0, 200),
+            referenciaCaja: codigosDeReferencia(persona)[0] ?? undefined,
           }
         : {}),
       ...(conCaja && cajaId !== "" && movimientoCaja && monedaCaja
@@ -3057,6 +3086,7 @@ function FilaNueva({
     </button>
     {abierta && <div className="cc-velo" onClick={() => setAbierta(false)} />}
     {verificacion && <VerificarMontosModal verificacion={verificacion} />}
+    {preguntaCuenta && <CuentaDesconocidaModal cuentas={preguntaCuenta.cuentas} onResponder={preguntaCuenta.resolver} />}
     {capturaParecida.modal}
     {preguntaMoneda && (
       <Modal titulo={`¿En qué moneda se lleva ${cuenta.tercero_nombre}?`} onCerrar={() => responderMoneda(null)}>

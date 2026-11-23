@@ -390,6 +390,8 @@ interface RegistrarMovimientoInput {
   montoCaja?: string; // con signo: + entra a la caja, - sale
   monedaCajaId?: number; // moneda en la que se mueve la caja (si no es la de la cuenta)
   metodoPagoId?: number;
+  observacionCaja?: string; // qué fue, en el movimiento de la caja o del banco
+  referenciaCaja?: string; // la referencia del capture: queda en el libro de la cuenta de banco (no se repite)
   // Confirmaciones armadas con varias transferencias
   transferencias?: { referencia?: string; remitente?: string; cantidad: string; formula: "TASA" | "DIVIDIR" | "COMISION" | "DIRECTO"; valor?: string; resultado: string }[];
   totalEnviado?: string; // lo que suman las transferencias, antes de la comisión o la tasa

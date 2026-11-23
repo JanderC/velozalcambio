@@ -304,3 +304,43 @@ td .cap-menu { margin-left: 6px; }
 .cap-datos-lista li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.88rem; }
 .cap-datos-lista button { background: none; border: none; color: #b91c1c; cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; }
 .cap-datos-lista button:hover { background: #fee2e2; }
+
+/* Libro contable de una cuenta de banco y estado de cuenta */
+.lb { display: grid; gap: 12px; }
+.lb-pestanas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lb-pestanas button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid #cfd6e0; border-radius: 999px; background: white; font: inherit; font-size: 0.86rem; cursor: pointer; }
+.lb-pestanas button.activo { background: var(--color-navy, #0b2545); border-color: var(--color-navy, #0b2545); color: white; font-weight: 600; }
+.lb-saldo { margin-left: auto; font-size: 0.88rem; color: #374151; }
+.lb-filtros { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.lb-filtros label { display: grid; gap: 3px; font-size: 0.76rem; font-weight: 600; color: #374151; }
+.lb-filtros input { padding: 7px 9px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.88rem; }
+.lb-buscar { display: flex !important; align-items: center; gap: 6px; flex: 1; min-width: 220px; padding: 0 9px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; }
+.lb-buscar input { border: none !important; flex: 1; outline: none; }
+.lb-totales { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.88rem; color: #374151; }
+.lb-ultimo { margin-left: auto; color: #6b7280; }
+.lb-tabla { max-height: 56vh; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+.lb-tabla-corta { max-height: 40vh; }
+.lb-tabla table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.lb-tabla th { position: sticky; top: 0; background: #f3f5f9; text-align: left; padding: 7px 8px; font-size: 0.74rem; text-transform: uppercase; color: #4b5563; z-index: 1; }
+.lb-tabla td { padding: 6px 8px; border-top: 1px solid #eef0f4; vertical-align: top; }
+.lb-tabla td small { display: block; color: #6b7280; font-size: 0.74rem; }
+.lb-tabla .num { text-align: right; white-space: nowrap; }
+.lb-ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; white-space: nowrap; }
+.lb-banco { color: #0f766e !important; }
+.lb-estado { text-align: center; color: #15803d; }
+.lb-no { color: #b45309; font-size: 0.74rem; font-weight: 600; }
+.lb-fuera { background: #fffbeb; }
+.lb-anulado td { color: #9ca3af; text-decoration: line-through; }
+.lb-extracto { display: grid; gap: 10px; }
+.lb-archivo { display: inline-flex; align-items: center; gap: 8px; width: fit-content; padding: 9px 14px; border: 1px dashed #94a3b8; border-radius: 8px; background: #f8fafc; cursor: pointer; font-weight: 600; color: var(--color-navy, #0b2545); }
+.lb-resumen { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 10px 12px; border-radius: 8px; background: #f3f5f9; font-size: 0.86rem; }
+.lb-cuadra { display: flex; align-items: center; gap: 6px; color: #15803d; font-weight: 600; font-size: 0.86rem; }
+.lb-conteo { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.82rem; }
+.lb-conteo span { padding: 4px 10px; border-radius: 999px; background: #eef1f6; }
+.lb-conteo .nuevo { background: #dbeafe; color: #1e40af; }
+.lb-conteo .en-libro { background: #dcfce7; color: #166534; }
+.lb-est-nuevo { color: #1d4ed8; font-weight: 600; }
+.lb-est-en_libro { color: #15803d; font-weight: 600; }
+.lb-est-cargado { color: #6b7280; }
+.lb-listo { padding: 10px 12px; border-radius: 8px; background: #ecfdf5; color: #065f46; font-weight: 600; }
+.lb-diferencia { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; background: #fffbeb; border: 1px solid #fcd34d; font-size: 0.88rem; }

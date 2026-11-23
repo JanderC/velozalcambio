@@ -35,8 +35,11 @@ export function MenuBanco({ onAccion }: { onAccion: (a: AccionBanco) => void }) 
         <MoreHorizontal size={16} />
       </summary>
       <div className="cap-menu-lista">
+        <button type="button" onClick={(e) => elegir(e, "libro")}>
+          <b>Libro contable y estado de cuenta</b>
+        </button>
         <button type="button" onClick={(e) => elegir(e, "movimiento")}>
-          Ingreso o egreso
+          Ingreso o egreso (fondeo)
         </button>
         <button type="button" onClick={(e) => elegir(e, "traslado")}>
           Pasar a otra cuenta

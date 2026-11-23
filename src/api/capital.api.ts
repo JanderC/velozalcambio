@@ -60,7 +60,67 @@ export interface CuadreCompleto extends CuadreResumen {
   datos: Record<string, unknown>;
 }
 
+/** Un renglón del libro contable de una cuenta de banco. */
+export interface FilaLibro {
+  id: number;
+  tipo: "INGRESO" | "EGRESO";
+  monto: string;
+  saldo_nuevo: string;
+  observacion: string | null;
+  referencia: string | null;
+  de_extracto: boolean;
+  dia: string;
+  created_at: string;
+  usuario: string | null; // quién lo registró
+  cliente: string | null; // de qué cliente es (si vino de una confirmación)
+  movimiento_id: number | null;
+  detalle_cliente: string | null;
+  anulado: boolean | null;
+  en_extracto: boolean; // aparece en un estado de cuenta cargado
+  detalle_banco: string | null; // lo que dice el banco de ese movimiento
+}
+export interface LibroBanco {
+  caja: { id: number; nombre: string; moneda: string; saldo: string };
+  filas: FilaLibro[];
+  totales: { entra: string; sale: string; cantidad: number };
+  ultimoExtracto: { desde: string | null; hasta: string | null; saldo_final: string | null; created_at: string } | null;
+}
+export interface RevisionExtracto {
+  caja: { id: number; nombre: string; moneda: string; saldo: string };
+  cuenta: string | null;
+  desde: string | null;
+  hasta: string | null;
+  saldoInicial: string | null;
+  saldoFinal: string | null;
+  totalCreditos: string;
+  totalDebitos: string;
+  descuadres: { referencia: string; fecha: string; esperado: string; dice: string }[];
+  renglones: { referencia: string; fecha: string; descripcion: string; tipo: "NC" | "ND"; monto: string; saldo: string | null; estado: "nuevo" | "en_libro" | "cargado" }[];
+  nuevos: number;
+  enLibro: number;
+  cargados: number;
+}
+const formExtracto = (cajaId: number, archivo: File) => {
+  const f = new FormData();
+  f.append("cajaId", String(cajaId));
+  f.append("archivo", archivo);
+  return f;
+};
+
 export const capitalApi = {
+  libroBanco: (id: number, f: { desde?: string; hasta?: string; buscar?: string }) => {
+    const q = new URLSearchParams();
+    if (f.desde) q.set("desde", f.desde);
+    if (f.hasta) q.set("hasta", f.hasta);
+    if (f.buscar) q.set("buscar", f.buscar);
+    return api.get<LibroBanco>(`/capital/bancos/${id}/libro?${q.toString()}`);
+  },
+  revisarExtracto: (cajaId: number, archivo: File) => api.postForm<RevisionExtracto>("/capital/bancos/extracto/revisar", formExtracto(cajaId, archivo)),
+  cargarExtracto: (cajaId: number, archivo: File) =>
+    api.postForm<{ cuenta: string; nuevos: number; conciliados: number; yaCargados: number; saldoSistema: string; saldoFinalExtracto: string | null; hasta: string | null }>(
+      "/capital/bancos/extracto/cargar",
+      formExtracto(cajaId, archivo)
+    ),
   sistema: () => api.get<DatosDelSistema>("/capital/sistema"),
   cuadres: () => api.get<CuadreResumen[]>("/capital/cuadres"),
   cuadre: (id: number) => api.get<CuadreCompleto>(`/capital/cuadres/${id}`),

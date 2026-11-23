@@ -757,3 +757,10 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 /* Ir al último movimiento del cliente */
 .cc-dia-hoy.cc-dia-ultimo { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; font-weight: 600; white-space: nowrap; }
 .cc-dia button:disabled { opacity: 0.35; cursor: default; }
+
+/* Cuenta del capture que no es de la empresa: doble confirmación */
+.cc-cuenta-desconocida ul { margin: 0; padding-left: 20px; font-size: 0.9rem; }
+.cc-cuenta-desconocida p { margin: 0; font-size: 0.88rem; color: #374151; }
+.cc-check-doble { display: flex !important; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; font-weight: 600; cursor: pointer; }
+.cc-guardar.cc-peligro { background: #b45309; }
+.cc-guardar.cc-peligro:disabled { opacity: 0.45; }
