@@ -38,6 +38,7 @@ import {
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
+import { CedulaFaltanteModal, debePreguntarCedula } from "./CedulaFaltanteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
 import { EnviarAConfirmacionesModal } from "./EnviarAConfirmacionesModal";
@@ -601,6 +602,9 @@ export function HojaCuenta({
   // Si se le cobra en otra moneda: el saldo convertido con la tasa manual de la cuenta
   const actual = estado?.cuenta ?? cuenta;
   const esConfirmaciones = cuenta.modulo === "CAJA";
+  // Confirmaciones: si el cliente no tiene cédula, se pregunta al abrirlo (una vez por sesión si se dice "Ahora no")
+  const [cedulaCerrada, setCedulaCerrada] = useState(false);
+  const faltaCedula = esConfirmaciones && !!estado && !actual.tercero_identificacion?.trim() && !cedulaCerrada && debePreguntarCedula(actual.tercero_id);
   const cobro =
     actual.moneda_cobro_codigo && actual.tasa_cobro
       ? {
@@ -878,6 +882,18 @@ export function HojaCuenta({
         </div>
       </div>
       {resumenCliente}
+      {faltaCedula && !editandoCliente && (
+        <CedulaFaltanteModal
+          terceroId={actual.tercero_id}
+          nombre={actual.tercero_nombre}
+          onCerrar={() => setCedulaCerrada(true)}
+          onGuardada={() => {
+            setCedulaCerrada(true);
+            void cargar();
+            onActualizar();
+          }}
+        />
+      )}
       {editandoCliente && (
         <EditarClienteModal
           cuenta={actual}

@@ -52,6 +52,11 @@ export function actualizarTercero(id: number, data: { nombre?: string; identific
   return api.put<Tercero>(`/terceros/${id}`, data);
 }
 
+/** Ponerle la cédula a un cliente que no la tiene (también la puede cargar el cajero). */
+export function actualizarCedulaTercero(id: number, identificacion: string) {
+  return api.patch<Tercero>(`/terceros/${id}/cedula`, { identificacion });
+}
+
 export function obtenerResumenTercero(id: number) {
   return api.get<ResumenTercero>(`/terceros/${id}/resumen`);
 }
