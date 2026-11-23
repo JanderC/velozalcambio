@@ -11,7 +11,7 @@ import { AvisoClienteExistente, useClienteExistente } from "./ClienteExistente";
 import { useCaptureParecido } from "./CaptureParecido";
 import { OPERACIONES_CONFIRMACIONES } from "./HojaCuenta";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, montoParte, type PagoElegido } from "./PagoConfirmacion";
-import { errorDatosCliente } from "./datosCliente";
+import { errorDatosCliente, separarNombre, unirNombre } from "./datosCliente";
 import { METODOS, comisionPara, detectarMetodo, esFacturaBancolombia, formulaDeOperacion, nombreMetodo, sigueLaRegla, tasaDeOperacion, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita, useTablero } from "../tasas/tablero";
 
@@ -54,6 +54,10 @@ export function NuevaCuentaModal({
   const [modo, setModo] = useState<"nuevo" | "existente">("nuevo");
   const capturaParecida = useCaptureParecido();
   const [nombre, setNombre] = useState("");
+  // En Confirmaciones el nombre y el apellido van en casillas separadas (las dos obligatorias)
+  const [apellido, setApellido] = useState("");
+  const conApellido = modulo === "CAJA";
+  const nombreCompleto = conApellido ? unirNombre(nombre, apellido) : nombre.trim();
   const [tipo, setTipo] = useState<"PROVEEDOR" | "CLIENTE" | "MIXTO" | "AMIGO" | "EVENTUAL">(modulo === "CAJA" ? "CLIENTE" : "PROVEEDOR");
   const [referencia, setReferencia] = useState(""); // dato libre del cliente (Confirmaciones)
   const [cedula, setCedula] = useState("");
@@ -90,13 +94,18 @@ export function NuevaCuentaModal({
   }, [busqueda, modo]);
 
   // ¿Ya existe en el sistema (en cualquier módulo)? El cliente es uno solo: se ofrece traerlo en vez de crear otro
-  const existentes = useClienteExistente(nombre, telefono, modo === "nuevo");
+  const existentes = useClienteExistente(nombreCompleto, telefono, modo === "nuevo");
 
   // Lo escrito a mano manda sobre lo que viene de la búsqueda
   const tocado = useRef({ nombre: false, telefono: false, cedula: false });
   useEffect(() => {
     if (!inicial) return;
-    if (!tocado.current.nombre) setNombre(inicial.nombre ?? "");
+    if (!tocado.current.nombre) {
+      // lo buscado ("daniel perez") se reparte: la primera palabra al nombre y el resto al apellido
+      const partes = conApellido ? separarNombre(inicial.nombre ?? "") : { nombre: inicial.nombre ?? "", apellido: "" };
+      setNombre(partes.nombre);
+      setApellido(partes.apellido);
+    }
     if (!tocado.current.telefono) setTelefono(inicial.telefono ?? "");
     if (!tocado.current.cedula) setCedula(inicial.cedula ?? "");
   }, [inicial?.nombre, inicial?.telefono, inicial?.cedula]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -323,7 +332,7 @@ export function NuevaCuentaModal({
   async function crearYSeguir(seguirCon: "varias" | "repartido") {
     setError(null);
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre del cliente.");
-    if (modo === "nuevo" && modulo === "CAJA" && errorDatosCliente(nombre, telefono)) return setError(errorDatosCliente(nombre, telefono));
+    if (modo === "nuevo" && conApellido && errorDatosCliente(nombre, apellido, telefono)) return setError(errorDatosCliente(nombre, apellido, telefono));
     if (modo === "existente" && !tercero) return setError("Buscá y elegí al cliente.");
     if (!medio) return setError("Elegí arriba el medio: Bolívares, Bancolombia, Nequi, USDT, Western Union o Zelle.");
     const cop = monedas.find((m) => m.codigo === "COP");
@@ -331,7 +340,7 @@ export function NuevaCuentaModal({
     const datos = {
       ...(modo === "existente"
         ? { terceroId: tercero!.id, usarExistente: true }
-        : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
+        : { nuevoTercero: { nombre: nombreCompleto, tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
       canalId: medio.id,
       modulo,
       referencia: referencia.trim() || undefined,
@@ -347,6 +356,7 @@ export function NuevaCuentaModal({
       });
       tocado.current = { nombre: false, telefono: false, cedula: false };
       setNombre("");
+      setApellido("");
       setTelefono("");
       setCedula("");
       setReferencia("");
@@ -362,7 +372,7 @@ export function NuevaCuentaModal({
     e.preventDefault();
     setError(null);
     if (modo === "nuevo" && nombre.trim().length < 2) return setError("Escribí el nombre.");
-    if (modo === "nuevo" && modulo === "CAJA" && errorDatosCliente(nombre, telefono)) return setError(errorDatosCliente(nombre, telefono));
+    if (modo === "nuevo" && conApellido && errorDatosCliente(nombre, apellido, telefono)) return setError(errorDatosCliente(nombre, apellido, telefono));
     if (modo === "existente" && !tercero) return setError("Buscá y elegí a quién le abrís la cuenta.");
     if (monedaId === "") return setError("Elegí la moneda.");
     const pagarCon = enLinea && hayMovimiento && !movResta && movPago.modo === "otro" ? movPago : null;
@@ -407,7 +417,7 @@ export function NuevaCuentaModal({
         if (igual && !(await capturaParecida.mostrar([igual], imagenesAdjuntas))) return setError("No se registró: es la misma operación.");
       }
       const datosCuenta = {
-        ...(modo === "existente" ? { terceroId: tercero!.id, usarExistente: true } : { nuevoTercero: { nombre: nombre.trim(), tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
+        ...(modo === "existente" ? { terceroId: tercero!.id, usarExistente: true } : { nuevoTercero: { nombre: nombreCompleto, tipo, telefono: telefono.trim() || undefined, identificacion: cedula.trim() || undefined } }),
         canalId: enLinea ? medio?.id : canalId === "" ? undefined : canalId,
         modulo,
         referencia: referencia.trim() || undefined,
@@ -507,6 +517,7 @@ export function NuevaCuentaModal({
         // el formulario sigue en la página: queda limpio para el siguiente cliente
         tocado.current = { nombre: false, telefono: false, cedula: false };
         setNombre("");
+        setApellido("");
         setTelefono("");
         setCedula("");
         setReferencia("");
@@ -536,19 +547,50 @@ export function NuevaCuentaModal({
 
         {modo === "nuevo" ? (
           <>
-            <label>
-              {modulo === "CAJA" ? "Nombre y apellido (obligatorio)" : "Nombre"}
-              <input
-                required={modulo === "CAJA"}
-                value={nombre}
-                onChange={(e) => {
-                  tocado.current.nombre = true;
-                  setNombre(e.target.value);
-                }}
-                placeholder={modulo === "CAJA" ? "ej. Daniel Pérez" : "ej. Daniel"}
-                autoFocus={!enLinea}
-              />
-            </label>
+            {conApellido ? (
+              <div className="cc-modal-fila">
+                <label>
+                  Nombre (obligatorio)
+                  <input
+                    required
+                    value={nombre}
+                    onChange={(e) => {
+                      tocado.current.nombre = true;
+                      setNombre(e.target.value);
+                    }}
+                    placeholder="ej. Daniel"
+                    autoComplete="off"
+                    autoFocus={!enLinea}
+                  />
+                </label>
+                <label>
+                  Apellido (obligatorio)
+                  <input
+                    required
+                    value={apellido}
+                    onChange={(e) => {
+                      tocado.current.nombre = true;
+                      setApellido(e.target.value);
+                    }}
+                    placeholder="ej. Pérez"
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+            ) : (
+              <label>
+                Nombre
+                <input
+                  value={nombre}
+                  onChange={(e) => {
+                    tocado.current.nombre = true;
+                    setNombre(e.target.value);
+                  }}
+                  placeholder="ej. Daniel"
+                  autoFocus={!enLinea}
+                />
+              </label>
+            )}
             <div className="cc-modal-fila">
               {!enLinea && (
                 <label>

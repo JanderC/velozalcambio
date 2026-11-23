@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { errorDatosCliente } from "./datosCliente";
+import { errorDatosCliente, separarNombre, unirNombre } from "./datosCliente";
 import { Modal } from "../../components/common/Modal";
 import { actualizarTercero, type TipoTercero } from "../../api/terceros.api";
 import { ApiError } from "../../api/client";
@@ -8,7 +8,10 @@ import type { CuentaCorrienteResumen } from "../../api/cuentasCorrientes.api";
 /** Corregir o completar los datos del cliente de la cuenta: nombre, qué es (cliente, eventual…), teléfono y cédula. */
 export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: CuentaCorrienteResumen; onGuardado: () => void; onCerrar: () => void }) {
   const enConfirmaciones = cuenta.modulo === "CAJA";
-  const [nombre, setNombre] = useState(cuenta.tercero_nombre);
+  // en Confirmaciones el nombre y el apellido van en casillas separadas: lo guardado se reparte
+  const [nombre, setNombre] = useState(() => (enConfirmaciones ? separarNombre(cuenta.tercero_nombre).nombre : cuenta.tercero_nombre));
+  const [apellido, setApellido] = useState(() => (enConfirmaciones ? separarNombre(cuenta.tercero_nombre).apellido : ""));
+  const nombreCompleto = enConfirmaciones ? unirNombre(nombre, apellido) : nombre.trim();
   const [telefono, setTelefono] = useState(cuenta.tercero_telefono ?? "");
   const [cedula, setCedula] = useState(cuenta.tercero_identificacion ?? "");
   const [tipo, setTipo] = useState<TipoTercero>(cuenta.tercero_tipo);
@@ -20,11 +23,11 @@ export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: C
     setError(null);
     if (nombre.trim().length < 2) return setError("Escribí el nombre.");
     // en Confirmaciones no se pueden dejar sin apellido o sin teléfono
-    if (enConfirmaciones && errorDatosCliente(nombre, telefono)) return setError(errorDatosCliente(nombre, telefono));
+    if (enConfirmaciones && errorDatosCliente(nombre, apellido, telefono)) return setError(errorDatosCliente(nombre, apellido, telefono));
     setEnviando(true);
     try {
       // la cédula es única en el sistema: vacía no se manda (no se puede dejar en blanco dos veces)
-      await actualizarTercero(cuenta.tercero_id, { nombre: nombre.trim(), tipo, telefono: telefono.trim(), identificacion: cedula.trim() || undefined });
+      await actualizarTercero(cuenta.tercero_id, { nombre: nombreCompleto, tipo, telefono: telefono.trim(), identificacion: cedula.trim() || undefined });
       onGuardado();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudieron guardar los datos.");
@@ -36,10 +39,23 @@ export function EditarClienteModal({ cuenta, onGuardado, onCerrar }: { cuenta: C
   return (
     <Modal titulo="Datos del cliente" onCerrar={onCerrar}>
       <form className="cc-modal" onSubmit={guardar}>
-        <label>
-          {enConfirmaciones ? "Nombre y apellido (obligatorio)" : "Nombre"}
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus required={enConfirmaciones} placeholder={enConfirmaciones ? "ej. Daniel Pérez" : undefined} />
-        </label>
+        {enConfirmaciones ? (
+          <div className="cc-modal-fila">
+            <label>
+              Nombre (obligatorio)
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus required placeholder="ej. Daniel" />
+            </label>
+            <label>
+              Apellido (obligatorio)
+              <input value={apellido} onChange={(e) => setApellido(e.target.value)} required placeholder="ej. Pérez" />
+            </label>
+          </div>
+        ) : (
+          <label>
+            Nombre
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+          </label>
+        )}
         <label>
           Es
           <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoTercero)}>
