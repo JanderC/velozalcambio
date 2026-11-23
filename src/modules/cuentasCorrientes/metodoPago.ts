@@ -45,7 +45,7 @@ export function detectarMetodo(d: DatosComprobante | null): Metodo | null {
   if (/n[uú]mero de env[ií]o|importe enviado|obtiene/.test(t) || /^ES\d{8,}$/.test(ref)) return "WESTERN_BANCOLOMBIA";
   if (/western union/.test(t)) return "WESTERN_TAQUILLA";
   // bancos de Venezuela y pago móvil: bolívares
-  if (d.moneda === "VES" || /banco de venezuela|banesco|mercantil|provincial|bancamiga|banco nacional de cr[eé]dito|\bbnc\b|bicentenario|venezolano de cr[eé]dito|banplus|pago m[oó]vil|bol[ií]vares|\bbs\.?\s?\d/.test(t)) return "BOLIVARES";
+  if (d.moneda === "VES" || /banco\s+de\s+venezuela|banesco|mercantil|provincial|bancamiga|banco nacional de cr[eé]dito|\bbnc\b|bicentenario|venezolano de cr[eé]dito|banplus|pago\s*m[oó]vil|\bbdv|bol[ií]vares|\bbs\.?\s?\d|\d,\d{2}\s*bs\b/.test(t)) return "BOLIVARES";
   if (d.moneda === "USDT" || /binance|usdt|tether|trc-?20|bep-?20/.test(t)) return "USDT";
   if (/zelle|safebalance|chase|bank of america|wells fargo|jpm|registrado como|inscrit[oa] como|estamos enviando tu dinero|lo recibir[aá] en unos minutos/.test(t)) return "ZELLE";
   if (/nequi|env[ií]o a banco|escanea este qr/.test(t) || /^M\d{7,}$/.test(ref)) return "NEQUI";

@@ -63,7 +63,7 @@ function monedaDe(simbolo: string | undefined, texto: string): string | null {
   if (/usdt|binance/i.test(texto)) return "USDT";
   if (/zelle|usd|d[oó]lar/i.test(texto) || BANCO_DE_EEUU.test(texto)) return "USD";
   if (/bancolombia|nequi|daviplata|cop|pesos/i.test(texto)) return "COP";
-  if (/bol[ií]var|pago m[oó]vil|banco de venezuela|banesco|mercantil/i.test(texto)) return "VES";
+  if (/bol[ií]var|pago\s*m[oó]vil|\bbdv|banco\s+de\s+venezuela|banesco|mercantil/i.test(texto)) return "VES";
   return null;
 }
 
@@ -202,7 +202,10 @@ export function fechaCreible(fecha: string | null, hoy = hoyEnBogota()): string 
 
 function buscarBanco(texto: string): string | null {
   const bancos = ["Zelle", "Bancolombia", "Nequi", "Daviplata", "Binance", "Western Union", "Banco de Venezuela", "Banesco", "Mercantil", "Provincial", "Pago Móvil"];
-  return bancos.find((b) => new RegExp(b.replace("ó", "[oó]"), "i").test(texto)) ?? (BANCO_DE_EEUU.test(texto) ? "Zelle" : null);
+  // los espacios del nombre pueden venir como salto de línea ("BANCO DE / VENEZUELA") o no venir ("PagomóvilBDV")
+  const enTexto = (b: string) => new RegExp(b.replace(/ó/g, "[oó]").replace(/ /g, "\\s*"), "i").test(texto);
+  if (/pago\s*m[oó]vil\s*bdv|\bbdv\b/i.test(texto)) return "Banco de Venezuela";
+  return bancos.find(enTexto) ?? (BANCO_DE_EEUU.test(texto) ? "Zelle" : null);
 }
 
 /** Saca los datos del texto ya leído de un comprobante. Separado del OCR para poder probarlo. */
@@ -317,22 +320,49 @@ async function prepararParaOcr(imagen: File): Promise<File | null> {
   }
 }
 
+/**
+ * Otra forma de preparar la captura: solo lo casi blanco queda como letra (negra sobre blanco) y todo lo demás
+ * como fondo. Sirve para la letra blanca sobre un recuadro gris en modo oscuro, que no sale ni tal cual ni invertida
+ * (el monto de PagomóvilBDV: "50.000,00 Bs" en blanco sobre gris). null si no es una captura oscura o no se puede.
+ */
+async function prepararUmbral(imagen: File): Promise<File | null> {
+  try {
+    const mapa = await createImageBitmap(imagen);
+    const escala = Math.min(2.5, Math.max(1, 1500 / mapa.width));
+    const lienzo = document.createElement("canvas");
+    lienzo.width = Math.round(mapa.width * escala);
+    lienzo.height = Math.round(mapa.height * escala);
+    if (lienzo.width * lienzo.height > 16_000_000) return null;
+    const c = lienzo.getContext("2d", { willReadFrequently: true });
+    if (!c) return null;
+    c.imageSmoothingQuality = "high";
+    c.drawImage(mapa, 0, 0, lienzo.width, lienzo.height);
+    const datos = c.getImageData(0, 0, lienzo.width, lienzo.height);
+    const px = datos.data;
+    let suma = 0;
+    for (let i = 0; i < px.length; i += 4) suma += 0.299 * px[i]! + 0.587 * px[i + 1]! + 0.114 * px[i + 2]!;
+    if (suma / (px.length / 4) >= 110) return null; // no es modo oscuro: no hace falta
+    for (let i = 0; i < px.length; i += 4) {
+      const gris = 0.299 * px[i]! + 0.587 * px[i + 1]! + 0.114 * px[i + 2]!;
+      px[i] = px[i + 1] = px[i + 2] = gris >= 185 ? 0 : 255;
+    }
+    c.putImageData(datos, 0, 0);
+    const blob = await new Promise<Blob | null>((resolver) => lienzo.toBlob(resolver, "image/png"));
+    return blob ? new File([blob], "comprobante-umbral.png", { type: "image/png" }) : null;
+  } catch {
+    return null;
+  }
+}
+
 const cuantos = (d: DatosComprobante) => [d.referencia, d.monto, d.fecha].filter(Boolean).length;
 
-/** Lectura local blindada: se lee la captura preparada y, si no sale monto y referencia, también la original; queda la mejor. */
-async function leerLocal(imagen: File): Promise<DatosComprobante> {
-  const preparada = await prepararParaOcr(imagen);
-  if (!preparada) return leerEnElNavegador(imagen);
-  const a = await leerEnElNavegador(preparada).catch(() => null);
-  if (a && a.monto && a.referencia) return a;
-  const b = await leerEnElNavegador(imagen).catch(() => null);
-  if (!a && !b) throw new Error("No se pudo leer la imagen. Revisá la conexión (el lector se descarga la primera vez) y probá de nuevo.");
-  if (!a || !b) return (a ?? b)!;
+/** Junta dos lecturas: lo que una no vio lo completa la otra (gana la que sacó más datos). */
+function juntar(a: DatosComprobante, b: DatosComprobante): DatosComprobante {
   const [mejor, otro] = cuantos(b) > cuantos(a) ? [b, a] : [a, b];
   return {
     referencia: mejor.referencia ?? otro.referencia,
     monto: mejor.monto ?? otro.monto,
-    moneda: mejor.moneda ?? otro.moneda,
+    moneda: mejor.monto ? (mejor.moneda ?? otro.moneda) : (otro.moneda ?? mejor.moneda),
     fecha: mejor.fecha ?? otro.fecha,
     hora: mejor.hora ?? otro.hora,
     banco: mejor.banco ?? otro.banco,
@@ -343,6 +373,28 @@ async function leerLocal(imagen: File): Promise<DatosComprobante> {
     texto: `${mejor.texto ?? ""}
 ${otro.texto ?? ""}`,
   };
+}
+
+/** Lectura local blindada: se lee la captura preparada y, si no sale monto y referencia, también la original; queda la mejor. */
+async function leerLocal(imagen: File): Promise<DatosComprobante> {
+  const preparada = await prepararParaOcr(imagen);
+  let leido: DatosComprobante | null = null;
+  if (preparada) {
+    const a = await leerEnElNavegador(preparada).catch(() => null);
+    if (a && a.monto && a.referencia) return a;
+    const b = await leerEnElNavegador(imagen).catch(() => null);
+    if (!a && !b) throw new Error("No se pudo leer la imagen. Revisá la conexión (el lector se descarga la primera vez) y probá de nuevo.");
+    leido = a && b ? juntar(a, b) : (a ?? b);
+  } else {
+    leido = await leerEnElNavegador(imagen);
+  }
+  // Modo oscuro sin monto: el monto suele estar en blanco sobre un recuadro gris; se lee solo lo blanco
+  if (leido && !leido.monto) {
+    const umbral = await prepararUmbral(imagen);
+    const c = umbral ? await leerEnElNavegador(umbral).catch(() => null) : null;
+    if (c) leido = juntar(leido, c);
+  }
+  return leido!;
 }
 
 // Si el servidor dice que la IA no está disponible (501), no se le vuelve a preguntar por un rato
