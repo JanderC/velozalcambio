@@ -1850,7 +1850,10 @@ function FilaNueva({
         const leida = l.primera;
         const cuentasLeidas = { origen: leida?.cuentaOrigen ?? null, destino: leida?.cuentaDestino ?? null };
         // solo las de Venezuela (ahí están las cuentas de la empresa que se reconocen por los últimos 4 dígitos)
-        const venezolana = esCuentaVenezolana(cuentasLeidas.origen) || esCuentaVenezolana(cuentasLeidas.destino);
+        const venezolana =
+          esCuentaVenezolana(cuentasLeidas.origen) ||
+          esCuentaVenezolana(cuentasLeidas.destino) ||
+          (leida?.moneda === "VES" && !!(cuentasLeidas.origen || cuentasLeidas.destino));
         setCuentasCapture(venezolana ? { cuentas: cuentasLeidas, nuestra: null } : null);
         void reconocerBancoEmpresa(leida?.cuentaOrigen, leida?.cuentaDestino)
           .then((b) => {

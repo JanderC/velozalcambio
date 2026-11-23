@@ -63,7 +63,7 @@ function monedaDe(simbolo: string | undefined, texto: string): string | null {
   if (/usdt|binance/i.test(texto)) return "USDT";
   if (/zelle|usd|d[oó]lar/i.test(texto) || BANCO_DE_EEUU.test(texto)) return "USD";
   if (/bancolombia|nequi|daviplata|cop|pesos/i.test(texto)) return "COP";
-  if (/bol[ií]var|pago\s*m[oó]vil|\bbdv|banco\s+de\s+venezuela|banesco|mercantil/i.test(texto)) return "VES";
+  if (/bol[ií]var|pago\s*m[oó]vil|\bbdv|banco\s+de\s+venezuela|banesco|mercantil|provincial|bbva|bancamiga|\bbnc\b|bicentenario|banplus/i.test(texto)) return "VES";
   return null;
 }
 
@@ -169,8 +169,12 @@ function buscarFecha(texto: string): string | null {
 
 /** "28 Oct 2026 - 07:07 p m." -> "19:07". La primera hora con minutos que aparezca. */
 export function buscarHora(texto: string): string | null {
-  const m = /\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?\s*m?\b/i.exec(texto);
-  if (!m) return null;
+  const todas = [...texto.matchAll(/\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?\s*m?\b/gi)];
+  if (!todas.length) return null;
+  // la de la operación: la que va en el renglón de la fecha o de "Hora" (la primera suele ser la del reloj del teléfono)
+  const renglonDe = (i: number) => texto.slice(texto.lastIndexOf("\n", i) + 1, (texto.indexOf("\n", i) + 1 || texto.length + 1) - 1);
+  const conFecha = todas.find((x) => /\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\b\d{1,2}\s+(?:de\s+)?[a-zñ]{3,}\.?\s+(?:de\s+)?\d{4}|[a-zñ]{3,}\.?\s+\d{1,2},?\s+\d{4}|\bhora\b/i.test(renglonDe(x.index!)));
+  const m = conFecha ?? (todas.length > 1 && texto.indexOf("\n") > todas[0]!.index! ? todas[1]! : todas[0]!);
   let h = Number(m[1]);
   const pm = m[3]?.toLowerCase() === "p";
   if (m[3] && h === 12) h = pm ? 12 : 0;
@@ -201,7 +205,7 @@ export function fechaCreible(fecha: string | null, hoy = hoyEnBogota()): string 
 }
 
 function buscarBanco(texto: string): string | null {
-  const bancos = ["Zelle", "Bancolombia", "Nequi", "Daviplata", "Binance", "Western Union", "Banco de Venezuela", "Banesco", "Mercantil", "Provincial", "Pago Móvil"];
+  const bancos = ["Zelle", "Bancolombia", "Nequi", "Daviplata", "Binance", "Western Union", "Banco de Venezuela", "Banesco", "Mercantil", "Provincial", "BBVA Provincial", "Pago Móvil"];
   // los espacios del nombre pueden venir como salto de línea ("BANCO DE / VENEZUELA") o no venir ("PagomóvilBDV")
   const enTexto = (b: string) => new RegExp(b.replace(/ó/g, "[oó]").replace(/ /g, "\\s*"), "i").test(texto);
   if (/pago\s*m[oó]vil\s*bdv|\bbdv\b/i.test(texto)) return "Banco de Venezuela";
@@ -223,6 +227,12 @@ export function buscarCuenta(lineas: string[], etiqueta: RegExp): string | null 
     if (enLinea && parece(enLinea)) return enLinea;
     const siguiente = lineas[i + 1]?.trim();
     if (!resto && siguiente && /^[\d*xX•\s-]{6,}$/.test(siguiente) && parece(siguiente)) return siguiente;
+    // la cuenta con un solo punto y sus últimos 4 dígitos (Banco Provincial: "Corriente •8522", "Sandy Ontiveros
+    // •1788"): el punto el lector lo ve como •, ·, +, - o *; puede quedar en el renglón de abajo, junto al nombre
+    for (const v of [resto, lineas[i + 1] ?? ""]) {
+      const corta = /(?:^|\s|[a-záéíóúñ])\s*[•·+*\-]\s?(\d{4})\s*$/i.exec(v.trim());
+      if (corta && !/^\d{1,2}[/.-]/.test(v.trim())) return `•${corta[1]}`;
+    }
   }
   return null;
 }
