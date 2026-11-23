@@ -47,11 +47,11 @@ export function MenuBanco({ onAccion }: { onAccion: (a: AccionBanco) => void }) 
         <button type="button" onClick={(e) => elegir(e, "saldo")}>
           Cargar saldo real
         </button>
-        <button type="button" onClick={(e) => elegir(e, "datos")}>
-          Cuenta y pago móvil
+        <button type="button" onClick={(e) => elegir(e, "editar")}>
+          Editar cuenta (4 dígitos, pago móvil)
         </button>
-        <button type="button" onClick={(e) => elegir(e, "renombrar")}>
-          Editar nombre
+        <button type="button" onClick={(e) => elegir(e, "datos")}>
+          Más cuentas y pagos móviles
         </button>
         <button type="button" onClick={(e) => elegir(e, "historial")}>
           Ver movimientos
@@ -85,13 +85,12 @@ export function CuadroBancos({
   soloLectura: boolean;
   tasaAPesos?: number; // bolívares: pesos por bolívar, para el total en pesos
   onAccion: (accion: AccionBanco, bancoId: number) => void;
-  onCrear: (nombre: string) => Promise<boolean>;
+  onCrear: () => void; // abre el formulario de la cuenta nueva
   onCierre: (valores: { bancoId: number; saldo: string }[]) => Promise<boolean>;
   children?: ReactNode; // lo que se anota a mano (personas, otras cuentas fuera del sistema)
 }) {
   const [cierre, setCierre] = useState<Record<number, string>>({});
   const [registrando, setRegistrando] = useState(false);
-  const [nueva, setNueva] = useState<string | null>(null);
   const fmt = (n: number) => (moneda === "COP" ? pesos(n) : `Bs ${conDecimales(n)}`);
   const total = bancos.reduce((s, b) => s + saldoDe(b, moneda), 0);
   const escritos = bancos
@@ -167,40 +166,15 @@ export function CuadroBancos({
                 </td>
               </tr>
             )}
-            {!soloLectura &&
-              (nueva !== null ? (
-                <tr className="cap-banco-nuevo">
-                  <td colSpan={2}>
-                    <input
-                      value={nueva}
-                      onChange={(e) => setNueva(e.target.value)}
-                      placeholder={moneda === "COP" ? "Nombre (ej. Nequi 2)" : "Nombre (ej. Banesco)"}
-                      autoFocus
-                      aria-label="Nombre de la cuenta nueva"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") void onCrear(nueva).then((ok) => ok && setNueva(null));
-                        if (e.key === "Escape") setNueva(null);
-                      }}
-                    />
-                  </td>
-                  <td className="cap-banco-accion" colSpan={2}>
-                    <button type="button" onClick={() => void onCrear(nueva).then((ok) => ok && setNueva(null))}>
-                      Crear
-                    </button>
-                    <button type="button" className="secundario" onClick={() => setNueva(null)}>
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                <tr className="cap-agregar">
-                  <td colSpan={4}>
-                    <button type="button" onClick={() => setNueva("")}>
-                      <Plus size={13} /> Agregar cuenta
-                    </button>
-                  </td>
-                </tr>
-              ))}
+            {!soloLectura && (
+              <tr className="cap-agregar">
+                <td colSpan={4}>
+                  <button type="button" onClick={onCrear}>
+                    <Plus size={13} /> Agregar cuenta
+                  </button>
+                </td>
+              </tr>
+            )}
           </tbody>
           <tfoot>
             <tr>

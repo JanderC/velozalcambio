@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCajas, type Caja } from "../../api/cajas.api";
+import { getMonedas } from "../../api/monedas.api";
 import { formatearMonto, leerNumero, sumarDecimales } from "../../utils/montos";
 import { conPuntos } from "../cuentasPorCobrarPagar/NuevoClienteCobrarModal";
 
@@ -13,6 +14,7 @@ export interface PagoElegido {
   modo: "taquilla" | "otro" | "parte";
   cajaId: number | null;
   nombre: string;
+  bolivares?: boolean; // se le paga en bolívares por una cuenta de bolívares (pago móvil o transferencia)
   monto?: string; // "parte": cuánto va por banco, como se escribe (400.000)
 }
 export const PAGO_POR_TAQUILLA: PagoElegido = { modo: "taquilla", cajaId: null, nombre: "" };
@@ -46,6 +48,42 @@ export function useCuentasDePago(activo = true) {
   return cuentas;
 }
 
+/**
+ * Las cuentas de bolívares de la empresa (todas: Banco de Venezuela 8515, Provincial 1788…). Los bolívares nunca se
+ * entregan en taquilla: se pagan por pago móvil o transferencia desde una de estas.
+ */
+export function useCuentasBolivares(activo = true) {
+  const [cuentas, setCuentas] = useState<Caja[] | null>(null);
+  useEffect(() => {
+    if (!activo || cuentas) return;
+    Promise.all([getCajas(), getMonedas()])
+      .then(([lista, monedas]) => {
+        const ves = monedas.find((m) => m.codigo === "VES")?.id;
+        setCuentas(lista.filter((c) => c.tipo === "BANCO" && c.activo && ves !== undefined && c.moneda_id === ves));
+      })
+      .catch(() => setCuentas([]));
+  }, [activo, cuentas]);
+  return cuentas;
+}
+const CLAVE_BOLIVARES = "cc-pago-bolivares-cuenta";
+/** La cuenta de bolívares que se propone: la última usada, o la primera. */
+export function cuentaBolivaresPropuesta(cuentas: Caja[]) {
+  let ultima: string | null = null;
+  try {
+    ultima = localStorage.getItem(CLAVE_BOLIVARES);
+  } catch {
+    // sin almacenamiento: la primera
+  }
+  return cuentas.find((c) => String(c.id) === ultima) ?? cuentas[0] ?? null;
+}
+export function recordarCuentaBolivares(id: number) {
+  try {
+    localStorage.setItem(CLAVE_BOLIVARES, String(id));
+  } catch {
+    // no es grave
+  }
+}
+
 /** El mensaje para el cliente cuando una parte se le pagó por banco y el resto lo retira en efectivo. */
 export function avisoDePagoParcial(referencia: string, total: string, porBanco: string, banco: string, efectivo: string) {
   return `Estimado(a), le informamos que la operación ha sido confirmada.\n\nRef: ${referencia || "—"}\nMonto: ${total}\nPagado por ${banco}: ${porBanco}\nPara retirar en efectivo: ${efectivo}`;
@@ -77,8 +115,21 @@ export function PagoConfirmacion({
   codigo?: string;
 }) {
   const [cuentas, setCuentas] = useState<Caja[] | null>(null);
+  // Se le entregan bolívares: no viene a retirar; se le paga por pago móvil o transferencia desde una cuenta de bolívares
+  const enBolivares = codigo === "VES";
+  const cuentasBs = useCuentasBolivares(enBolivares);
+  useEffect(() => {
+    if (enBolivares) {
+      if (!cuentasBs || !cuentasBs.length) return;
+      if (valor.bolivares && cuentasBs.some((c) => c.id === valor.cajaId)) return;
+      const c = cuentaBolivaresPropuesta(cuentasBs)!;
+      onCambio({ modo: "otro", cajaId: c.id, nombre: c.nombre, bolivares: true });
+    } else if (valor.bolivares) {
+      onCambio(PAGO_POR_TAQUILLA); // dejó de ser en bolívares: vuelve a lo de siempre
+    }
+  }, [enBolivares, cuentasBs, valor.bolivares, valor.cajaId, onCambio]);
   // por banco (todo o una parte): hace falta la cuenta de la empresa
-  const otro = valor.modo === "otro" || valor.modo === "parte";
+  const otro = !enBolivares && (valor.modo === "otro" || valor.modo === "parte");
   const parte = valor.modo === "parte";
 
   useEffect(() => {
@@ -113,6 +164,40 @@ export function PagoConfirmacion({
     } catch {
       // no es grave: solo no se recuerda
     }
+  }
+
+  if (enBolivares) {
+    return (
+      <div className="cc-pago-conf otro cc-pago-bs">
+        <span>¿Cómo se le paga?</span>
+        <b>En bolívares: pago móvil o transferencia. No pasa a taquilla.</b>
+        {cuentasBs === null ? (
+          <small>Cargando las cuentas de bolívares…</small>
+        ) : cuentasBs.length === 0 ? (
+          <small>No hay cuentas de bolívares en Capital de giros: creala ahí para pagar desde esa cuenta. Mientras tanto queda para taquilla.</small>
+        ) : (
+          <>
+            <select
+              value={valor.bolivares ? (valor.cajaId ?? "") : ""}
+              onChange={(e) => {
+                const c = cuentasBs.find((x) => String(x.id) === e.target.value);
+                if (!c) return;
+                recordarCuentaBolivares(c.id);
+                onCambio({ modo: "otro", cajaId: c.id, nombre: c.nombre, bolivares: true });
+              }}
+              aria-label="Desde qué cuenta de bolívares se le paga"
+            >
+              {cuentasBs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Desde {c.nombre}
+                </option>
+              ))}
+            </select>
+            <small>Queda pagada al agregar y sale de esa cuenta de bolívares.</small>
+          </>
+        )}
+      </div>
+    );
   }
 
   return (

@@ -344,3 +344,12 @@ td .cap-menu { margin-left: 6px; }
 .lb-est-cargado { color: #6b7280; }
 .lb-listo { padding: 10px 12px; border-radius: 8px; background: #ecfdf5; color: #065f46; font-weight: 600; }
 .lb-diferencia { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; background: #fffbeb; border: 1px solid #fcd34d; font-size: 0.88rem; }
+
+/* Ficha de la cuenta: lo que se va a guardar y cómo se reconoce en los captures */
+.cap-ficha-vista { display: grid; gap: 3px; padding: 10px 12px; border-radius: 8px; border: 1px solid #cfd6e0; background: #f8fafc; font-size: 0.86rem; }
+.cap-ficha-vista span { color: #374151; }
+.cap-ficha-vista small { display: flex; align-items: center; gap: 5px; color: #6b7280; }
+.cap-ficha-vista.bien { border-color: #86efac; background: #f0fdf4; }
+.cap-ficha-vista.bien small { color: #166534; font-weight: 600; }
+.cap-ficha-vista.mal { border-color: #fca5a5; background: #fef2f2; }
+.cap-ficha-vista.mal small { color: #b91c1c; font-weight: 600; }

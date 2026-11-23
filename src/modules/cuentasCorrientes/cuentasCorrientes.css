@@ -764,3 +764,6 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-check-doble { display: flex !important; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; font-weight: 600; cursor: pointer; }
 .cc-guardar.cc-peligro { background: #b45309; }
 .cc-guardar.cc-peligro:disabled { opacity: 0.45; }
+
+/* Pago en bolívares: directo desde una cuenta de bolívares */
+.cc-pago-bs b { font-size: 0.86rem; color: #7c2d12; }

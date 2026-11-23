@@ -6,7 +6,7 @@ import { formatearMonto, leerNumero } from "../../utils/montos";
 import { DatosBancoModal } from "./DatosBancoModal";
 import { LibroBancoModal } from "./LibroBancoModal";
 
-export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo" | "datos" | "libro";
+export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo" | "datos" | "libro" | "editar";
 
 /** Lo que se va escribiendo, con los puntos de miles puestos solos y decimales con coma. */
 function conPuntos(escrito: string) {

@@ -10,6 +10,7 @@ import { getCuentasCorrientes, type CuentaCorrienteResumen } from "../../api/cue
 import { formatearMonto, leerNumero } from "../../utils/montos";
 import { enPesos, grupoDe } from "../cuentasPorCobrarPagar/cobrar";
 import { BancoAccionModal, type AccionBanco } from "./BancoAccionModal";
+import { CuentaBancoModal } from "./CuentaBancoModal";
 import { CapitalGrafica } from "./CapitalGrafica";
 import { CapitalTendencia } from "./CapitalTendencia";
 import { CuadroBancos } from "./CuadroBancos";
@@ -438,6 +439,13 @@ export function CapitalPage() {
   // ---------- Cuentas de banco ----------
   // editar, ingreso o egreso, traslado o ver movimientos de una cuenta
   const [accionBanco, setAccionBanco] = useState<{ accion: AccionBanco; bancoId: number } | null>(null);
+  // la ficha de una cuenta (crear o editar): nombre, banco, últimos 4 dígitos y pago móvil, todo junto
+  const [ficha, setFicha] = useState<{ moneda: "COP" | "VES"; bancoId?: number } | null>(null);
+  const abrirAccion = (accion: AccionBanco, bancoId: number) => {
+    if (accion !== "editar") return setAccionBanco({ accion, bancoId });
+    const b = sistema?.bancos?.find((x) => x.id === bancoId);
+    setFicha({ moneda: b?.moneda === "VES" ? "VES" : "COP", bancoId });
+  };
   async function recargarSistema() {
     try {
       setSistema(await capitalApi.sistema());
@@ -445,19 +453,7 @@ export function CapitalPage() {
       // si falla, queda lo que había
     }
   }
-  // una cuenta nueva en esa moneda (Bancolombia y Nequi en pesos, o de bolívares)
-  async function crearBanco(nombre: string, moneda: string) {
-    if (nombre.trim().length < 2) return setError("Escribí el nombre de la cuenta."), false;
-    try {
-      await capitalApi.crearBanco(nombre.trim(), moneda);
-      setError(null);
-      await recargarSistema();
-      return true;
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo crear la cuenta.");
-      return false;
-    }
-  }
+
   // el cierre de la noche: lo que hay de verdad en cada cuenta (la diferencia queda anotada en cada una)
   async function registrarCierre(moneda: string, valores: { bancoId: number; saldo: string }[]) {
     const hechos: string[] = [];
@@ -692,6 +688,21 @@ export function CapitalPage() {
             </label>
           </section>
 
+          {ficha && (
+            <CuentaBancoModal
+              modo={ficha.bancoId ? "editar" : "crear"}
+              moneda={ficha.moneda}
+              banco={sistema?.bancos?.find((b) => b.id === ficha.bancoId)}
+              bancos={sistema?.bancos ?? []}
+              onCerrar={() => setFicha(null)}
+              onHecho={(mensaje) => {
+                setFicha(null);
+                setAviso(mensaje);
+                setTimeout(() => setAviso(null), 8000);
+                void recargarSistema();
+              }}
+            />
+          )}
           {accionBanco && sistema?.bancos?.some((b) => b.id === accionBanco.bancoId) && (
             <BancoAccionModal
               accion={accionBanco.accion}
@@ -714,8 +725,8 @@ export function CapitalPage() {
             moneda="COP"
             bancos={(foto.bancos ?? []).filter((b) => (b.moneda ?? "COP") === "COP")}
             soloLectura={soloLectura}
-            onAccion={(accion, bancoId) => setAccionBanco({ accion, bancoId })}
-            onCrear={(nombre) => crearBanco(nombre, "COP")}
+            onAccion={abrirAccion}
+            onCrear={() => setFicha({ moneda: "COP" })}
             onCierre={(valores) => registrarCierre("COP", valores)}
           >
             <ManoDe titulo="Otros pesos (fuera del sistema)" abierto={manual.pesos.some((f) => f.nombre.trim() || f.monto.trim())} total={pesos(t.pesosManual)}>
@@ -729,8 +740,8 @@ export function CapitalPage() {
             bancos={(foto.bancos ?? []).filter((b) => b.moneda === "VES")}
             soloLectura={soloLectura}
             tasaAPesos={t.tasaBs}
-            onAccion={(accion, bancoId) => setAccionBanco({ accion, bancoId })}
-            onCrear={(nombre) => crearBanco(nombre, "VES")}
+            onAccion={abrirAccion}
+            onCrear={() => setFicha({ moneda: "VES" })}
             onCierre={(valores) => registrarCierre("VES", valores)}
           >
             <ManoDe

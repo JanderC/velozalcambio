@@ -1,6 +1,7 @@
 import { Plus, X } from "lucide-react";
 import type { Moneda } from "../../api/monedas.api";
-import { useCuentasDePago } from "./PagoConfirmacion";
+import { useEffect } from "react";
+import { cuentaBolivaresPropuesta, recordarCuentaBolivares, useCuentasBolivares, useCuentasDePago } from "./PagoConfirmacion";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
 // Pago repartido: lo que envió el cliente se le entrega en varias monedas (800 USD: 400 en pesos y 400 en bolívares).
@@ -70,6 +71,27 @@ export function RepartoMonedas({
   conPago?: boolean;
 }) {
   const cuentasPago = useCuentasDePago(conPago);
+  // la parte que se entrega en bolívares no pasa a taquilla: se paga desde una cuenta de bolívares
+  const cuentasBs = useCuentasBolivares(conPago);
+  const idsBs = new Set((cuentasBs ?? []).map((c) => c.id));
+  useEffect(() => {
+    if (!conPago || !cuentasBs?.length) return;
+    let cambio = false;
+    const nuevas = partes.map((p) => {
+      if (p.moneda === "VES" && (!p.pago || !idsBs.has(p.pago.cajaId))) {
+        const c = cuentaBolivaresPropuesta(cuentasBs)!;
+        cambio = true;
+        return { ...p, pago: { cajaId: c.id, nombre: c.nombre } };
+      }
+      if (p.moneda !== "VES" && p.pago && idsBs.has(p.pago.cajaId)) {
+        cambio = true;
+        return { ...p, pago: null };
+      }
+      return p;
+    });
+    if (cambio) onCambio(nuevas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conPago, cuentasBs, partes.map((p) => `${p.moneda}:${p.pago?.cajaId ?? ""}`).join("|")]);
   const cuentas = partes.map((p) => calcularParte(p, llega));
   const repartido = cuentas.reduce((suma, c) => (c.cantidad ? sumarDecimales(suma, c.cantidad) : suma), "0");
   const resto = totalEnviado ? sumarDecimales(totalEnviado, `-${repartido}`) : null;
@@ -126,22 +148,42 @@ export function RepartoMonedas({
             {conPago && (
               <label className="cc-reparto-pago">
                 Se le paga
-                <select
-                  value={p.pago?.cajaId ?? ""}
-                  onChange={(e) => {
-                    const cta = cuentasPago?.find((x) => String(x.id) === e.target.value);
-                    cambiar(i, { pago: cta ? { cajaId: cta.id, nombre: cta.nombre } : null });
-                  }}
-                  aria-label={`Cómo se le paga la parte ${i + 1}`}
-                  disabled={!cuentasPago}
-                >
-                  <option value="">Pasa a taquilla</option>
-                  {(cuentasPago ?? []).map((cta) => (
-                    <option key={cta.id} value={cta.id}>
-                      Ya por {cta.nombre}
-                    </option>
-                  ))}
-                </select>
+                {p.moneda === "VES" && cuentasBs?.length ? (
+                  // bolívares: siempre por pago móvil o transferencia, desde una cuenta de bolívares
+                  <select
+                    value={p.pago?.cajaId ?? ""}
+                    onChange={(e) => {
+                      const cta = cuentasBs.find((x) => String(x.id) === e.target.value);
+                      if (!cta) return;
+                      recordarCuentaBolivares(cta.id);
+                      cambiar(i, { pago: { cajaId: cta.id, nombre: cta.nombre } });
+                    }}
+                    aria-label={`Desde qué cuenta de bolívares se le paga la parte ${i + 1}`}
+                  >
+                    {cuentasBs.map((cta) => (
+                      <option key={cta.id} value={cta.id}>
+                        Bs desde {cta.nombre}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={p.pago?.cajaId ?? ""}
+                    onChange={(e) => {
+                      const cta = cuentasPago?.find((x) => String(x.id) === e.target.value);
+                      cambiar(i, { pago: cta ? { cajaId: cta.id, nombre: cta.nombre } : null });
+                    }}
+                    aria-label={`Cómo se le paga la parte ${i + 1}`}
+                    disabled={!cuentasPago}
+                  >
+                    <option value="">Pasa a taquilla</option>
+                    {(cuentasPago ?? []).map((cta) => (
+                      <option key={cta.id} value={cta.id}>
+                        Ya por {cta.nombre}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </label>
             )}
             <output className="cc-reparto-total" title={c.error ?? undefined}>
@@ -190,7 +232,7 @@ export function RepartoMonedas({
       </div>
       <small>
         Cada parte queda como un movimiento aparte, en la cuenta del cliente en esa moneda (se le abre sola si no la tiene), con la misma referencia y la misma captura.
-        {conPago && " La que pasa a taquilla se le paga allá en efectivo (y se descuenta de la taquilla); la que se paga por un banco queda pagada al registrar y no pasa a taquilla."}
+        {conPago && " La que pasa a taquilla se le paga allá en efectivo (y se descuenta de la taquilla); la que se paga por un banco queda pagada al registrar y no pasa a taquilla. Los bolívares nunca pasan a taquilla: salen de una cuenta de bolívares."}
       </small>
     </div>
   );
