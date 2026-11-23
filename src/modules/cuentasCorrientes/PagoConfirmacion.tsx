@@ -31,6 +31,21 @@ const METODOS: { nombre: string; cuenta: RegExp }[] = [
 // el método que se propone según el medio por el que llegó la plata
 const METODO_DEL_MEDIO: Record<string, string> = { ZELLE: "Zelle", WESTERN_UNION: "Western Union", USDT: "USDT", BANCOLOMBIA: "Bancolombia", BOLIVARES: "Bs", PAGO_MOVIL: "Bs" };
 
+/** Las cuentas de la empresa por las que se le paga al cliente (Zelle, Bancolombia, Bs…), en el orden de siempre. */
+export function useCuentasDePago(activo = true) {
+  const [cuentas, setCuentas] = useState<Caja[] | null>(null);
+  useEffect(() => {
+    if (!activo || cuentas) return;
+    getCajas()
+      .then((lista) => {
+        const activas = lista.filter((c) => c.tipo === "BANCO" && c.activo);
+        setCuentas(METODOS.flatMap((m) => activas.filter((c) => m.cuenta.test(c.nombre)).slice(0, 1).map((c) => ({ ...c, nombre: m.nombre }))));
+      })
+      .catch(() => setCuentas([]));
+  }, [activo, cuentas]);
+  return cuentas;
+}
+
 /** El mensaje para el cliente cuando una parte se le pagó por banco y el resto lo retira en efectivo. */
 export function avisoDePagoParcial(referencia: string, total: string, porBanco: string, banco: string, efectivo: string) {
   return `Estimado(a), le informamos que la operación ha sido confirmada.\n\nRef: ${referencia || "—"}\nMonto: ${total}\nPagado por ${banco}: ${porBanco}\nPara retirar en efectivo: ${efectivo}`;

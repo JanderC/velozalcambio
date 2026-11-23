@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import type { Moneda } from "../../api/monedas.api";
+import { useCuentasDePago } from "./PagoConfirmacion";
 import { dividirDecimales, factorDeComision, formatearMonto, leerNumero, multiplicarDecimales, sumarDecimales } from "../../utils/montos";
 
 // Pago repartido: lo que envió el cliente se le entrega en varias monedas (800 USD: 400 en pesos y 400 en bolívares).
@@ -10,6 +11,8 @@ export interface ParteReparto {
   moneda: string; // en qué se entrega esta parte
   operador: "x" | "÷" | "%";
   tasa: string; // con "%": el porcentaje de comisión
+  // cómo se le paga esta parte: sin cuenta = pasa a taquilla (como siempre); con cuenta = se le paga ya por esa cuenta
+  pago?: { cajaId: number; nombre: string } | null;
 }
 
 export const partesIniciales = (primera: string, segunda: string): ParteReparto[] => [
@@ -56,13 +59,17 @@ export function RepartoMonedas({
   partes,
   totalEnviado,
   onCambio,
+  conPago = false,
 }: {
   llega: string; // la moneda en la que llegó la plata (la del medio)
   monedas: Moneda[];
   partes: ParteReparto[];
   totalEnviado: string | null; // lo escrito en "Cantidad", si se escribió: las partes tienen que sumar eso
   onCambio: (partes: ParteReparto[]) => void;
+  // Confirmaciones (compra): cada parte dice si pasa a taquilla o se le paga ya por una cuenta de la empresa
+  conPago?: boolean;
 }) {
+  const cuentasPago = useCuentasDePago(conPago);
   const cuentas = partes.map((p) => calcularParte(p, llega));
   const repartido = cuentas.reduce((suma, c) => (c.cantidad ? sumarDecimales(suma, c.cantidad) : suma), "0");
   const resto = totalEnviado ? sumarDecimales(totalEnviado, `-${repartido}`) : null;
@@ -116,6 +123,27 @@ export function RepartoMonedas({
                 aria-label={p.operador === "%" ? `Comisión de la parte en ${p.moneda}` : `Tasa de la parte en ${p.moneda}`}
               />
             </div>
+            {conPago && (
+              <label className="cc-reparto-pago">
+                Se le paga
+                <select
+                  value={p.pago?.cajaId ?? ""}
+                  onChange={(e) => {
+                    const cta = cuentasPago?.find((x) => String(x.id) === e.target.value);
+                    cambiar(i, { pago: cta ? { cajaId: cta.id, nombre: cta.nombre } : null });
+                  }}
+                  aria-label={`Cómo se le paga la parte ${i + 1}`}
+                  disabled={!cuentasPago}
+                >
+                  <option value="">Pasa a taquilla</option>
+                  {(cuentasPago ?? []).map((cta) => (
+                    <option key={cta.id} value={cta.id}>
+                      Ya por {cta.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <output className="cc-reparto-total" title={c.error ?? undefined}>
               {c.total ? `= ${dineroEn(c.total, p.moneda)}` : "= —"}
               {p.operador === "%" && c.total && c.tasa && <small> (− {formatearMonto(c.tasa)}%)</small>}
@@ -160,7 +188,10 @@ export function RepartoMonedas({
               : ` · completo ✓`)}
         </span>
       </div>
-      <small>Cada parte queda como un movimiento aparte, en la cuenta del cliente en esa moneda (se le abre sola si no la tiene), con la misma referencia y la misma captura.</small>
+      <small>
+        Cada parte queda como un movimiento aparte, en la cuenta del cliente en esa moneda (se le abre sola si no la tiene), con la misma referencia y la misma captura.
+        {conPago && " La que pasa a taquilla se le paga allá en efectivo (y se descuenta de la taquilla); la que se paga por un banco queda pagada al registrar y no pasa a taquilla."}
+      </small>
     </div>
   );
 }

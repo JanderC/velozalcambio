@@ -530,6 +530,7 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-nueva label.cc-reparto-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--color-navy); }
 .cc-reparto { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid #cfd6e0; border-radius: 10px; background: #f8fafc; }
 .cc-reparto-fila { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(150px, 1.2fr) minmax(170px, 1.2fr) minmax(120px, 1fr) auto; gap: 10px; align-items: end; }
+.cc-reparto-fila:has(.cc-reparto-pago) { grid-template-columns: minmax(100px, 0.9fr) minmax(140px, 1.1fr) minmax(170px, 1.2fr) minmax(150px, 1.1fr) minmax(110px, 0.9fr) auto; }
 .cc-reparto-fila label { display: grid; gap: 4px; font-size: 0.76rem; font-weight: 600; color: #374151; }
 .cc-reparto-fila input, .cc-reparto-fila select { width: 100%; padding: 8px 9px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; font: inherit; font-size: 0.9rem; }
 .cc-reparto-fila input { text-align: right; }

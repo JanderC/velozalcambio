@@ -2524,8 +2524,13 @@ function FilaNueva({
       imagenesAdjuntas
     );
     if (!verificado) return setError("No se procesó: revisá los montos.");
+    // las partes que se pagan ya por un banco (en una venta no se paga nada: es el cliente el que paga)
+    const pagoDe = (i: number) => (!resta ? (partes[i]?.pago ?? null) : null);
+    if (partes.some((_, i) => pagoDe(i)) && llevaConfirmacion && !confirmada)
+      return setError("Para pagar una parte por banco la transferencia ya tiene que entrar confirmada: marcá que ya está confirmada (o dejá esa parte en \"Pasa a taquilla\").");
     setEnviando(true);
     const hechas: string[] = [];
+    const noPagadas: string[] = []; // las partes que se pagaron por banco y fallaron al pagar: quedan en taquilla
     const idsAca: number[] = []; // las partes que quedaron en esta cuenta
     let enEstaCuenta = "0";
     const signo = resta ? "-" : "";
@@ -2569,7 +2574,19 @@ function FilaNueva({
               : {}),
         });
         if (imagen) await subirComprobanteMovimiento(creado.movimiento.id, imagen).catch(() => {});
-        hechas.push(dineroEn(c.total!, p.moneda));
+        // se le paga ya por un banco: queda pagada y no pasa a taquilla
+        const pagoParte = pagoDe(i);
+        let pagadaPorBanco = false;
+        if (pagoParte) {
+          try {
+            await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagoParte.cajaId);
+            pagadaPorBanco = true;
+          } catch (e) {
+            noPagadas.push(`${dineroEn(c.total!, p.moneda)} por ${pagoParte.nombre} (${e instanceof ApiError ? e.message : "error de conexión"})`);
+          }
+        }
+        hechas.push(`${dineroEn(c.total!, p.moneda)}${pagadaPorBanco ? ` (pagado por ${pagoParte!.nombre})` : !resta && pagoDe(i) === null && partes.some((_, j) => pagoDe(j)) ? " (en taquilla)" : ""}`);
+        if (pagadaPorBanco) continue; // ya se le pagó: no queda nada por retirar de esta parte
         if (destino.id === cuenta.id) {
           idsAca.push(creado.movimiento.id);
           enEstaCuenta = sumarDecimales(enEstaCuenta, c.total!);
@@ -2577,10 +2594,12 @@ function FilaNueva({
       }
       // el aviso para el cliente lleva todo junto: lo que envió y lo que recibe en cada moneda
       const ref = nMtcn ? `MTCN ${nMtcn}` : codigosDeReferencia(persona).join(" / ") || "—";
+      // si todas las partes se le pagaron por banco, no hay nada para recoger en taquilla
+      const todoPagado = !resta && hechas.every((h) => / \(pagado por /.test(h));
       const texto =
-        `Estimado(a), le informamos que ${enProceso ? "la operación está en proceso de confirmación" : resta ? "su compra ha sido registrada" : "la operación ha sido confirmada"}.\n\n` +
+        `Estimado(a), le informamos que ${enProceso ? "la operación está en proceso de confirmación" : resta ? "su compra ha sido registrada" : todoPagado ? "la operación ha sido confirmada y pagada" : "la operación ha sido confirmada"}.\n\n` +
         `Ref: ${ref}\nEnvió: ${dineroEn(repartidoTotal, codigoLlega)}\n${resta ? "Monto" : "Recibe"}: ${hechas.join(" + ")}\n` +
-        (enProceso ? "En breves minutos estará disponible" : resta ? "" : "Disponible para recoger");
+        (enProceso ? "En breves minutos estará disponible" : resta || todoPagado ? "" : "Disponible para recoger");
       const descripcionAviso = `${referenciaFinal}${personaCompleta ? `${SEPARADOR_PERSONA}${personaCompleta}` : ""}`;
       setImagenesAdjuntas([]);
       setCapturasDudosas(0);
@@ -2593,6 +2612,7 @@ function FilaNueva({
       setMtcn("");
       setConfirmada(false);
       setCantidad("");
+      if (noPagadas.length) setError(`Se registró todo, pero no se pudo pagar por banco: ${noPagadas.join("; ")}. Esa parte quedó para pagar en taquilla.`);
       onGuardado({ monto: cuentas[0]!.total!, descripcion: descripcionAviso, sentido: enProceso ? "proceso" : resta ? "recibe" : "retiro", texto: texto.trim(), ids: idsAca, porRetirar: enEstaCuenta });
     } catch (err) {
       const mensaje = err instanceof ApiError ? err.message : (err as Error).message || "error de conexión";
@@ -3223,7 +3243,7 @@ function FilaNueva({
         </label>
       )}
       {enConfirmaciones && repartido && (
-        <RepartoMonedas llega={codigoLlega} monedas={monedas} partes={partes} totalEnviado={nCantidad ? sinSigno(nCantidad) : null} onCambio={setPartes} />
+        <RepartoMonedas llega={codigoLlega} monedas={monedas} partes={partes} totalEnviado={nCantidad ? sinSigno(nCantidad) : null} onCambio={setPartes} conPago={!resta} />
       )}
       {enConfirmaciones && !resta && !repartido && <PagoConfirmacion valor={pago} onCambio={setPago} medioNombre={medioMov.nombre} total={varias ? null : monto} codigo={codigoMonto} />}
       {puedeElegirEntrega && !repartido && (
