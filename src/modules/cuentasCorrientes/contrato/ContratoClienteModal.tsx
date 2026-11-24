@@ -4,10 +4,29 @@ import { Modal } from "../../../components/common/Modal";
 import { getMovimientosCuentaCorriente, type CuentaCorrienteResumen, type MovimientoCC } from "../../../api/cuentasCorrientes.api";
 import { formatearMonto, leerNumero } from "../../../utils/montos";
 import { generarDocumento, type Finiquito, type Parte } from "./documentoContrato";
+import { FirmaControl, firmaParaWord } from "./FirmaControl";
 
 const PARTE_VACIA: Parte = { nombre: "", cedula: "", rif: "", ciudad: "", municipio: "", estado: "Táchira" };
 const CLAVE_EMPRESA = "contrato-comisionista";
 const claveCliente = (terceroId: number) => `contrato-cliente-${terceroId}`;
+// las firmas: la de la empresa se repite sola en cada contrato; la del cliente queda para sus próximos contratos
+const CLAVE_FIRMA_EMPRESA = "contrato-firma-empresa";
+const claveFirmaCliente = (terceroId: number) => `contrato-firma-cliente-${terceroId}`;
+const leerFirma = (clave: string) => {
+  try {
+    return localStorage.getItem(clave);
+  } catch {
+    return null;
+  }
+};
+const guardarFirma = (clave: string, v: string | null) => {
+  try {
+    if (v) localStorage.setItem(clave, v);
+    else localStorage.removeItem(clave);
+  } catch {
+    // no es grave: la próxima vez se carga de nuevo
+  }
+};
 const leerGuardado = <T,>(clave: string): Partial<T> => {
   try {
     return JSON.parse(localStorage.getItem(clave) ?? "{}") as Partial<T>;
@@ -52,7 +71,8 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
     cedula: cuenta.tercero_identificacion ?? leerGuardado<Parte>(claveCliente(cuenta.tercero_id)).cedula ?? "",
   }));
   const [empresa, setEmpresa] = useState<Parte>(() => ({ ...PARTE_VACIA, ...leerGuardado<Parte>(CLAVE_EMPRESA) }));
-  const [lugar, setLugar] = useState("San Cristóbal");
+  const [firmaCliente, setFirmaCliente] = useState<string | null>(() => leerFirma(claveFirmaCliente(cuenta.tercero_id)));
+  const [firmaEmpresa, setFirmaEmpresa] = useState<string | null>(() => leerFirma(CLAVE_FIRMA_EMPRESA));
   const [conFiniquito, setConFiniquito] = useState(true);
   const [movimientos, setMovimientos] = useState<MovimientoCC[] | null>(null);
   const [movId, setMovId] = useState<number | "">("");
@@ -135,7 +155,15 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
         : null;
     setGenerando(true);
     try {
-      const blob = await generarDocumento({ comitente: cliente, comisionista: empresa, lugarFirma: lugar, fechaFirma: new Date(), finiquito });
+      guardarFirma(CLAVE_FIRMA_EMPRESA, firmaEmpresa);
+      guardarFirma(claveFirmaCliente(cuenta.tercero_id), firmaCliente);
+      const blob = await generarDocumento({
+        comitente: cliente,
+        comisionista: empresa,
+        firmaComitente: await firmaParaWord(firmaCliente),
+        firmaComisionista: await firmaParaWord(firmaEmpresa),
+        finiquito,
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -185,10 +213,15 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
             {campoParte(empresa, setEmpresa, "rif", "RIF", "J-12345678-9")}
             {campoParte(empresa, setEmpresa, "ciudad", "Ciudad", "San Cristóbal")}
             {campoParte(empresa, setEmpresa, "municipio", "Municipio")}
-            <label>
-              Lugar de la firma
-              <input value={lugar} onChange={(e) => setLugar(e.target.value)} />
-            </label>
+            {campoParte(empresa, setEmpresa, "estado", "Estado", "Táchira")}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Las firmas (opcional: sin firma queda la línea para firmar a mano)</legend>
+          <div className="cc-firmas">
+            <FirmaControl titulo="Firma del cliente" valor={firmaCliente} onCambio={setFirmaCliente} ayuda="Queda guardada para sus próximos contratos." />
+            <FirmaControl titulo="Firma de la empresa" valor={firmaEmpresa} onCambio={setFirmaEmpresa} ayuda="Se repite sola en todos los contratos." />
           </div>
         </fieldset>
 

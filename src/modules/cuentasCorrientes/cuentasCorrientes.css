@@ -777,3 +777,20 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-contrato-neto { margin: 0; padding: 8px 12px; border-radius: 8px; background: #f0fdf4; color: #166534; font-size: 0.9rem; }
 .cc-contrato-boton { display: inline-flex; align-items: center; gap: 5px; }
 @media (max-width: 760px) { .cc-contrato-grilla { grid-template-columns: 1fr; } }
+
+/* Firmas del contrato: subir una imagen o dibujarla */
+.cc-firmas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cc-firma { display: grid; gap: 6px; align-content: start; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #fafbfc; }
+.cc-firma-titulo { font-size: 0.8rem; font-weight: 700; color: #374151; }
+.cc-firma-vista { max-width: 100%; height: 70px; object-fit: contain; justify-self: start; background: white; border-bottom: 1px solid #9ca3af; }
+.cc-firma-vacia { font-size: 0.78rem; color: #6b7280; padding: 22px 0; border-bottom: 1px solid #9ca3af; }
+.cc-firma-botones { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-firma-botones button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; font: inherit; font-size: 0.8rem; cursor: pointer; }
+.cc-firma-botones button.usar { background: var(--color-navy, #0b2545); border-color: var(--color-navy, #0b2545); color: white; font-weight: 600; }
+.cc-firma-botones button.usar:disabled { opacity: 0.4; }
+.cc-firma-botones button.quitar { color: #b91c1c; }
+.cc-firma small { font-size: 0.72rem; color: #6b7280; }
+.cc-firma .cc-firma-error { color: #b91c1c; }
+.cc-firma-lienzo { display: grid; gap: 6px; }
+.cc-firma-lienzo canvas { width: 100%; aspect-ratio: 480 / 180; border: 1px solid #94a3b8; border-radius: 6px; background: white; touch-action: none; cursor: crosshair; }
+@media (max-width: 760px) { .cc-firmas { grid-template-columns: 1fr; } }
