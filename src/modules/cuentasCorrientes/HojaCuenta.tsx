@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Landmark, Loader2, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Calculator, Camera, CheckCircle2, Image as IconoImagen, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, FileText, Landmark, Loader2, Lock, MessageCircle, Pencil, Plus, RotateCcw, Search, Send, Share2, Undo2, X } from "lucide-react";
 import {
   anularMovimientoCC,
   confirmarMovimientoCC,
@@ -38,6 +38,7 @@ import {
 } from "../../api/cuentasCorrientes.api";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { EditarClienteModal } from "./EditarClienteModal";
+import { ContratoClienteModal } from "./contrato/ContratoClienteModal";
 import { CedulaFaltanteModal, debePreguntarCedula } from "./CedulaFaltanteModal";
 import { EditarMovimientoModal } from "./EditarMovimientoModal";
 import { MoverMovimientoModal } from "./MoverMovimientoModal";
@@ -319,6 +320,8 @@ export function HojaCuenta({
   const [descargando, setDescargando] = useState(false);
   const [configurandoCobro, setConfigurandoCobro] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState(false);
+  // contrato de comisión y finiquito del cliente, en Word
+  const [haciendoContrato, setHaciendoContrato] = useState(false);
   // "Venta de <banco>" para cada banco o canal: ZELLE -> "Venta de Zelle"
   const [ventasPorBanco, setVentasPorBanco] = useState<string[]>([]);
 
@@ -826,6 +829,9 @@ export function HojaCuenta({
               <button type="button" className="cc-mover" onClick={() => setEditandoCliente(true)}>
                 Editar datos (nombre, teléfono, cédula)
               </button>
+              <button type="button" className="cc-mover cc-contrato-boton" onClick={() => setHaciendoContrato(true)} title="Contrato de comisión y finiquito de una operación, en Word, con los datos del cliente">
+                <FileText size={13} /> Contrato y finiquito (Word)
+              </button>
               <button type="button" className="cc-mover cc-eliminar" onClick={eliminar}>
                 Eliminar
               </button>
@@ -896,6 +902,7 @@ export function HojaCuenta({
           }}
         />
       )}
+      {haciendoContrato && <ContratoClienteModal cuenta={actual} onCerrar={() => setHaciendoContrato(false)} />}
       {editandoCliente && (
         <EditarClienteModal
           cuenta={actual}

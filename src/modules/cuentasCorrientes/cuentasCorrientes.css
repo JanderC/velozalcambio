@@ -769,3 +769,11 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-pago-bs b { font-size: 0.86rem; color: #7c2d12; }
 
 .cc-comision-bs { color: #7c2d12 !important; font-weight: 600; }
+
+/* Contrato de comisión y finiquito (Word) */
+.cc-contrato fieldset { display: grid; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 10px; }
+.cc-contrato legend { padding: 0 6px; font-size: 0.82rem; font-weight: 700; color: var(--color-navy, #0b2545); }
+.cc-contrato-grilla { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.cc-contrato-neto { margin: 0; padding: 8px 12px; border-radius: 8px; background: #f0fdf4; color: #166534; font-size: 0.9rem; }
+.cc-contrato-boton { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 760px) { .cc-contrato-grilla { grid-template-columns: 1fr; } }
