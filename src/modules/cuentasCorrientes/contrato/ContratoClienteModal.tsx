@@ -357,7 +357,7 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
               />
               {!firmaCliente &&
                 (linkCliente ? (
-                  <CajaLink link={linkCliente} telefono={cuenta.tercero_telefono} para={cuenta.tercero_nombre} />
+                  <CajaLink link={linkCliente} telefono={cuenta.tercero_telefono} para={cuenta.tercero_nombre} vinculado />
                 ) : (
                   <button type="button" className="cc-pedir-link" onClick={() => void pedirLink("CLIENTE")} disabled={ocupado === "link-CLIENTE"}>
                     <Link2 size={13} /> Link para que firme el cliente
@@ -387,7 +387,7 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
                   <input value={nuevo.numeroCuenta} onChange={(e) => setNuevo({ ...nuevo, numeroCuenta: e.target.value })} placeholder="Número de cuenta (opcional)" inputMode="numeric" aria-label="Cuenta del titular" />
                   <FirmaControl titulo="Firma del titular" valor={null} onCambio={(v) => void guardarFirmaDe("TITULAR", v, null)} />
                   {linkNuevoTitular ? (
-                    <CajaLink link={linkNuevoTitular} para={nuevo.nombre} />
+                    <CajaLink link={linkNuevoTitular} para={nuevo.nombre} vinculado />
                   ) : (
                     <button type="button" className="cc-pedir-link" onClick={() => void pedirLink("TITULAR")} disabled={ocupado === "link-TITULAR"}>
                       <Link2 size={13} /> Link para que firme el titular

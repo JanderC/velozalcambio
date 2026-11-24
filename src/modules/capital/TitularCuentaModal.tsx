@@ -105,7 +105,7 @@ export function TitularCuentaModal({ banco, onCerrar }: { banco: BancoDelSistema
         )}
 
         {pendiente ? (
-          <CajaLink link={pendiente} telefono={telefono} para={pendiente.nombre ?? ""} mensaje={`para los contratos de Pago Veloz al Cambio necesitamos tu firma como titular de la cuenta ${banco.nombre}`} />
+          <CajaLink link={pendiente} telefono={telefono} para={pendiente.nombre ?? ""} mensaje={`para los contratos de Pago Veloz al Cambio necesitamos tu firma como titular de la cuenta ${banco.nombre}`} vinculado />
         ) : (
           <button type="button" className="cc-pedir-link" onClick={() => void pedirLink()} disabled={cargando}>
             <Link2 size={13} /> {firma ? "Link para que vuelva a firmar" : "Link para que firme el titular"}
