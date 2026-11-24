@@ -6,7 +6,7 @@ import type { FirmaImagen } from "./documentoContrato";
  * Limpia una firma para el documento: lo casi blanco queda transparente y se recorta al trazo (sin márgenes de
  * papel). Devuelve un PNG como data URL, o null si la imagen no tiene trazo.
  */
-async function limpiarFirma(fuente: string): Promise<string | null> {
+export async function limpiarFirma(fuente: string): Promise<string | null> {
   const img = await new Promise<HTMLImageElement>((ok, mal) => {
     const i = new Image();
     i.onload = () => ok(i);
@@ -123,7 +123,7 @@ export function FirmaControl({ titulo, valor, onCambio, ayuda }: { titulo: strin
 }
 
 /** Un recuadro para firmar con el mouse o el dedo. */
-function Lienzo({ onListo }: { onListo: (dataUrl: string | null) => void }) {
+export function Lienzo({ onListo }: { onListo: (dataUrl: string | null) => void }) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   const trazando = useRef(false);
   const [vacio, setVacio] = useState(true);

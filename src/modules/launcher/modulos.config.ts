@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Receipt,
   Store,
+  FileSignature,
 } from "lucide-react";
 import type { ModuloConfig } from "../../types/modulo.types";
 import { ROLES_REGISTRO_TASAS } from "../tasas/tasas.roles";
@@ -188,6 +189,15 @@ export const MODULOS: ModuloConfig[] = [
     acento: ACENTO_ADMIN,
     icono: BarChart3,
     ruta: "/reportes",
+    rolesPermitidos: ["ADMIN", "ASESOR"],
+  },
+  {
+    id: "contratos",
+    titulo: "Contratos",
+    categoria: "Gestión financiera",
+    acento: ACENTO_FINANCIERO,
+    icono: FileSignature,
+    ruta: "/contratos",
     rolesPermitidos: ["ADMIN", "ASESOR"],
   },
   {

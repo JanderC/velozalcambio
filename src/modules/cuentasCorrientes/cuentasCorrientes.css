@@ -794,3 +794,18 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-firma-lienzo { display: grid; gap: 6px; }
 .cc-firma-lienzo canvas { width: 100%; aspect-ratio: 480 / 180; border: 1px solid #94a3b8; border-radius: 6px; background: white; touch-action: none; cursor: crosshair; }
 @media (max-width: 760px) { .cc-firmas { grid-template-columns: 1fr; } }
+
+/* Contrato: las tres firmas (cliente, titular de la cuenta, empresa) y los links */
+.cc-firmas-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cc-firma-col { display: grid; gap: 8px; align-content: start; }
+.cc-firmas-actualizar { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 2px 8px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; font: inherit; font-size: 0.72rem; font-weight: 500; cursor: pointer; }
+.cc-pedir-link { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 10px; border: 1px dashed #1e40af; border-radius: 8px; background: #eff6ff; color: #1e40af; font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.cc-link-firma { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; font-size: 0.8rem; color: #1e3a8a; }
+.cc-link-firma.firmado { border-color: #86efac; background: #f0fdf4; color: #166534; font-weight: 600; }
+.cc-link-firma input { padding: 6px 8px; border: 1px solid #cfd6e0; border-radius: 6px; font-size: 0.74rem; background: white; }
+.cc-link-wa { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 6px; background: #16a34a; color: white; font-size: 0.8rem; font-weight: 600; text-decoration: none; }
+.cc-titular-elegir { display: grid; gap: 4px; font-size: 0.8rem; font-weight: 700; color: #374151; }
+.cc-titular-elegir select { padding: 7px 8px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.84rem; font-weight: 400; }
+.cc-titular-nuevo { display: grid; gap: 6px; }
+.cc-titular-nuevo > input { padding: 7px 9px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.86rem; }
+@media (max-width: 960px) { .cc-firmas-3 { grid-template-columns: 1fr; } }

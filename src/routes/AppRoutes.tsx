@@ -26,6 +26,8 @@ import { CajasPage } from "../modules/cajas/CajasPage";
 import { CajaDetallePage } from "../modules/cajas/CajaDetallePage";
 import { CuentasEmpresaPage } from "../modules/cuentasEmpresa/CuentasEmpresaPage";
 import { CapitalPage } from "../modules/capital/CapitalPage";
+import { ContratosPage } from "../modules/contratos/ContratosPage";
+import { FirmarPage } from "../modules/contratos/FirmarPage";
 
 
 
@@ -40,6 +42,8 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* el link para firmar un contrato: se abre sin iniciar sesión (lo usa el cliente o el titular desde su teléfono) */}
+      <Route path="/firmar/:token" element={<FirmarPage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/" element={<LauncherPage />} />
@@ -84,6 +88,8 @@ export function AppRoutes() {
         {/* Panel de chats: admin y asesor. Conexión y configuración de la IA: solo admin (lo decide la página y el backend) */}
         <Route element={<RequireRole roles={["ADMIN", "ASESOR"]} />}>
           <Route path="/whatsapp/*" element={<WhatsAppPage />} />
+          {/* los contratos de los clientes y las firmas de clientes y titulares */}
+          <Route path="/contratos" element={<ContratosPage />} />
         </Route>
         {/* /taquilla-2, /taquilla-3… las que se creen en Configuración; cualquier otra ruta vuelve al panel */}
         <Route path="*" element={<TaquillaPorRuta />} />

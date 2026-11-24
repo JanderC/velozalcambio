@@ -49,6 +49,9 @@ export interface DatosDocumento {
   comisionista: Parte; // la empresa (quien firma por ella)
   firmaComitente?: FirmaImagen | null;
   firmaComisionista?: FirmaImagen | null;
+  // el titular de la cuenta que recibe el dinero (si es otra persona): firma el contrato y el finiquito
+  titular?: { nombre: string; cedula: string } | null;
+  firmaTitular?: FirmaImagen | null;
   finiquito: Finiquito | null; // null: solo el contrato
 }
 
@@ -122,6 +125,13 @@ function contrato(d: DatosDocumento): (Paragraph | Table)[] {
       { nombre: d.comitente.nombre, cedula: d.comitente.cedula, firma: d.firmaComitente },
       { nombre: d.comisionista.nombre, cedula: d.comisionista.cedula, firma: d.firmaComisionista },
     ]),
+    // el titular de la cuenta que recibe: debajo, centrado
+    ...(d.titular?.nombre.trim()
+      ? [
+          new Paragraph({ children: [], spacing: { before: 500 } }),
+          ...firmas([{ nombre: d.titular.nombre, cedula: d.titular.cedula, firma: d.firmaTitular, rol: "Titular de la cuenta receptora" }], 50),
+        ]
+      : []),
   ];
 }
 
@@ -129,11 +139,11 @@ function contrato(d: DatosDocumento): (Paragraph | Table)[] {
  * Las dos firmas lado a lado, como en el contrato: la firma (si se cargó) sobre la línea, el nombre en negrita y la
  * cédula ("Ci: 14.985.239"). En el finiquito va además quién es cada uno (EL CLIENTE, EL GESTOR).
  */
-function firmas(partes: { nombre: string; cedula: string; firma?: FirmaImagen | null; rol?: string }[]): (Paragraph | Table)[] {
+function firmas(partes: { nombre: string; cedula: string; firma?: FirmaImagen | null; rol?: string }[], anchoTabla = 100): (Paragraph | Table)[] {
   const sinBorde = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
   const celda = (p: (typeof partes)[number]) =>
     new TableCell({
-      width: { size: 50, type: WidthType.PERCENTAGE },
+      width: { size: Math.floor(100 / partes.length), type: WidthType.PERCENTAGE },
       borders: { top: sinBorde, bottom: sinBorde, left: sinBorde, right: sinBorde },
       children: [
         // la firma, o el espacio para firmar a mano
@@ -149,7 +159,7 @@ function firmas(partes: { nombre: string; cedula: string; firma?: FirmaImagen | 
         ...(p.rol ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: p.rol, bold: true, font: FUENTE, size: 20 })] })] : []),
       ],
     });
-  return [new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [new TableRow({ children: partes.map(celda) })] })];
+  return [new Table({ width: { size: anchoTabla, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, rows: [new TableRow({ children: partes.map(celda) })] })];
 }
 
 function celdaTabla(texto: string, negrita = false, fondo?: string) {
@@ -208,6 +218,7 @@ function finiquito(d: DatosDocumento, f: Finiquito): (Paragraph | Table)[] {
     ),
     ...firmas([
       { nombre: d.comitente.nombre, cedula: d.comitente.cedula, firma: d.firmaComitente, rol: "EL CLIENTE" },
+      ...(d.titular?.nombre.trim() ? [{ nombre: d.titular.nombre, cedula: d.titular.cedula, firma: d.firmaTitular, rol: "TITULAR DE LA CUENTA" }] : []),
       { nombre: d.comisionista.nombre, cedula: d.comisionista.cedula, firma: d.firmaComisionista, rol: "EL GESTOR" },
     ]),
   ];
@@ -223,4 +234,15 @@ export async function generarDocumento(d: DatosDocumento): Promise<Blob> {
     sections: [{ properties: { page: { margin: { top: 1418, bottom: 1418, left: 1418, right: 1418 } } }, children: hijos }],
   });
   return Packer.toBlob(doc);
+}
+
+/** Arma el Word y lo descarga con ese nombre de archivo. */
+export async function descargarContrato(d: DatosDocumento, nombreArchivo: string) {
+  const blob = await generarDocumento(d);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombreArchivo;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }

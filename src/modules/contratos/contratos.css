@@ -1,0 +1,67 @@
+/* ---------- Módulo Contratos ---------- */
+.ct-pagina { min-height: 100vh; background: #f3f5f9; padding-bottom: 40px; }
+.ct-cabeza { display: flex; align-items: center; gap: 14px; margin: 18px 40px 0; padding: 18px 22px; border-radius: 14px; background: var(--color-navy, #0b2545); color: white; }
+.ct-cabeza h1 { margin: 0; font-size: 1.4rem; }
+.ct-cabeza p { margin: 2px 0 0; font-size: 0.86rem; color: #cbd5e1; }
+.ct-barra { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 16px 40px 10px; }
+.ct-pestanas { display: flex; flex-wrap: wrap; gap: 6px; }
+.ct-pestanas button { padding: 8px 14px; border: 1px solid #cfd6e0; border-radius: 999px; background: white; font: inherit; font-size: 0.88rem; cursor: pointer; }
+.ct-pestanas button.activo { background: var(--color-navy, #0b2545); border-color: var(--color-navy, #0b2545); color: white; font-weight: 600; }
+.ct-buscar { display: flex; align-items: center; gap: 6px; min-width: 260px; padding: 0 10px; border: 1px solid #cfd6e0; border-radius: 8px; background: white; }
+.ct-buscar input { flex: 1; padding: 8px 0; border: none; outline: none; font: inherit; }
+.ct-error, .ct-aviso { margin: 0 40px 10px; }
+.ct-aviso { padding: 8px 12px; border-radius: 8px; background: #ecfdf5; color: #065f46; font-weight: 600; }
+.ct-tabla { margin: 0 40px; overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 10px; background: white; }
+.ct-tabla table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.ct-tabla th { text-align: left; padding: 9px 10px; background: #f3f5f9; font-size: 0.74rem; text-transform: uppercase; color: #4b5563; }
+.ct-tabla td { padding: 9px 10px; border-top: 1px solid #eef0f4; vertical-align: middle; }
+.ct-tabla td small { display: block; color: #6b7280; font-size: 0.75rem; }
+.ct-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; white-space: nowrap; }
+.ct-marcas { display: flex; flex-wrap: wrap; gap: 4px; }
+.ct-marca { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px; font-size: 0.74rem; font-weight: 600; }
+.ct-marca.si { background: #dcfce7; color: #166534; }
+.ct-marca.no { background: #fef3c7; color: #92400e; }
+.ct-boton { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid #cfd6e0; border-radius: 6px; background: white; font: inherit; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
+.ct-tenue { color: #9ca3af; }
+.ct-vacio { padding: 22px; text-align: center; color: #6b7280; }
+.ct-estado { padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
+.ct-estado.firmado { background: #dcfce7; color: #166534; }
+.ct-estado.pendiente { background: #dbeafe; color: #1e40af; }
+.ct-estado.vencido { background: #f3f4f6; color: #6b7280; }
+.ct-empresa { display: flex; align-items: center; gap: 12px; margin: 0 40px 12px; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: white; font-size: 0.86rem; }
+.ct-empresa img { height: 44px; max-width: 180px; object-fit: contain; }
+.ct-firmas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 0 40px; }
+.ct-firma { position: relative; display: grid; gap: 3px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: white; }
+.ct-firma img { width: 100%; height: 80px; object-fit: contain; border-bottom: 1px solid #9ca3af; margin-bottom: 6px; }
+.ct-firma b { font-size: 0.9rem; }
+.ct-firma small { font-size: 0.76rem; color: #4b5563; }
+.ct-quitar { position: absolute; top: 8px; right: 8px; padding: 4px; border: none; background: none; color: #9ca3af; cursor: pointer; }
+.ct-quitar:hover { color: #b91c1c; }
+@media (max-width: 760px) {
+  .ct-cabeza, .ct-barra, .ct-tabla, .ct-firmas, .ct-empresa, .ct-error, .ct-aviso { margin-left: 12px; margin-right: 12px; }
+}
+
+/* ---------- Página pública para firmar con el link (teléfono) ---------- */
+.fp-pagina { min-height: 100vh; display: grid; place-items: start center; padding: 18px 12px; background: #eef2f7; }
+.fp-caja { width: min(520px, 100%); display: grid; gap: 12px; padding: 18px; border-radius: 16px; background: white; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12); }
+.fp-caja header { display: flex; align-items: center; gap: 10px; color: var(--color-navy, #0b2545); }
+.fp-caja h1 { margin: 0; font-size: 1.25rem; }
+.fp-caja header p { margin: 0; font-size: 0.82rem; color: #6b7280; }
+.fp-texto { margin: 0; font-size: 0.92rem; color: #374151; line-height: 1.45; }
+.fp-caja label { display: grid; gap: 4px; font-size: 0.82rem; font-weight: 600; color: #374151; }
+.fp-caja input:not([type="checkbox"]) { padding: 11px 12px; border: 1px solid #cfd6e0; border-radius: 8px; font: inherit; font-size: 1rem; }
+.fp-caja input[readonly] { background: #f3f5f9; }
+.fp-firma { display: grid; gap: 6px; }
+.fp-firma > span { font-size: 0.82rem; font-weight: 600; color: #374151; }
+.fp-firma img { width: 100%; height: 130px; object-fit: contain; border-bottom: 1px solid #9ca3af; }
+.fp-acepto { display: flex !important; align-items: flex-start; gap: 8px; font-weight: 500 !important; line-height: 1.35; }
+.fp-acepto input { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+.fp-enviar { padding: 14px; border: none; border-radius: 10px; background: var(--color-navy, #0b2545); color: white; font: inherit; font-size: 1.02rem; font-weight: 700; cursor: pointer; }
+.fp-enviar:disabled { opacity: 0.5; }
+.fp-secundario { justify-self: start; padding: 7px 12px; border: 1px solid #cfd6e0; border-radius: 8px; background: white; font: inherit; font-size: 0.84rem; }
+.fp-error { margin: 0; padding: 10px 12px; border-radius: 8px; background: #fef2f2; color: #b91c1c; font-size: 0.9rem; }
+.fp-cargando { color: #6b7280; }
+.fp-vence { font-size: 0.75rem; color: #6b7280; text-align: center; }
+.fp-listo { display: grid; justify-items: center; gap: 6px; padding: 20px 0; text-align: center; color: #166534; }
+.fp-listo h2 { margin: 0; }
+.fp-listo p { margin: 0; color: #374151; }
