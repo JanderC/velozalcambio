@@ -3,7 +3,29 @@ import { Check, MoreHorizontal, Plus } from "lucide-react";
 import type { BancoDelSistema } from "../../api/capital.api";
 import { formatearMonto, leerNumero } from "../../utils/montos";
 import type { AccionBanco } from "./BancoAccionModal";
-import { textoDato } from "./DatosBancoModal";
+import { BANCOS_VE, textoDato } from "./DatosBancoModal";
+import logoBdv from "../../assets/bancos/bdv.png";
+
+// El logo de cada banco de Venezuela (por su código); los que no tienen, sus iniciales
+const LOGOS: Record<string, string> = { "0102": logoBdv };
+const CORTOS: Record<string, string> = { "0102": "BDV", "0108": "BBVA", "0134": "BAN", "0105": "MER", "0191": "BNC", "0172": "BAM", "0114": "BCB", "0174": "BPL" };
+
+/** Una cuenta de bolívares en una fila: el banco (logo), sus últimos 4 dígitos y el pago móvil. */
+function identidadBs(b: BancoDelSistema) {
+  const cuenta = b.datos?.find((d) => d.tipo === "CUENTA");
+  const pago = b.datos?.find((d) => d.tipo === "PAGO_MOVIL");
+  const codigo = cuenta?.banco ?? pago?.banco ?? null;
+  return {
+    codigo,
+    banco: codigo ? (BANCOS_VE.find(([c]) => c === codigo)?.[1] ?? codigo) : null,
+    digitos: cuenta?.numero ? cuenta.numero.slice(-4) : null,
+    pagoMovil: pago?.telefono ? `0${pago.telefono.slice(0, 3)}-${pago.telefono.slice(3)}` : null,
+  };
+}
+function LogoBanco({ codigo }: { codigo: string | null }) {
+  if (codigo && LOGOS[codigo]) return <img className="cap-logo-banco" src={LOGOS[codigo]} alt="" aria-hidden="true" />;
+  return <span className="cap-logo-banco cap-logo-iniciales">{(codigo && CORTOS[codigo]) ?? "Bs"}</span>;
+}
 
 const pesos = (n: number) => `${n < 0 ? "−" : ""}$${formatearMonto(String(Math.round(Math.abs(n))))}`;
 const conDecimales = (n: number) => `${n < 0 ? "−" : ""}${formatearMonto(Math.abs(n).toFixed(2))}`;
@@ -116,7 +138,8 @@ export function CuadroBancos({
           <thead>
             <tr>
               <th>Cuenta</th>
-              <th className="num">Sistema</th>
+              {moneda === "VES" && <th>Nº de cuenta</th>}
+              <th className="num">{moneda === "VES" ? "Hay" : "Sistema"}</th>
               {!soloLectura && <th className="num">Cierre</th>}
               {!soloLectura && <th />}
             </tr>
@@ -127,12 +150,27 @@ export function CuadroBancos({
               const escrito = cierre[b.id]?.trim() ? leerNumero(cierre[b.id]!) : null;
               const diferencia = escrito !== null ? Number(escrito) - enSistema : 0;
               return (
-                <tr key={b.id}>
-                  <td className="cap-banco-nombre">
-                    {b.nombre}
-                    {/* con qué se reconoce en los captures de Confirmaciones */}
-                    {!!b.datos?.length && <small className="cap-banco-datos">{b.datos.map((d) => textoDato(d)).join(" · ")}</small>}
-                  </td>
+                <tr key={b.id} className={moneda === "VES" ? "cap-fila-bs" : ""}>
+                  {moneda === "VES" ? (
+                    (() => {
+                      const id = identidadBs(b);
+                      return (
+                        <>
+                          <td className="cap-banco-nombre cap-bs-cuenta" title={[id.banco, id.pagoMovil ? `Pago móvil ${id.pagoMovil}` : null].filter(Boolean).join(" · ") || undefined}>
+                            <LogoBanco codigo={id.codigo} />
+                            <span>{b.nombre}</span>
+                          </td>
+                          <td className="cap-bs-digitos">{id.digitos ? <b>···· {id.digitos}</b> : <span className="cap-bs-sin">sin dígitos</span>}</td>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <td className="cap-banco-nombre">
+                      {b.nombre}
+                      {/* con qué se reconoce en los captures de Confirmaciones */}
+                      {!!b.datos?.length && <small className="cap-banco-datos">{b.datos.map((d) => textoDato(d)).join(" · ")}</small>}
+                    </td>
+                  )}
                   <td className="num">{fmt(enSistema)}</td>
                   {!soloLectura && (
                     <td className="num cap-banco-cierre">
@@ -161,14 +199,14 @@ export function CuadroBancos({
             })}
             {bancos.length === 0 && (
               <tr>
-                <td colSpan={4} className="cap-vacio">
+                <td colSpan={5} className="cap-vacio">
                   Todavía no hay cuentas.
                 </td>
               </tr>
             )}
             {!soloLectura && (
               <tr className="cap-agregar">
-                <td colSpan={4}>
+                <td colSpan={5}>
                   <button type="button" onClick={onCrear}>
                     <Plus size={13} /> Agregar cuenta
                   </button>
@@ -178,7 +216,8 @@ export function CuadroBancos({
           </tbody>
           <tfoot>
             <tr>
-              <td>Total en las cuentas</td>
+              <td>{moneda === "VES" ? `Hay en total (${bancos.length} ${bancos.length === 1 ? "cuenta" : "cuentas"})` : "Total en las cuentas"}</td>
+              {moneda === "VES" && <td />}
               <td className="num">{fmt(total)}</td>
               {!soloLectura && <td className="num">{escritos.length ? fmt(totalCierre) : ""}</td>}
               {!soloLectura && <td />}
@@ -186,6 +225,7 @@ export function CuadroBancos({
             {moneda === "VES" && (
               <tr className="cap-fila-oscura">
                 <td>En pesos {tasaAPesos ? `(× ${formatearMonto(String(tasaAPesos))})` : "(falta la tasa)"}</td>
+                <td />
                 <td className="num">{pesos(total * (tasaAPesos ?? 0))}</td>
                 {!soloLectura && <td />}
                 {!soloLectura && <td />}

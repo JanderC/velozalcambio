@@ -353,3 +353,12 @@ td .cap-menu { margin-left: 6px; }
 .cap-ficha-vista.bien small { color: #166534; font-weight: 600; }
 .cap-ficha-vista.mal { border-color: #fca5a5; background: #fef2f2; }
 .cap-ficha-vista.mal small { color: #b91c1c; font-weight: 600; }
+
+/* Bolívares: una fila por cuenta con el logo del banco y sus últimos 4 dígitos */
+.cap-fila-bs td { vertical-align: middle; }
+.cap-bs-cuenta { display: flex; align-items: center; gap: 9px; }
+.cap-logo-banco { width: 26px; height: 26px; flex: none; border-radius: 6px; object-fit: contain; background: white; }
+.cap-logo-iniciales { display: grid; place-items: center; background: #eef1f6; color: #374151; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.02em; }
+.cap-bs-digitos { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; color: #111827; }
+.cap-bs-digitos b { font-size: 0.95rem; letter-spacing: 0.04em; }
+.cap-bs-sin { font-family: inherit; font-size: 0.74rem; color: #b45309; }
