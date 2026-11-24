@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Copy, FileText, Link2, MessageCircle, RefreshCw } from "lucide-react";
+import { FileText, Link2, RefreshCw } from "lucide-react";
 import { Modal } from "../../../components/common/Modal";
 import { ApiError } from "../../../api/client";
 import { getMovimientosCuentaCorriente, type CuentaCorrienteResumen, type MovimientoCC } from "../../../api/cuentasCorrientes.api";
-import { contratosApi, urlDeFirma, type Firma, type LinkFirma } from "../../../api/contratos.api";
+import { contratosApi, type Firma, type LinkFirma } from "../../../api/contratos.api";
 import { leerNumero } from "../../../utils/montos";
 import { descargarContrato, type Finiquito, type Parte } from "./documentoContrato";
 import { FirmaControl, firmaParaWord } from "./FirmaControl";
+import { CajaLink } from "./CajaLink";
 
 const PARTE_VACIA: Parte = { nombre: "", cedula: "", rif: "", ciudad: "", municipio: "", estado: "Táchira" };
 const CLAVE_EMPRESA = "contrato-comisionista";
@@ -43,42 +44,6 @@ const codigoOperacion = (m: MovimientoCC) => {
 };
 const soloDigitos = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "");
 
-/** El link para firmar, con copiar y mandarlo por WhatsApp. */
-function CajaLink({ link, telefono, para }: { link: LinkFirma; telefono?: string | null; para: string }) {
-  const url = urlDeFirma(link.token);
-  const [copiado, setCopiado] = useState(false);
-  const texto = `Hola ${para.split(/\s+/)[0]}, para el contrato de Pago Veloz al Cambio necesitamos tu firma. Ábrelo y firma con el dedo: ${url}`;
-  const tel = soloDigitos(telefono);
-  return (
-    <div className={`cc-link-firma ${link.estado === "FIRMADO" ? "firmado" : ""}`}>
-      <span>
-        {link.estado === "FIRMADO" ? "✓ Firmado desde el link" : link.estado === "VENCIDO" ? "El link venció" : "Link para firmar (pendiente)"}
-      </span>
-      {link.estado === "PENDIENTE" && (
-        <>
-          <input value={url} readOnly onFocus={(e) => e.target.select()} aria-label="Link para firmar" />
-          <div className="cc-firma-botones">
-            <button
-              type="button"
-              onClick={() => {
-                void navigator.clipboard?.writeText(url).then(() => {
-                  setCopiado(true);
-                  setTimeout(() => setCopiado(false), 2500);
-                });
-              }}
-            >
-              <Copy size={13} /> {copiado ? "¡Copiado!" : "Copiar"}
-            </button>
-            <a className="cc-link-wa" href={`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer">
-              <MessageCircle size={13} /> Mandar por WhatsApp
-            </a>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 /**
  * Contrato de comisión y finiquito del cliente, en Word, con las firmas guardadas en el sistema:
  *  - la del cliente y la del titular de la cuenta que recibe: se cargan aquí (subir o dibujar) o se les manda un link
@@ -111,9 +76,19 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
   const [titularElegido, setTitularElegido] = useState<number | "nuevo" | "">("");
   const [nuevo, setNuevo] = useState({ nombre: "", cedula: "", numeroCuenta: "", banco: "Bancolombia" });
   const [ocupado, setOcupado] = useState<string | null>(null);
+  // EL COMISIONISTA: la empresa (firma general) o el titular de la cuenta donde depositó el cliente
+  const [comisionistas, setComisionistas] = useState<Firma[]>([]);
+  const [comisionistaId, setComisionistaId] = useState<number | "">("");
+  const comisionista = comisionistas.find((c) => c.id === comisionistaId) ?? null;
 
   const cargarFirmas = useCallback(async () => {
-    const [deCliente, deEmpresa, susLinks] = await Promise.all([contratosApi.firmas({ terceroId }), contratosApi.firmas({ tipo: "EMPRESA" }), contratosApi.links({ terceroId })]);
+    const [deCliente, deEmpresa, susLinks, titularesCuentas] = await Promise.all([
+      contratosApi.firmas({ terceroId }),
+      contratosApi.firmas({ tipo: "EMPRESA" }),
+      contratosApi.links({ terceroId }),
+      contratosApi.firmas({ tipo: "COMISIONISTA" }).catch(() => [] as Firma[]),
+    ]);
+    setComisionistas(titularesCuentas);
     setFirmaCliente(deCliente.find((x) => x.tipo === "CLIENTE") ?? null);
     setTitulares(deCliente.filter((x) => x.tipo === "TITULAR"));
     setFirmaEmpresa(deEmpresa[0] ?? null);
@@ -201,11 +176,36 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
 
   function elegir(m: MovimientoCC) {
     setMovId(m.id);
+    void contratosApi
+      .cuentaDeMovimiento(m.id)
+      .then(({ cajaId }) => setCajaOperacion(cajaId))
+      .catch(() => setCajaOperacion(null));
     const partes = (m.descripcion ?? "").split(" · ");
     const enBs = /bol[ií]var|bs\b|pago m[oó]vil/i.test(m.descripcion ?? "") || cuenta.canal_nombre === "BOLIVARES";
     setF((x) => ({ ...x, referencia: partes[1] ?? "", bolivares: enBs && m.cantidad_base ? bonito(Number(m.cantidad_base)) : "", subtotal: cuenta.moneda_codigo === "COP" ? bonito(Number(m.monto), 0) : "" }));
   }
   const mov = movimientos?.find((m) => m.id === movId) ?? null;
+  // la cuenta de la empresa donde entró la plata de la operación elegida
+  const [cajaOperacion, setCajaOperacion] = useState<number | null>(null);
+  useEffect(() => {
+    if (!cajaOperacion) return;
+    const suyo = comisionistas.find((c) => c.caja_id === cajaOperacion);
+    if (suyo) setComisionistaId(suyo.id);
+  }, [cajaOperacion, comisionistas]);
+  // el comisionista elegido llena los datos de EL COMISIONISTA
+  useEffect(() => {
+    if (!comisionista) return;
+    setEmpresa({
+      nombre: comisionista.nombre,
+      cedula: comisionista.cedula ?? "",
+      rif: comisionista.datos?.rif ?? "",
+      ciudad: comisionista.datos?.ciudad ?? "",
+      municipio: comisionista.datos?.municipio ?? "",
+      estado: comisionista.datos?.estado ?? "Táchira",
+    });
+  }, [comisionista]);
+  // la firma que va como EL COMISIONISTA: la del titular de la cuenta, o la general de la empresa
+  const firmaComisionista = comisionista ?? firmaEmpresa;
 
   const calc = useMemo(() => {
     const bs = num(f.bolivares);
@@ -228,7 +228,7 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
     if (empresa.nombre.trim().length < 3 || !empresa.cedula.trim()) return setError("Faltan los datos del comisionista (nombre y cédula de quien firma por la empresa).");
     if (conFiniquito && !mov) return setError("Elegí la operación para el finiquito (o quitá el finiquito).");
     if (titularElegido === "nuevo") return setError("El titular nuevo todavía no firmó: mandale el link, cargá su firma, o elegí 'Recibe el mismo cliente'.");
-    guardar(CLAVE_EMPRESA, empresa);
+    if (!comisionista) guardar(CLAVE_EMPRESA, empresa);
     guardar(claveCliente(terceroId), { rif: cliente.rif, ciudad: cliente.ciudad, municipio: cliente.municipio, estado: cliente.estado, cedula: cliente.cedula });
     const finiquito: Finiquito | null =
       conFiniquito && mov
@@ -265,7 +265,7 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
         datos: { comitente: cliente, comisionista: empresa, titular: datosTitular, finiquito },
         firmaClienteId: firmaCliente?.id ?? null,
         firmaTitularId: titular?.id ?? null,
-        firmaEmpresaId: firmaEmpresa?.id ?? null,
+        firmaEmpresaId: firmaComisionista?.id ?? null,
       });
       await descargarContrato(
         {
@@ -273,7 +273,7 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
           comisionista: empresa,
           titular: datosTitular,
           firmaComitente: await firmaParaWord(firmaCliente?.imagen ?? null),
-          firmaComisionista: await firmaParaWord(firmaEmpresa?.imagen ?? null),
+          firmaComisionista: await firmaParaWord(firmaComisionista?.imagen ?? null),
           firmaTitular: await firmaParaWord(titular?.imagen ?? null),
           finiquito,
         },
@@ -315,7 +315,20 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
           </div>
         </fieldset>
         <fieldset>
-          <legend>La empresa (EL COMISIONISTA) · queda recordado</legend>
+          <legend>EL COMISIONISTA</legend>
+          <label className="cc-comisionista-elegir">
+            Firma como EL COMISIONISTA
+            <select value={comisionistaId} onChange={(e) => setComisionistaId(e.target.value ? Number(e.target.value) : "")}>
+              <option value="">La empresa (datos y firma general)</option>
+              {comisionistas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Titular de {c.caja_nombre ?? "una cuenta"}: {c.nombre}
+                  {cajaOperacion && c.caja_id === cajaOperacion ? " (aquí depositó el cliente)" : ""}
+                </option>
+              ))}
+            </select>
+            {comisionistas.length === 0 && <small>Ninguna cuenta tiene todavía la firma de su titular: se carga en Capital de giros → ⋯ de la cuenta → “Titular y firma (contratos)”.</small>}
+          </label>
           <div className="cc-contrato-grilla">
             {campoParte(empresa, setEmpresa, "nombre", "Nombre de quien firma")}
             {campoParte(empresa, setEmpresa, "cedula", "Cédula")}
@@ -385,7 +398,17 @@ export function ContratoClienteModal({ cuenta, onCerrar }: { cuenta: CuentaCorri
             </div>
             {/* la empresa */}
             <div className="cc-firma-col">
-              <FirmaControl titulo="Firma de la empresa" valor={firmaEmpresa?.imagen ?? null} onCambio={(v) => void guardarFirmaDe("EMPRESA", v, firmaEmpresa)} ayuda="Una sola: se repite en todos los contratos." />
+              {comisionista ? (
+                <div className="cc-firma">
+                  <span className="cc-firma-titulo">Firma de EL COMISIONISTA</span>
+                  <img className="cc-firma-vista" src={comisionista.imagen} alt={`Firma de ${comisionista.nombre}`} />
+                  <small>
+                    {comisionista.nombre} · titular de {comisionista.caja_nombre}. Se cambia en Capital de giros.
+                  </small>
+                </div>
+              ) : (
+                <FirmaControl titulo="Firma de la empresa" valor={firmaEmpresa?.imagen ?? null} onCambio={(v) => void guardarFirmaDe("EMPRESA", v, firmaEmpresa)} ayuda="Una sola: se repite en todos los contratos." />
+              )}
             </div>
           </div>
         </fieldset>

@@ -809,3 +809,7 @@ label.cc-sin-comision:has(input:checked) { color: #9a3412; font-weight: 600; }
 .cc-titular-nuevo { display: grid; gap: 6px; }
 .cc-titular-nuevo > input { padding: 7px 9px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.86rem; }
 @media (max-width: 960px) { .cc-firmas-3 { grid-template-columns: 1fr; } }
+
+.cc-comisionista-elegir { display: grid; gap: 4px; font-size: 0.8rem; font-weight: 700; color: #374151; }
+.cc-comisionista-elegir select { padding: 7px 8px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-size: 0.86rem; font-weight: 400; }
+.cc-comisionista-elegir small { font-weight: 400; color: #92400e; }

@@ -5,8 +5,9 @@ import { capitalApi, type BancoDelSistema, type MovimientoBanco } from "../../ap
 import { formatearMonto, leerNumero } from "../../utils/montos";
 import { DatosBancoModal } from "./DatosBancoModal";
 import { LibroBancoModal } from "./LibroBancoModal";
+import { TitularCuentaModal } from "./TitularCuentaModal";
 
-export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo" | "datos" | "libro" | "editar";
+export type AccionBanco = "movimiento" | "traslado" | "renombrar" | "historial" | "saldo" | "datos" | "libro" | "editar" | "titular";
 
 /** Lo que se va escribiendo, con los puntos de miles puestos solos y decimales con coma. */
 function conPuntos(escrito: string) {
@@ -98,6 +99,7 @@ export function BancoAccionModal({
 
   if (accion === "datos") return <DatosBancoModal banco={banco} onCambio={() => onCambio?.()} onCerrar={onCerrar} />;
 
+  if (accion === "titular") return <TitularCuentaModal banco={banco} onCerrar={onCerrar} />;
   if (accion === "libro") return <LibroBancoModal banco={banco} onCambio={() => onCambio?.()} onCerrar={onCerrar} />;
   if (accion === "historial") {
     return (

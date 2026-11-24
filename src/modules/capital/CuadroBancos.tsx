@@ -70,6 +70,9 @@ export function MenuBanco({ onAccion }: { onAccion: (a: AccionBanco) => void }) 
         <button type="button" onClick={(e) => elegir(e, "saldo")}>
           Cargar saldo real
         </button>
+        <button type="button" onClick={(e) => elegir(e, "titular")}>
+          Titular y firma (contratos)
+        </button>
         <button type="button" onClick={(e) => elegir(e, "editar")}>
           Editar cuenta (4 dígitos, pago móvil)
         </button>

@@ -17,6 +17,11 @@ export function FirmarPage() {
   const [nombre, setNombre] = useState("");
   const [cedula, setCedula] = useState("");
   const [cuenta, setCuenta] = useState("");
+  // el titular de una cuenta de la empresa (EL COMISIONISTA): sus datos van en el contrato
+  const [rif, setRif] = useState("");
+  const [ciudad, setCiudad] = useState("");
+  const [municipio, setMunicipio] = useState("");
+  const [estado, setEstado] = useState("Táchira");
   const [firma, setFirma] = useState<string | null>(null);
   const [dibujando, setDibujando] = useState(true);
   const [acepto, setAcepto] = useState(false);
@@ -39,11 +44,18 @@ export function FirmarPage() {
     if (!firma) return setError("Firmá en el recuadro.");
     if (nombre.trim().split(/\s+/).length < 2) return setError("Escribí tu nombre y apellido.");
     if (!cedula.replace(/\D/g, "")) return setError("Escribí tu número de cédula.");
+    if (info?.tipo === "COMISIONISTA" && !ciudad.trim()) return setError("Escribí la ciudad donde vivís (va en el contrato).");
     if (!acepto) return setError("Marcá que estás de acuerdo para firmar.");
     setError(null);
     setEnviando(true);
     try {
-      await contratosApi.firmarPublico(token, { imagen: firma, nombre: nombre.trim(), cedula: cedula.trim(), numeroCuenta: cuenta.trim() || undefined });
+      await contratosApi.firmarPublico(token, {
+        imagen: firma,
+        nombre: nombre.trim(),
+        cedula: cedula.trim(),
+        numeroCuenta: cuenta.trim() || undefined,
+        ...(info?.tipo === "COMISIONISTA" ? { datos: { rif: rif.trim() || null, ciudad: ciudad.trim() || null, municipio: municipio.trim() || null, estado: estado.trim() || null } } : {}),
+      });
       setListo(true);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "No se pudo guardar la firma. Probá de nuevo.");
@@ -53,6 +65,7 @@ export function FirmarPage() {
   }
 
   const esTitular = info?.tipo === "TITULAR";
+  const esComisionista = info?.tipo === "COMISIONISTA";
   return (
     <div className="fp-pagina">
       <div className="fp-caja">
@@ -75,7 +88,12 @@ export function FirmarPage() {
         ) : (
           <>
             <p className="fp-texto">
-              {esTitular ? (
+              {esComisionista ? (
+                <>
+                  Vas a firmar como <b>titular de la cuenta {info.cuenta}</b> de Pago Veloz al Cambio. Tu firma y tus datos van como <b>EL COMISIONISTA</b> en los contratos de comisión con los
+                  clientes que depositan en esa cuenta.
+                </>
+              ) : esTitular ? (
                 <>
                   Vas a firmar como <b>titular de la cuenta que recibe el dinero</b>
                   {info.cliente ? (
@@ -95,12 +113,32 @@ export function FirmarPage() {
             </p>
             <label>
               Nombre y apellido
-              <input value={nombre} onChange={(e) => setNombre(e.target.value)} readOnly={!esTitular && !!info.nombre} autoComplete="name" />
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)} readOnly={!esTitular && !esComisionista && !!info.nombre} autoComplete="name" />
             </label>
             <label>
               Cédula
-              <input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" readOnly={!esTitular && !!info.cedula} placeholder="V-12345678" />
+              <input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" readOnly={!esTitular && !esComisionista && !!info.cedula} placeholder="V-12345678" />
             </label>
+            {esComisionista && (
+              <>
+                <label>
+                  RIF
+                  <input value={rif} onChange={(e) => setRif(e.target.value)} placeholder="J-12.345.678-9" />
+                </label>
+                <label>
+                  Ciudad donde vivís
+                  <input value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="ej. Rubio" />
+                </label>
+                <label>
+                  Municipio
+                  <input value={municipio} onChange={(e) => setMunicipio(e.target.value)} placeholder="ej. Junin" />
+                </label>
+                <label>
+                  Estado
+                  <input value={estado} onChange={(e) => setEstado(e.target.value)} />
+                </label>
+              </>
+            )}
             {esTitular && (
               <label>
                 Número de cuenta donde recibís {info.banco ? `(${info.banco})` : ""}
@@ -131,7 +169,9 @@ export function FirmarPage() {
             </div>
             <label className="fp-acepto">
               <input type="checkbox" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} />
-              Estoy de acuerdo y autorizo que esta firma se use en el contrato y sus finiquitos.
+              {esComisionista
+                ? "Estoy de acuerdo y autorizo que esta firma y mis datos se usen como EL COMISIONISTA en los contratos y finiquitos de los clientes que depositan en esta cuenta."
+                : "Estoy de acuerdo y autorizo que esta firma se use en el contrato y sus finiquitos."}
             </label>
             {error && <p className="fp-error">{error}</p>}
             <button type="button" className="fp-enviar" onClick={() => void enviar()} disabled={enviando || !firma}>

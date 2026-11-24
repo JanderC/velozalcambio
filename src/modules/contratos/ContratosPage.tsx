@@ -7,7 +7,7 @@ import { descargarContrato, type Finiquito, type Parte } from "../cuentasCorrien
 import { firmaParaWord } from "../cuentasCorrientes/contrato/FirmaControl";
 import "./contratos.css";
 
-type Vista = "contratos" | "clientes" | "titulares" | "links";
+type Vista = "contratos" | "clientes" | "titulares" | "cuentas" | "links";
 const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "numeric" });
 const fechaHora = (iso: string) =>
   new Date(iso).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "2-digit", hour: "numeric", minute: "2-digit" });
@@ -34,7 +34,7 @@ export function ContratosPage() {
       if (vista === "contratos") setContratos(await contratosApi.contratos({ buscar: b }));
       else if (vista === "links") setLinks(await contratosApi.links());
       else {
-        const [lista, deEmpresa] = await Promise.all([contratosApi.firmas({ tipo: vista === "clientes" ? "CLIENTE" : "TITULAR", buscar: b }), contratosApi.firmas({ tipo: "EMPRESA" })]);
+        const [lista, deEmpresa] = await Promise.all([contratosApi.firmas({ tipo: vista === "clientes" ? "CLIENTE" : vista === "cuentas" ? "COMISIONISTA" : "TITULAR", buscar: b }), contratosApi.firmas({ tipo: "EMPRESA" })]);
         setFirmas(lista);
         setEmpresa(deEmpresa[0] ?? null);
       }
@@ -111,6 +111,7 @@ export function ContratosPage() {
               ["contratos", "Contratos"],
               ["clientes", "Firmas de clientes"],
               ["titulares", "Firmas de titulares"],
+              ["cuentas", "Titulares de nuestras cuentas"],
               ["links", "Links para firmar"],
             ] as [Vista, string][]
           ).map(([v, t]) => (
@@ -166,7 +167,10 @@ export function ContratosPage() {
                     <b>{c.cliente_nombre}</b>
                     {c.con_finiquito && <small>con finiquito</small>}
                   </td>
-                  <td>{c.titular_nombre ?? <span className="ct-tenue">el mismo cliente</span>}</td>
+                  <td>
+                    {c.titular_nombre ?? <span className="ct-tenue">el mismo cliente</span>}
+                    {c.comisionista_nombre && <small>Comisionista: {c.comisionista_nombre}</small>}
+                  </td>
                   <td className="ct-marcas">
                     {marca(c.firmo_cliente, "Cliente")}
                     {c.titular_nombre && marca(c.firmo_titular, "Titular")}
@@ -185,7 +189,7 @@ export function ContratosPage() {
         </div>
       )}
 
-      {(vista === "clientes" || vista === "titulares") && (
+      {(vista === "clientes" || vista === "titulares" || vista === "cuentas") && (
         <>
           {empresa && vista === "clientes" && (
             <div className="ct-empresa">
@@ -198,7 +202,9 @@ export function ContratosPage() {
             {firmas === null && <p className="ct-vacio">Cargando…</p>}
             {firmas?.length === 0 && (
               <p className="ct-vacio">
-                {vista === "clientes" ? "Todavía no hay firmas de clientes." : "Todavía no hay firmas de titulares."} Se cargan desde el contrato del cliente (subir, dibujar o con el link).
+                {vista === "cuentas"
+                  ? "Ninguna cuenta de la empresa tiene todavía la firma de su titular. Se carga en Capital de giros → ⋯ de la cuenta → “Titular y firma (contratos)”."
+                  : `${vista === "clientes" ? "Todavía no hay firmas de clientes." : "Todavía no hay firmas de titulares."} Se cargan desde el contrato del cliente (subir, dibujar o con el link).`}
               </p>
             )}
             {firmas?.map((f) => (
@@ -212,6 +218,19 @@ export function ContratosPage() {
                   </small>
                 )}
                 {f.tipo === "TITULAR" && f.cliente_nombre && <small>Cliente: {f.cliente_nombre}</small>}
+                {f.tipo === "COMISIONISTA" && (
+                  <>
+                    <small>
+                      <b>Titular de {f.caja_nombre ?? "una cuenta"}</b>
+                    </small>
+                    {(f.datos?.rif || f.datos?.ciudad) && (
+                      <small>
+                        {f.datos?.rif ? `RIF ${f.datos.rif}` : ""}
+                        {f.datos?.ciudad ? ` · ${f.datos.ciudad}` : ""}
+                      </small>
+                    )}
+                  </>
+                )}
                 <small className="ct-tenue">
                   {fecha(f.created_at)} · {f.origen === "LINK" ? "firmó por el link" : "cargada en el sistema"}
                 </small>
@@ -256,7 +275,7 @@ export function ContratosPage() {
               {links?.map((l) => (
                 <tr key={l.id}>
                   <td>{fechaHora(l.created_at)}</td>
-                  <td>{l.tipo === "CLIENTE" ? "Cliente" : "Titular"}</td>
+                  <td>{l.tipo === "CLIENTE" ? "Cliente" : l.tipo === "COMISIONISTA" ? `Titular de ${l.caja_nombre ?? "una cuenta"}` : "Titular"}</td>
                   <td>
                     <b>{l.nombre ?? "—"}</b>
                     {l.cedula && <small>C.I. {l.cedula}</small>}
