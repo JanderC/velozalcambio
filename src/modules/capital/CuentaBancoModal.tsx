@@ -11,6 +11,8 @@ const soloDigitos = (v: string) => v.replace(/\D/g, "");
 const nombreDelBanco = (codigo: string) => BANCOS_VE.find(([c]) => c === codigo)?.[1] ?? "";
 /** 4147320762 -> 0414-7320762 */
 const telefonoBonito = (t: string | null | undefined) => (t && t.length === 10 ? `0${t.slice(0, 3)}-${t.slice(3)}` : (t ?? ""));
+/** 01020123450001238515 -> 0102-0123-45-0001238515 (como lo escriben los bancos de Venezuela) */
+export const cuentaBonita = (n: string) => (n.length === 20 ? `${n.slice(0, 4)}-${n.slice(4, 8)}-${n.slice(8, 10)}-${n.slice(10)}` : n);
 const telefonoNormal = (v: string) => {
   const d = soloDigitos(v);
   return d.length >= 10 ? d.slice(-10) : d;
@@ -63,6 +65,10 @@ export function CuentaBancoModal({
     setError(null);
     if (nombreFinal.length < 2) return setError("Escribí el nombre de la cuenta (o los últimos 4 dígitos para ponerle uno).");
     if (numero && numero.length < 4) return setError("Escribí los últimos 4 dígitos de la cuenta (o el número completo).");
+    // en Venezuela la cuenta tiene 20 dígitos: o completa, o solo los últimos 4
+    if (enBolivares && numero.length > 4 && numero.length !== 20) return setError(`La cuenta completa tiene 20 dígitos (escribiste ${numero.length}). Escribila completa, o solo los últimos 4.`);
+    if (enBolivares && numero.length === 20 && codigo && numero.slice(0, 4) !== codigo)
+      return setError(`Esa cuenta empieza con ${numero.slice(0, 4)} y elegiste el banco ${codigo}: revisá el número o el banco.`);
     if (telefono.trim() && tel.length !== 10) return setError("El teléfono del pago móvil no es válido (ej. 0414-7320762).");
     if (otraConDigitos) return setError(`La cuenta terminada en ${numero.slice(-4)} ya es "${otraConDigitos.nombre}".`);
     if (otraConTelefono) return setError(`Ese pago móvil ya es de "${otraConTelefono.nombre}".`);
@@ -117,15 +123,21 @@ export function CuentaBancoModal({
           </label>
         )}
         <label>
-          Últimos 4 dígitos de la cuenta
+          {enBolivares ? "Número de cuenta completo (para las transferencias)" : "Últimos 4 dígitos de la cuenta"}
           <input
-            value={digitos}
-            onChange={(e) => setDigitos(soloDigitos(e.target.value).slice(0, 20))}
+            value={enBolivares && numero.length === 20 ? cuentaBonita(numero) : digitos}
+            onChange={(e) => {
+              const d = soloDigitos(e.target.value).slice(0, 20);
+              setDigitos(d);
+              // completa: el banco sale de sus primeros 4 dígitos (0102 = Banco de Venezuela)
+              if (enBolivares && d.length === 20 && BANCOS_VE.some(([c]) => c === d.slice(0, 4))) setCodigo(d.slice(0, 4));
+            }}
             inputMode="numeric"
-            placeholder="ej. 8515 (o el número completo)"
+            placeholder={enBolivares ? "0102-0123-45-0001238515 (o solo los últimos 4)" : "ej. 4521 (o el número completo)"}
             autoFocus
-            aria-label="Últimos 4 dígitos de la cuenta"
+            aria-label={enBolivares ? "Número de cuenta completo" : "Últimos 4 dígitos de la cuenta"}
           />
+          {enBolivares && numero.length > 4 && numero.length < 20 && <small className="cap-ficha-falta">Van {numero.length} de 20 dígitos</small>}
         </label>
         <label>
           Nombre de la cuenta
@@ -134,11 +146,11 @@ export function CuentaBancoModal({
         {enBolivares && (
           <div className="cc-modal-fila">
             <label>
-              Pago móvil: teléfono (opcional)
-              <input value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/[^\d\s+-]/g, ""))} inputMode="tel" placeholder="0414-7320762" />
+              Teléfono del pago móvil (para los pagos móviles)
+              <input value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/[^\d\s+-]/g, ""))} inputMode="tel" placeholder="0414-7320762" aria-label="Teléfono del pago móvil" />
             </label>
             <label>
-              Cédula (opcional)
+              Cédula del titular (opcional)
               <input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" placeholder="V-12345678" />
             </label>
           </div>
@@ -156,9 +168,15 @@ export function CuentaBancoModal({
           <span>
             {enBolivares ? "Bolívares" : "Pesos"}
             {enBolivares && codigo ? ` · ${codigo} ${nombreDelBanco(codigo)}` : ""}
-            {numero.length >= 4 ? ` · cuenta ···· ${numero.slice(-4)}` : ""}
-            {enBolivares && tel.length === 10 ? ` · pago móvil ${telefonoBonito(tel)}` : ""}
+            {!enBolivares && numero.length >= 4 ? ` · cuenta ···· ${numero.slice(-4)}` : ""}
           </span>
+          {enBolivares && (
+            <span className="cap-ficha-como">
+              Transferencias: {numero.length === 20 ? <b>{cuentaBonita(numero)}</b> : numero.length === 4 ? <b>cuenta ···· {numero}</b> : <i>falta la cuenta</i>}
+              <br />
+              Pago móvil: {tel.length === 10 ? <b>{telefonoBonito(tel)}{soloDigitos(cedula) ? ` · C.I. ${soloDigitos(cedula)}` : ""}</b> : <i>falta el teléfono</i>}
+            </span>
+          )}
           {otraConDigitos ? (
             <small>
               <AlertTriangle size={13} /> La cuenta terminada en {numero.slice(-4)} ya es “{otraConDigitos.nombre}”.

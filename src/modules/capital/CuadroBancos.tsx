@@ -19,6 +19,7 @@ function identidadBs(b: BancoDelSistema) {
     codigo,
     banco: codigo ? (BANCOS_VE.find(([c]) => c === codigo)?.[1] ?? codigo) : null,
     digitos: cuenta?.numero ? cuenta.numero.slice(-4) : null,
+    completa: cuenta?.numero && cuenta.numero.length === 20 ? `${cuenta.numero.slice(0, 4)}-${cuenta.numero.slice(4, 8)}-${cuenta.numero.slice(8, 10)}-${cuenta.numero.slice(10)}` : null,
     pagoMovil: pago?.telefono ? `0${pago.telefono.slice(0, 3)}-${pago.telefono.slice(3)}` : null,
   };
 }
@@ -139,6 +140,7 @@ export function CuadroBancos({
             <tr>
               <th>Cuenta</th>
               {moneda === "VES" && <th>Nº de cuenta</th>}
+              {moneda === "VES" && <th>Pago móvil</th>}
               <th className="num">{moneda === "VES" ? "Hay" : "Sistema"}</th>
               {!soloLectura && <th className="num">Cierre</th>}
               {!soloLectura && <th />}
@@ -160,7 +162,11 @@ export function CuadroBancos({
                             <LogoBanco codigo={id.codigo} />
                             <span>{b.nombre}</span>
                           </td>
-                          <td className="cap-bs-digitos">{id.digitos ? <b>···· {id.digitos}</b> : <span className="cap-bs-sin">sin dígitos</span>}</td>
+                          <td className="cap-bs-digitos" title={id.completa ?? undefined}>
+                            {id.digitos ? <b>···· {id.digitos}</b> : <span className="cap-bs-sin">sin cuenta</span>}
+                            {id.digitos && !id.completa && <small className="cap-bs-incompleta">solo 4 dígitos</small>}
+                          </td>
+                          <td className="cap-bs-telefono">{id.pagoMovil ?? <span className="cap-bs-sin">sin pago móvil</span>}</td>
                         </>
                       );
                     })()
@@ -199,14 +205,14 @@ export function CuadroBancos({
             })}
             {bancos.length === 0 && (
               <tr>
-                <td colSpan={5} className="cap-vacio">
+                <td colSpan={6} className="cap-vacio">
                   Todavía no hay cuentas.
                 </td>
               </tr>
             )}
             {!soloLectura && (
               <tr className="cap-agregar">
-                <td colSpan={5}>
+                <td colSpan={6}>
                   <button type="button" onClick={onCrear}>
                     <Plus size={13} /> Agregar cuenta
                   </button>
@@ -218,6 +224,7 @@ export function CuadroBancos({
             <tr>
               <td>{moneda === "VES" ? `Hay en total (${bancos.length} ${bancos.length === 1 ? "cuenta" : "cuentas"})` : "Total en las cuentas"}</td>
               {moneda === "VES" && <td />}
+              {moneda === "VES" && <td />}
               <td className="num">{fmt(total)}</td>
               {!soloLectura && <td className="num">{escritos.length ? fmt(totalCierre) : ""}</td>}
               {!soloLectura && <td />}
@@ -225,6 +232,7 @@ export function CuadroBancos({
             {moneda === "VES" && (
               <tr className="cap-fila-oscura">
                 <td>En pesos {tasaAPesos ? `(× ${formatearMonto(String(tasaAPesos))})` : "(falta la tasa)"}</td>
+                <td />
                 <td />
                 <td className="num">{pesos(total * (tasaAPesos ?? 0))}</td>
                 {!soloLectura && <td />}
