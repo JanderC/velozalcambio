@@ -131,7 +131,7 @@ export function CuadroBancos({
   }
 
   return (
-    <section className={`cap-bloque ${color} cap-bancos`}>
+    <section className={`cap-bloque ${color} cap-bancos cap-bancos-${moneda.toLowerCase()}`}>
       <h2>{titulo}</h2>
       <div className="cap-tabla">
         <table>

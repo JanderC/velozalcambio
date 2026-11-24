@@ -718,7 +718,7 @@ export function CapitalPage() {
               }}
             />
           )}
-          {/* ---------- Las cuentas de banco: Bancolombia y Nequi, y bolívares, lado a lado ---------- */}
+          {/* ---------- Las cuentas de banco: Bancolombia y Nequi, y abajo bolívares (cada una en su fila) ---------- */}
           <CuadroBancos
             titulo="Bancolombia y Nequi"
             color="cian"
