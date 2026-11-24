@@ -46,6 +46,7 @@ import { sugerenciasDeTasa, useTablero } from "../tasas/tablero";
 import { METODOS, comisionPara, detectarMetodo, esFacturaBancolombia, formulaDeOperacion, nombreMetodo, referenciaDelMetodo, sigueLaRegla, tasaDeOperacion, tasaDelMetodo, type Metodo } from "./metodoPago";
 import { escrita } from "../tasas/tablero";
 import { AvisoGuardarTasa, ChipsTasaDelDia, decidirTasaUsada, type PropuestaTasa } from "../tasas/TasasDelDia";
+import { envioPropuesto } from "./comisionesBolivares";
 import { PAGO_POR_TAQUILLA, PagoConfirmacion, avisoDePagada, avisoDePagoParcial, montoParte, type PagoElegido } from "./PagoConfirmacion";
 import { VariasTransferencias, calcularResumen, progresoMeta, textoProgreso, transferenciaVacia, type DestinoVarias, type FormulaGeneral, type Transferencia } from "./VariasTransferencias";
 import { RepartoMonedas, calcularParte, dineroEn, partesIniciales, type ParteReparto } from "./RepartoMonedas";
@@ -2476,7 +2477,7 @@ function FilaNueva({
       let pagadaPor: string | null = null;
       if (pagarCon) {
         try {
-          await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarCon.cajaId!);
+          await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarCon.cajaId!, pagarCon.bolivares ? (pagarCon.envio ?? "P2P") : undefined);
           pagadaPor = pagarCon.nombre;
         } catch (e) {
           setError(`La confirmación quedó registrada, pero no se pudo pagar por ${pagarCon.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);
@@ -2600,7 +2601,7 @@ function FilaNueva({
         let pagadaPorBanco = false;
         if (pagoParte) {
           try {
-            await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagoParte.cajaId);
+            await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagoParte.cajaId, p.moneda === "VES" ? envioPropuesto() : undefined);
             pagadaPorBanco = true;
           } catch (e) {
             noPagadas.push(`${dineroEn(c.total!, p.moneda)} por ${pagoParte.nombre} (${e instanceof ApiError ? e.message : "error de conexión"})`);
@@ -2980,7 +2981,7 @@ function FilaNueva({
       let pagadaPor: string | null = null;
       if (pagarCon) {
         try {
-          await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarCon.cajaId!);
+          await pagarConfirmacionOtroMetodo(creado.movimiento.id, pagarCon.cajaId!, pagarCon.bolivares ? (pagarCon.envio ?? "P2P") : undefined);
           pagadaPor = pagarCon.nombre;
         } catch (e) {
           setError(`La confirmación quedó registrada, pero no se pudo pagar por ${pagarCon.nombre} (${e instanceof ApiError ? e.message : "error de conexión"}): quedó para pagar en taquilla.`);

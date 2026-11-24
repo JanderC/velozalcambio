@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCajas, type Caja } from "../../api/cajas.api";
 import { getMonedas } from "../../api/monedas.api";
+import { ENVIOS_BOLIVARES, TIPOS_ENVIO, comisionBolivares, envioPropuesto, recordarEnvio, type EnvioBolivares } from "./comisionesBolivares";
 import { formatearMonto, leerNumero, sumarDecimales } from "../../utils/montos";
 import { conPuntos } from "../cuentasPorCobrarPagar/NuevoClienteCobrarModal";
 
@@ -15,6 +16,7 @@ export interface PagoElegido {
   cajaId: number | null;
   nombre: string;
   bolivares?: boolean; // se le paga en bolívares por una cuenta de bolívares (pago móvil o transferencia)
+  envio?: EnvioBolivares; // en bolívares: pago móvil P2P/P2C/C2P o transferencia (la comisión del banco sale de la cuenta)
   monto?: string; // "parte": cuánto va por banco, como se escribe (400.000)
 }
 export const PAGO_POR_TAQUILLA: PagoElegido = { modo: "taquilla", cajaId: null, nombre: "" };
@@ -123,7 +125,7 @@ export function PagoConfirmacion({
       if (!cuentasBs || !cuentasBs.length) return;
       if (valor.bolivares && cuentasBs.some((c) => c.id === valor.cajaId)) return;
       const c = cuentaBolivaresPropuesta(cuentasBs)!;
-      onCambio({ modo: "otro", cajaId: c.id, nombre: c.nombre, bolivares: true });
+      onCambio({ modo: "otro", cajaId: c.id, nombre: c.nombre, bolivares: true, envio: valor.envio ?? envioPropuesto() });
     } else if (valor.bolivares) {
       onCambio(PAGO_POR_TAQUILLA); // dejó de ser en bolívares: vuelve a lo de siempre
     }
@@ -183,7 +185,7 @@ export function PagoConfirmacion({
                 const c = cuentasBs.find((x) => String(x.id) === e.target.value);
                 if (!c) return;
                 recordarCuentaBolivares(c.id);
-                onCambio({ modo: "otro", cajaId: c.id, nombre: c.nombre, bolivares: true });
+                onCambio({ modo: "otro", cajaId: c.id, nombre: c.nombre, bolivares: true, envio: valor.envio ?? envioPropuesto() });
               }}
               aria-label="Desde qué cuenta de bolívares se le paga"
             >
@@ -193,7 +195,36 @@ export function PagoConfirmacion({
                 </option>
               ))}
             </select>
-            <small>Queda pagada al agregar y sale de esa cuenta de bolívares.</small>
+            <select
+              value={valor.envio ?? "P2P"}
+              onChange={(e) => {
+                const envio = e.target.value as EnvioBolivares;
+                recordarEnvio(envio);
+                onCambio({ ...valor, envio });
+              }}
+              aria-label="Cómo se le manda (la comisión del banco)"
+            >
+              {TIPOS_ENVIO.map((t) => (
+                <option key={t} value={t}>
+                  {ENVIOS_BOLIVARES[t].etiqueta} ({ENVIOS_BOLIVARES[t].corto})
+                </option>
+              ))}
+            </select>
+            {(() => {
+              const envio = valor.envio ?? "P2P";
+              const n = total ? Number(total) : 0;
+              const comision = n > 0 ? comisionBolivares(n, envio) : 0;
+              return (
+                <small className="cc-comision-bs">
+                  {comision > 0
+                    ? `Comisión del banco: Bs. ${formatearMonto(comision.toFixed(2))}. Sale de esa cuenta aparte del pago (en total salen Bs. ${formatearMonto((n + comision).toFixed(2))}).`
+                    : envio === "TRANSFERENCIA"
+                      ? "Transferencia: sin comisión aparte."
+                      : `La comisión (${ENVIOS_BOLIVARES[envio].corto}) se calcula con el monto.`}{" "}
+                  Queda pagada al agregar.
+                </small>
+              );
+            })()}
           </>
         )}
       </div>

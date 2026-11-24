@@ -412,8 +412,9 @@ export function pagarParteConfirmacion(movimientoId: number, cajaId: number, mon
 }
 
 /** Confirmaciones: le paga al cliente por otro método (no pasa a taquilla), desde una cuenta de la empresa. */
-export function pagarConfirmacionOtroMetodo(movimientoId: number, cajaId: number) {
-  return api.post<{ pagado: true; cuenta: string; pagoId: number }>(`/cuentas-corrientes/movimientos/${movimientoId}/pagar-otro-metodo`, { cajaId });
+/** envio: en bolívares, cómo se le mandó (pago móvil P2P/P2C/C2P o transferencia): el servidor descuenta la comisión del banco. */
+export function pagarConfirmacionOtroMetodo(movimientoId: number, cajaId: number, envio?: "P2P" | "P2C" | "C2P" | "TRANSFERENCIA") {
+  return api.post<{ pagado: true; cuenta: string; pagoId: number; comision?: string | null }>(`/cuentas-corrientes/movimientos/${movimientoId}/pagar-otro-metodo`, { cajaId, envio });
 }
 
 /** Vuelve a activar un movimiento anulado (solo administradores): se quita su contrario y vuelve a contar en el saldo. */
