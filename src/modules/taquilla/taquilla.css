@@ -331,6 +331,7 @@
 .tq-retira input { padding: 8px 10px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-weight: 400; }
 .tq-retira-botones { display: flex; justify-content: flex-end; gap: 8px; }
 .tq-retira-botones button { padding: 8px 16px; border-radius: 6px; border: 1px solid #cfd6e0; background: white; font: inherit; cursor: pointer; }
-.tq-retira-botones .tq-pagar { border: none; }
+.tq-retira-botones .tq-pagar { border: none; background: #1a7f37; color: white; font-weight: 700; padding: 10px 22px; }
+.tq-retira-botones .tq-pagar:hover { background: #14632b; }
 .tq-retira-botones button:disabled { opacity: 0.5; cursor: default; }
 .tqh-retira { display: block; color: #64748b; font-size: 0.78rem; }
