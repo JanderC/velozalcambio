@@ -178,7 +178,10 @@ export function HistorialTaquilla({ nombre, onCerrar }: { nombre: string; onCerr
                   {datos.entregas.map((s) => (
                     <tr key={s.id}>
                       <td className="tqh-fecha">{s.pagado_en ? fechaHora(s.pagado_en) : "—"}</td>
-                      <td>{s.cliente_nombre}</td>
+                      <td>
+                        {s.cliente_nombre}
+                        {(s.retira_nombre || s.retira_cedula) && <small className="tqh-retira">retiró otra persona: {[s.retira_nombre, s.retira_cedula && `C.I. ${s.retira_cedula}`].filter(Boolean).join(" · ")}</small>}
+                      </td>
                       <td>{referenciaDe(s.descripcion)}</td>
                       <td>{textoMedio(s.pagado_medio)}</td>
                       <td>{s.pagado_por_nombre ?? "—"}</td>

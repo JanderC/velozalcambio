@@ -318,3 +318,19 @@
 .tqh-totales { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 10px; border-radius: 8px; background: #f2f7ff; font-size: 0.84rem; color: #374151; }
 .tqh-totales span { display: inline-flex; align-items: center; gap: 4px; }
 .tqh-vacio { color: #6b7280; text-align: center; padding: 12px; }
+
+/* ¿Quién retira? (antes de pagar en efectivo) */
+.tq-retira { display: grid; gap: 10px; min-width: min(420px, 100%); }
+.tq-retira > p { margin: 0; }
+.tq-retira-opcion { display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid #d6dce5; border-radius: 10px; background: white; font: inherit; text-align: left; cursor: pointer; }
+.tq-retira-opcion span { display: grid; gap: 2px; }
+.tq-retira-opcion small { color: #64748b; }
+.tq-retira-opcion.activo { border-color: #16a34a; background: #f0fdf4; }
+.tq-retira fieldset { display: grid; gap: 8px; margin: 0; padding: 10px; border: 1px solid #d6dce5; border-radius: 8px; }
+.tq-retira label { display: grid; gap: 3px; font-size: 0.85rem; font-weight: 600; }
+.tq-retira input { padding: 8px 10px; border: 1px solid #cfd6e0; border-radius: 6px; font: inherit; font-weight: 400; }
+.tq-retira-botones { display: flex; justify-content: flex-end; gap: 8px; }
+.tq-retira-botones button { padding: 8px 16px; border-radius: 6px; border: 1px solid #cfd6e0; background: white; font: inherit; cursor: pointer; }
+.tq-retira-botones .tq-pagar { border: none; }
+.tq-retira-botones button:disabled { opacity: 0.5; cursor: default; }
+.tqh-retira { display: block; color: #64748b; font-size: 0.78rem; }

@@ -21,6 +21,7 @@ import {
   type NumeroTaquilla,
   usarTaquilla,
   type MontosPorMoneda,
+  type QuienRetira,
   type SaldoTaquilla,
   type SolicitudTaquilla,
   type Taquilla,
@@ -31,6 +32,7 @@ import { OperacionesTaquilla } from "./OperacionesTaquilla";
 import { HistorialTaquilla } from "./HistorialTaquilla";
 import { AvisoClienteModal } from "../../components/whatsapp/AvisoClienteModal";
 import { mensajeParaCliente, montoParaMensaje } from "./mensajeCliente";
+import { QuienRetiraModal } from "./QuienRetiraModal";
 import "./taquilla.css";
 
 const NOMBRE_MONEDA: Record<string, string> = { COP: "Pesos", USD: "Dólares", EUR: "Euros" };
@@ -121,20 +123,20 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
   const referenciaDe = (s: SolicitudTaquilla) => (s.descripcion ?? "").split(" · ")[1]?.trim() || null;
 
   // En efectivo descuenta de la caja; por Bancolombia no la toca (solo queda contado arriba)
-  async function pagar(s: SolicitudTaquilla, medio: MedioTaquilla = "EFECTIVO") {
-    const pregunta =
-      medio !== "EFECTIVO"
-        ? `¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} ${textoMedio(medio)}? No se descuenta de la caja.`
-        : `¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} en efectivo? Se descuenta de la caja de taquilla.`;
-    if (!window.confirm(pregunta)) return;
+  // En efectivo primero se pregunta quién retira (el cliente u otra persona, con sus datos)
+  const [porRetirar, setPorRetirar] = useState<SolicitudTaquilla | null>(null);
+  async function pagar(s: SolicitudTaquilla, medio: MedioTaquilla = "EFECTIVO", retira?: QuienRetira | null) {
+    if (medio === "EFECTIVO" && retira === undefined) return setPorRetirar(s);
+    if (medio !== "EFECTIVO" && !window.confirm(`¿Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre} ${textoMedio(medio)}? No se descuenta de la caja.`)) return;
+    setPorRetirar(null);
     setPagando(s.id);
     try {
-      setTaquilla(await pagarSolicitud(s.id, medio));
+      setTaquilla(await pagarSolicitud(s.id, medio, retira ?? null));
       setDetalle(null);
       setError(null);
       setAviso({
         titulo: "Transacción entregada",
-        resumen: `Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre}${medio !== "EFECTIVO" ? ` ${textoMedio(medio)}` : " en efectivo"}.`,
+        resumen: `Se le pagó ${dinero(s.monto, s.moneda_codigo)} a ${s.cliente_nombre}${medio !== "EFECTIVO" ? ` ${textoMedio(medio)}` : " en efectivo"}${retira?.nombre ? `. Retiró ${retira.nombre}` : ""}.`,
         nombre: s.cliente_nombre,
         telefono: s.cliente_telefono,
         moneda: s.moneda_codigo,
@@ -143,7 +145,7 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
           que: "entregada",
           detalle: [`Monto: ${montoParaMensaje(s.monto, s.moneda_codigo)}`, medio === "EFECTIVO" ? "Entregado en efectivo" : `Pagado ${textoMedio(medio)}`],
           referencia: referenciaDe(s),
-          recibe: { nombre: s.cliente_nombre, cedula: s.cliente_cedula, telefono: s.cliente_telefono },
+          recibe: retira?.nombre ? retira : { nombre: s.cliente_nombre, cedula: s.cliente_cedula, telefono: s.cliente_telefono },
         }),
       });
     } catch (e) {
@@ -531,6 +533,9 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
           }}
         />
       )}
+      {porRetirar && (
+        <QuienRetiraModal solicitud={porRetirar} monto={dinero(porRetirar.monto, porRetirar.moneda_codigo)} onPagar={(r) => void pagar(porRetirar, "EFECTIVO", r)} onCerrar={() => setPorRetirar(null)} />
+      )}
       {aviso && (
         <AvisoClienteModal
           titulo={aviso.titulo}
@@ -572,6 +577,7 @@ function DetalleSolicitud({ solicitud: s, accion, onCerrar }: { solicitud: Solic
     ["Envió", s.cantidad_base ? formatearMonto(s.cantidad_base.replace(/^-/, "")) : null],
     [comision ? (s.comision_incluida ? "Comisión (ya sumada en lo enviado)" : "Comisión") : "Tasa", comision ? (/[1-9]/.test(comision) ? `${formatearMonto(comision)}%` : "Sin comisión (familiar o amigo)") : s.tasa ? formatearMonto(s.tasa) : null],
     ["Recibe", dinero(s.monto, s.moneda_codigo)],
+    ["Retiró", s.retira_nombre || s.retira_cedula || s.retira_telefono ? [s.retira_nombre, s.retira_cedula && `C.I. ${s.retira_cedula}`, s.retira_telefono && `Telf. ${s.retira_telefono}`].filter(Boolean).join(" · ") : s.pagado_en && s.pagado_medio === "EFECTIVO" ? "El mismo cliente" : null],
     ["Registrada", `${fechaHora(s.fecha)} por ${s.registrado_por_nombre}`],
     ["Estado", porConfirmar(s) ? "Falta confirmar la transferencia" : s.pagado_en ? `Pagada${s.pagado_caja_nombre ? ` en ${s.pagado_caja_nombre}` : ""} ${textoMedio(s.pagado_medio)} ${fechaHora(s.pagado_en)}${s.pagado_por_nombre ? ` por ${s.pagado_por_nombre}` : ""}` : "Confirmada, por pagar"],
   ];

@@ -56,6 +56,16 @@ export interface SolicitudTaquilla {
   cliente_nombre: string;
   cliente_telefono: string | null;
   cliente_cedula: string | null;
+  // retiró otra persona (no el cliente)
+  retira_nombre?: string | null;
+  retira_cedula?: string | null;
+  retira_telefono?: string | null;
+}
+
+export interface QuienRetira {
+  nombre: string;
+  cedula: string;
+  telefono: string;
 }
 
 export interface CierreTaquilla {
@@ -170,8 +180,8 @@ export function buscarSolicitudesPagadas(texto: string) {
   return api.get<SolicitudTaquilla[]>(`${base}/solicitudes/pagadas?q=${encodeURIComponent(texto)}`);
 }
 
-export function pagarSolicitud(id: number, medio: MedioTaquilla = "EFECTIVO") {
-  return api.post<Taquilla>(`${base}/solicitudes/${id}/pagar`, { medio });
+export function pagarSolicitud(id: number, medio: MedioTaquilla = "EFECTIVO", retira: QuienRetira | null = null) {
+  return api.post<Taquilla>(`${base}/solicitudes/${id}/pagar`, { medio, ...(retira ? { retira } : {}) });
 }
 
 export interface NuevaOperacionTaquilla {

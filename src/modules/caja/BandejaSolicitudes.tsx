@@ -269,7 +269,7 @@ export function BandejaSolicitudes() {
                         </button>
                       ))}
                     {s.tipo === "COMPROBANTE" && (
-                      <Link className="bs-principal" to={`/cajas-confirmaciones?buscar=${encodeURIComponent(s.telefono ? s.telefono.replace(/D/g, "").slice(-10) : nombreDe(s))}`} title="Abrir Confirmaciones con este cliente buscado, para registrar la captura">
+                      <Link className="bs-principal" to={`/cajas-confirmaciones?buscar=${encodeURIComponent(s.telefono ? s.telefono.replace(/\D/g, "").slice(-10) : nombreDe(s))}`} title="Abrir Confirmaciones con este cliente buscado, para registrar la captura">
                         <FileImage size={14} /> Registrar en Confirmaciones
                       </Link>
                     )}
