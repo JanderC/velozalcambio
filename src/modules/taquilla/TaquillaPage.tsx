@@ -30,7 +30,7 @@ import "../cuentasCorrientes/cuentasCorrientes.css";
 import { OperacionesTaquilla } from "./OperacionesTaquilla";
 import { HistorialTaquilla } from "./HistorialTaquilla";
 import { AvisoClienteModal } from "../../components/whatsapp/AvisoClienteModal";
-import { mensajeParaCliente } from "./mensajeCliente";
+import { mensajeParaCliente, montoParaMensaje } from "./mensajeCliente";
 import "./taquilla.css";
 
 const NOMBRE_MONEDA: Record<string, string> = { COP: "Pesos", USD: "Dólares", EUR: "Euros" };
@@ -141,8 +141,9 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
         mensaje: mensajeParaCliente({
           nombre: s.cliente_nombre,
           que: "entregada",
-          detalle: [`Monto: ${dinero(s.monto, s.moneda_codigo)}`, medio === "EFECTIVO" ? "Entregado en efectivo" : `Pagado ${textoMedio(medio)}`],
+          detalle: [`Monto: ${montoParaMensaje(s.monto, s.moneda_codigo)}`, medio === "EFECTIVO" ? "Entregado en efectivo" : `Pagado ${textoMedio(medio)}`],
           referencia: referenciaDe(s),
+          recibe: { nombre: s.cliente_nombre, cedula: s.cliente_cedula, telefono: s.cliente_telefono },
         }),
       });
     } catch (e) {
@@ -165,7 +166,7 @@ export function TaquillaPage({ numero = 1 }: { numero?: NumeroTaquilla }) {
         nombre: s.cliente_nombre,
         telefono: s.cliente_telefono,
         moneda: s.moneda_codigo,
-        mensaje: mensajeParaCliente({ nombre: s.cliente_nombre, que: "lista", detalle: [`Monto a recibir: ${dinero(s.monto, s.moneda_codigo)}`], referencia: referenciaDe(s) }),
+        mensaje: mensajeParaCliente({ nombre: s.cliente_nombre, que: "lista", detalle: [`Monto a recibir: ${montoParaMensaje(s.monto, s.moneda_codigo)}`], referencia: referenciaDe(s), recibe: { nombre: s.cliente_nombre, cedula: s.cliente_cedula, telefono: s.cliente_telefono } }),
       });
       const nueva = await getTaquilla();
       setTaquilla(nueva);

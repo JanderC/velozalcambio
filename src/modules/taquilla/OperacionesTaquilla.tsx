@@ -119,6 +119,7 @@ export function OperacionesTaquilla({ taquilla, onCambio }: { taquilla: Taquilla
       que: o.tipo === "EGRESO" ? "entregada" : "confirmada",
       // lo que se escribió en la descripción va tal cual; si no hay, la cuenta del movimiento
       detalle: [o.descripcion?.trim() || cuentaDe(o)],
+      recibe: { nombre: o.cliente_nombre, cedula: o.cliente_cedula, telefono: o.cliente_telefono },
     }),
   });
 
